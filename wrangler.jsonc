@@ -1,0 +1,95 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "red",
+	"main": "./src/worker.ts",
+	"compatibility_date": "2026-08-01",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "red-db",
+			// Replace after: npx wrangler d1 create red-db
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "./migrations"
+		}
+	],
+	// Optional — app falls back to isolate memory if omitted
+	// "kv_namespaces": [{ "binding": "CACHE", "id": "...", "preview_id": "..." }],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "POST_OBJECT",
+				"class_name": "PostObject"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["PostObject"]
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "MEDIA_BUCKET",
+			"bucket_name": "red-media"
+		}
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "red-posts"
+		}
+	],
+	"vars": {
+		"BETTER_AUTH_URL": "http://localhost:3000",
+		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
+	},
+	"workers_dev": true,
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"invocation_logs": true,
+			"persist": true
+		}
+	},
+	"ratelimits": [
+		{
+			"name": "EDGE_IP_RATE_LIMITER",
+			"namespace_id": "91001",
+			"simple": {
+				"limit": 400,
+				"period": 60
+			}
+		},
+		{
+			"name": "TUNNEL_IP_RATE_LIMITER",
+			"namespace_id": "91002",
+			"simple": {
+				"limit": 90,
+				"period": 60
+			}
+		},
+		{
+			"name": "EXPENSIVE_IP_RATE_LIMITER",
+			"namespace_id": "91003",
+			"simple": {
+				"limit": 30,
+				"period": 60
+			}
+		}
+	]
+}

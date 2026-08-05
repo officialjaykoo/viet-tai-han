@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx wrangler d1 migrations apply DB --local
+      - run: npx wrangler d1 execute DB --local --file=./seed.sql
+      # Stub OpenNext worker so `src/worker.ts` typechecks before a full build
+      - run: mkdir -p .open-next && printf '%s\n' 'export default { fetch() { return new Response("stub"); } };' > .open-next/worker.js
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:workers
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=chromium-desktop
+        env:
+          CI: true

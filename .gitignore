@@ -12,10 +12,19 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/blob-report/
 
 # next.js
 /.next/
 /out/
+.open-next/
+
+# cloudflare / wrangler local state
+.wrangler/
+.dev.vars
+!.dev.vars.example
 
 # production
 /build
@@ -23,6 +32,7 @@
 # misc
 .DS_Store
 *.pem
+.cursor/
 
 # debug
 npm-debug.log*
@@ -30,8 +40,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel

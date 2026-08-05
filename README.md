@@ -1,36 +1,156 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# red
 
-## Getting Started
+A Reddit-style community platform that runs **entirely on Cloudflare**.
 
-First, run the development server:
+No separate app servers. No managed Postgres elsewhere. No S3 account on another cloud. The app, database, media, AI, search vectors, bot protection, and edge rate limits all live on Cloudflare’s network.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Built end-to-end with [Cursor](https://cursor.com) (AI pair-programming), with human steering on architecture and product direction — a practical example of shipping a full product without leaving Cloudflare’s platform.
+
+> **Source + deploy instructions only.** There is no hosted demo. Fork it and deploy your own.
+
+---
+
+## Why this exists
+
+1. **Cloudflare as the whole backend** — Workers are versatile enough for a real social app: SSR UI, APIs, stateful coordination, SQL, object storage, embeddings, and abuse controls.
+2. **Modern AI-assisted engineering** — most of the implementation was written by an agent in Cursor; the result is meant to be readable, deployable, and honest about that workflow.
+
+## Cloudflare stack
+
+| Product | Role in `red` |
+| --- | --- |
+| **Workers** + **OpenNext** | Next.js app + custom edge entry (`src/worker.ts`) |
+| **D1** | Primary SQL database (users, posts, votes, DMs, …) |
+| **R2** | Media uploads |
+| **Durable Objects** | Per-post vote aggregation (`PostObject`) |
+| **KV** *(optional)* | Edge cache / challenge state (falls back to memory) |
+| **Vectorize** + **Workers AI** | Post embeddings, recommendations, translation |
+| **Workers Rate Limiting** | Cheap IP flood gates *before* Next/SSR |
+| **Turnstile** | Human checks on auth and write paths |
+| **Workers Logs** | Observability (`observability` in `wrangler.jsonc`) |
+
+```mermaid
+flowchart LR
+  Browser --> Worker["Worker / OpenNext"]
+  Worker --> D1[(D1)]
+  Worker --> R2[(R2)]
+  Worker --> DO["Durable Object\nPostObject"]
+  Worker --> KV[(KV)]
+  Worker --> AI["Workers AI"]
+  Worker --> VZ[Vectorize]
+  Worker --> TS[Turnstile]
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Communities, posts, comments, votes, profiles
+- Auth ([Better Auth](https://www.better-auth.com)) with email/password + username
+- Search and AI-backed recommendations
+- Direct messages and notifications
+- Media uploads (R2)
+- Ads + post analytics
+- Admin / moderation tools
+- Achievements, karma, badges, tags
+- Content translation via Workers AI
+- Sealed Protobuf API tunnel (`/i/api`) with bot / PoW challenges
+- Personal API keys
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Quick start (local)
 
-## Learn More
+Prerequisites: **Node 22+**, a Cloudflare account (AI / Vectorize are remote; D1 works locally).
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+git clone https://github.com/koval01/red.git
+cd red
+npm ci
+cp .dev.vars.example .dev.vars
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+npm run db:reset:local   # migrate + seed demo data
+npm run dev              # http://localhost:3000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Seeded demo login (local only): `alice` / `password123`
 
-## Deploy on Vercel
+Turnstile test keys in `.dev.vars.example` always pass locally. Replace them with your own widget keys for production.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Useful scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Next.js + Cloudflare bindings via OpenNext for Dev |
+| `npm run preview` | OpenNext build + local Workers preview |
+| `npm run deploy` | Build and deploy the Worker |
+| `npm test` | Unit + Workers/integration tests |
+| `npm run test:e2e:chromium` | Playwright smoke (Chromium) |
+| `npm run db:migrate:local` | Apply D1 migrations locally |
+| `npm run vectors:create` | Create the Vectorize index (remote) |
+
+## Deploy your own
+
+1. Create Cloudflare resources:
+
+   ```bash
+   npx wrangler login
+   npx wrangler d1 create red-db
+   npx wrangler r2 bucket create red-media
+   npm run vectors:create   # Vectorize index red-posts (768 dims, cosine)
+   # optional:
+   npx wrangler kv namespace create CACHE
+   npx wrangler kv namespace create CACHE --preview
+   ```
+
+2. Paste the returned IDs into `wrangler.jsonc` (`database_id`, and KV ids if used).
+
+3. Set `vars.BETTER_AUTH_URL` to your public origin and put your Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+4. Add that same origin to `trustedOrigins` in `src/lib/auth.ts`.
+
+5. Set secrets:
+
+   ```bash
+   wrangler secret put BETTER_AUTH_SECRET
+   wrangler secret put TURNSTILE_SECRET_KEY
+   ```
+
+6. Apply remote migrations, then deploy:
+
+   ```bash
+   npx wrangler d1 migrations apply DB --remote
+   npm run deploy
+   ```
+
+7. Attach a custom domain in the dashboard (Workers → Domains & Routes), or use `*.workers.dev`.
+
+### Production notes
+
+- **`NEXT_PUBLIC_*` is baked at build time.** Keep `.env.local` / build env aligned with the Turnstile site key in `wrangler.jsonc` before `npm run deploy`.
+- **Speed Brain** (zone Speed → Optimization) injects speculative prefeches that Cloudflare refuses for Worker routes (`cf-speculation-refused` → cosmetic Network-tab 503). Real navigations still return 200. Turn Speed Brain **off** for Worker apps if the noise bothers you.
+- Profile achievement sync is backgrounded for public views so Link-prefetch storms don’t burn Worker CPU.
+
+## Architecture notes
+
+- **Single Worker** — OpenNext handler and `PostObject` ship together from `src/worker.ts`.
+- **Edge rate limits first** — floods die before SSR/D1/AI can run.
+- **D1 + Kysely** — schema in `migrations/`; access via `src/lib/db.ts`.
+- **Security** — Turnstile, signed human cookies, challenge / PoW, sealed `/i/api` under `src/lib/security/` and `src/lib/internal-api/`.
+
+## Tests & CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs local D1 migrate/seed, typecheck, Vitest (unit + workers), and Playwright Chromium.
+
+```bash
+npm test
+npm run test:e2e:install
+npm run test:e2e:chromium
+```
+
+## Built with
+
+- [Next.js](https://nextjs.org) · [OpenNext Cloudflare](https://opennext.js.org/cloudflare)
+- [Better Auth](https://www.better-auth.com) · [Kysely](https://kysely.dev) · [Tailwind CSS](https://tailwindcss.com)
+- [Wrangler](https://developers.cloudflare.com/workers/wrangler/) · [Vitest](https://vitest.dev) · [Playwright](https://playwright.dev)
+- [Cursor](https://cursor.com) — primary implementation workflow
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
