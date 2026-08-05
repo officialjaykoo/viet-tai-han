@@ -6,7 +6,11 @@ No separate app servers. No managed Postgres elsewhere. No S3 account on another
 
 Built end-to-end with [Cursor](https://cursor.com) (AI pair-programming), with human steering on architecture and product direction — a practical example of shipping a full product without leaving Cloudflare’s platform.
 
-> **Source + deploy instructions only.** There is no hosted demo. Fork it and deploy your own.
+[![Watch the red walkthrough on YouTube](https://img.youtube.com/vi/mexvSvUr52c/maxresdefault.jpg)](https://www.youtube.com/watch?v=mexvSvUr52c)
+
+**[Watch the walkthrough →](https://www.youtube.com/watch?v=mexvSvUr52c)**
+
+> **Source + deploy instructions.** Fork it and deploy your own instance on Cloudflare.
 
 ---
 
