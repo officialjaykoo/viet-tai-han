@@ -63,7 +63,7 @@ export default async function SearchPage({
                         href={`/r/${community.name}`}
                         className="block rounded-2xl border border-border/60 bg-card/70 px-4 py-3 transition-colors hover:bg-muted/50"
                       >
-                        <p className="font-medium">r/{community.name}</p>
+                        <p className="font-medium">{community.name}</p>
                         <p className="text-sm text-muted-foreground">
                           {community.title} ·{" "}
                           {tLocale(locale, "search.membersCount", {
@@ -97,7 +97,7 @@ export default async function SearchPage({
                           size="md"
                         />
                         <div className="min-w-0">
-                          <p className="font-medium">u/{account.username}</p>
+                          <p className="font-medium">@{account.username}</p>
                           <p className="text-sm text-muted-foreground">
                             {account.karma.toLocaleString(locale)}{" "}
                             {tLocale(locale, "profile.karma").toLowerCase()}
@@ -129,9 +129,9 @@ export default async function SearchPage({
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {/^u_/i.test(post.subredditName)
-                            ? `u/${post.subredditName.slice(2)}`
-                            : `r/${post.subredditName}`}{" "}
-                          · u/{post.authorUsername} ·{" "}
+                            ? `@${post.subredditName.slice(2)}`
+                            : post.subredditName}{" "}
+                          · @{post.authorUsername} ·{" "}
                           {tLocale(locale, "search.points", {
                             count: post.score,
                           })}{" "}

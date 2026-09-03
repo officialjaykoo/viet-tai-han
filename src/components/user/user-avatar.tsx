@@ -23,7 +23,7 @@ export function UserAvatar({
   alt,
 }: UserAvatarProps) {
   const seed = username?.trim() || "anonymous";
-  const label = alt ?? (username ? `u/${username}` : "User avatar");
+  const label = alt ?? (username ? `@${username}` : "User avatar");
   const px = avatarSizePx(size);
   const mediaKey = mediaKeyFromImageField(image);
   const shellClass = cn(

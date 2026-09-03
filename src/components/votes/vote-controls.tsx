@@ -39,7 +39,7 @@ export function VoteControls({
           : "flex-row"
       )}
       role="group"
-      aria-label="Vote"
+      aria-label={t("vote.group")}
     >
       <Button
         type="button"

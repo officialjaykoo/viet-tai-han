@@ -155,6 +155,7 @@ export default async function ProfilePage({
                       <ProfileCommentCard
                         key={`c-${item.comment.id}`}
                         comment={item.comment}
+                        locale={locale}
                       />
                     )
                   )}
@@ -178,7 +179,11 @@ export default async function ProfilePage({
                 <ProfileFeed
                   empty={tLocale(locale, "profile.emptyComments")}
                   items={comments.map((comment) => (
-                    <ProfileCommentCard key={comment.id} comment={comment} />
+                    <ProfileCommentCard
+                      key={comment.id}
+                      comment={comment}
+                      locale={locale}
+                    />
                   ))}
                 />
               ) : null}

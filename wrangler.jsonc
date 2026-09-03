@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "red",
+	"name": "vth",
 	"main": "./src/worker.ts",
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": [
@@ -14,8 +14,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "red-db",
-			// Replace after: npx wrangler d1 create red-db
+			"database_name": "vth-db",
+			// Replace after: npx wrangler d1 create vth-db
 			"database_id": "00000000-0000-0000-0000-000000000000",
 			"migrations_dir": "./migrations"
 		}
@@ -39,7 +39,7 @@
 	"r2_buckets": [
 		{
 			"binding": "MEDIA_BUCKET",
-			"bucket_name": "red-media"
+			"bucket_name": "vth-media"
 		}
 	],
 	"ai": {
@@ -48,7 +48,7 @@
 	"vectorize": [
 		{
 			"binding": "VECTORIZE",
-			"index_name": "red-posts"
+			"index_name": "vth-posts"
 		}
 	],
 	"vars": {

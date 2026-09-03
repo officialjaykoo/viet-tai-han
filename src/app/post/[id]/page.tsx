@@ -50,7 +50,7 @@ export default async function PostPage({
               prefetch={false}
               className="hover:underline"
             >
-              u/{post.author.username}
+              @{post.author.username}
             </Link>
           </p>
 

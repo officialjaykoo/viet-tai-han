@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { SiteHeader } from "@/components/layout/site-header";
 import { PostStatsClient } from "@/components/posts/post-stats-client";
+import { getRequestLocale } from "@/lib/i18n/server";
+import { tLocale } from "@/lib/i18n/translate";
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/session";
 
@@ -15,6 +17,7 @@ export default async function PostStatsPage({
 }) {
   const { id } = await params;
   const session = await getSession();
+  const { locale } = await getRequestLocale();
   if (!session?.user) {
     redirect(`/login?next=/post/${id}/stats`);
   }
@@ -39,12 +42,12 @@ export default async function PostStatsPage({
         <div>
           <p className="text-sm text-muted-foreground">
             <Link href={`/post/${id}`} className="hover:underline">
-              Post
+              {tLocale(locale, "post.backToPost")}
             </Link>
             <span className="mx-1.5" aria-hidden>
               /
             </span>
-            Analytics
+            {tLocale(locale, "post.analytics")}
           </p>
           <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-balance">
             {post.title}

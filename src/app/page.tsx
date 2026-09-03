@@ -74,7 +74,7 @@ export default async function HomePage({
                 : tLocale(locale, "feed.popular")}
             </p>
             <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-              red
+              Việt tại Hàn
             </h1>
             <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
               {mode === "home"

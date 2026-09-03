@@ -10,22 +10,26 @@ test.describe("cross-platform smoke", () => {
   test("home feed renders brand and posts region", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
-    await expect(page.getByRole("heading", { name: "red", level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Việt tại Hàn", level: 1 })
+    ).toBeVisible();
     await expect(page.getByRole("banner")).toBeVisible();
-    await expect(page.getByRole("link", { name: /sign up|log in|home/i }).first()).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /đăng ký|đăng nhập|trang chủ/i }).first()
+    ).toBeVisible();
   });
 
   test("auth pages are usable on narrow viewports", async ({ page }) => {
     await page.goto("/login", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
-    await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
-    const username = page.getByLabel(/username/i);
+    await expect(page.getByRole("heading", { name: /đăng nhập/i })).toBeVisible();
+    const username = page.getByLabel(/tên người dùng/i);
     await expect(username).toBeVisible();
     await expect(username).toBeEditable();
 
     await page.goto("/signup", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
-    await expect(page.getByRole("heading", { name: /join red/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /tham gia/i })).toBeVisible();
     await expect(page.getByLabel(/^email$/i)).toBeVisible();
   });
 
@@ -43,7 +47,7 @@ test.describe("cross-platform smoke", () => {
     await page.goto("/communities", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
     await expect(
-      page.getByRole("heading", { name: /communities/i, level: 1 })
+      page.getByRole("heading", { name: /cộng đồng/i, level: 1 })
     ).toBeVisible();
   });
 
@@ -61,6 +65,6 @@ test.describe("cross-platform smoke", () => {
     expect(href).toBeTruthy();
     await page.goto(href!, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/post\//);
-    await expect(page.getByRole("heading", { name: /comments/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /bình luận/i })).toBeVisible();
   });
 });

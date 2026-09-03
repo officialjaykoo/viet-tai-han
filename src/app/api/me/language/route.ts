@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     if (!isLocale(body?.preferredLanguage)) {
       return await jsonLocalizedError(
-        "preferredLanguage must be en or ru",
+        "preferredLanguage must be vi or ko",
         400
       );
     }

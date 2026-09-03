@@ -6,7 +6,7 @@ import {
 } from "@/lib/profile-community-name";
 import { cn } from "@/lib/utils";
 
-/** r/foo or u/alice for personal profile communities. */
+/** Community or personal profile label with compatibility links. */
 export function SubredditLabel({
   name,
   className,
@@ -24,7 +24,7 @@ export function SubredditLabel({
         prefetch={false}
         className={cn("hover:underline", hrefClassName, className)}
       >
-        u/{profileUser}
+        @{profileUser}
       </Link>
     );
   }
@@ -34,14 +34,14 @@ export function SubredditLabel({
       href={`/r/${name}`}
       className={cn("hover:underline", hrefClassName, className)}
     >
-      r/{name}
+      {name}
     </Link>
   );
 }
 
 export function formatSubredditName(name: string): string {
   if (isProfileCommunityName(name)) {
-    return `u/${parseProfileCommunityName(name)}`;
+    return `@${parseProfileCommunityName(name)}`;
   }
-  return `r/${name}`;
+  return name;
 }

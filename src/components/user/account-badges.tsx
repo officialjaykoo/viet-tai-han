@@ -47,11 +47,7 @@ export function AccountBadges({
         return (
           <span
             key={`${badge.kind}-${badge.id}`}
-            title={
-              badge.kind === "karma"
-                ? `Karma badge · Lv ${badge.level}`
-                : `Account age · Lv ${badge.level}`
-            }
+            title={badge.label}
             className={cn(
               "inline-flex items-center gap-1 rounded-md font-semibold tracking-wide ring-1 ring-inset",
               size === "sm"

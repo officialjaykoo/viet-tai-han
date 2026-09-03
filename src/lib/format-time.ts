@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import { getMessages, translate } from "@/lib/i18n/translate";
@@ -14,7 +15,7 @@ export function parseSqliteDate(iso: string): number {
 export function formatRelativeTime(
   iso: string,
   now = Date.now(),
-  locale: Locale = "en"
+  locale: Locale = DEFAULT_LOCALE
 ): string {
   const then = parseSqliteDate(iso);
   if (Number.isNaN(then)) return iso;
@@ -37,7 +38,10 @@ export function formatRelativeTime(
 }
 
 /** Local calendar date for post/comment timestamps older than a month. */
-export function formatAbsoluteDate(iso: string, locale: Locale = "en"): string {
+export function formatAbsoluteDate(
+  iso: string,
+  locale: Locale = DEFAULT_LOCALE
+): string {
   const then = parseSqliteDate(iso);
   if (Number.isNaN(then)) return iso;
   try {
@@ -52,7 +56,10 @@ export function formatAbsoluteDate(iso: string, locale: Locale = "en"): string {
 }
 
 /** @deprecated Prefer `formatCakeDayDate` from `@/lib/account-age`. */
-export function formatCakeDay(iso: string, locale: Locale = "en"): string {
+export function formatCakeDay(
+  iso: string,
+  locale: Locale = DEFAULT_LOCALE
+): string {
   const then = parseSqliteDate(iso);
   if (Number.isNaN(then)) return iso;
   try {

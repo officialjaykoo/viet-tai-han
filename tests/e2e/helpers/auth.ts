@@ -8,14 +8,14 @@ export const SEED_USER = {
   password: "password123",
 } as const;
 
-/** Prefer English and skip the locale chooser dialog. */
+/** Prefer Vietnamese and skip the locale chooser dialog. */
 export async function seedLocaleCookie(page: Page) {
   const base = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
   const host = new URL(base).hostname;
   await page.context().addCookies([
     {
       name: LANG_COOKIE,
-      value: "en",
+      value: "vi",
       domain: host,
       path: "/",
     },
@@ -34,10 +34,10 @@ export async function disguiseAutomation(page: Page) {
 
 /** Dismiss the locale chooser if it still appears. */
 export async function dismissLanguagePrompt(page: Page) {
-  const preferEn = page.getByRole("button", { name: /prefer english/i });
-  if (await preferEn.isVisible().catch(() => false)) {
-    await preferEn.click();
-    await expect(preferEn).toBeHidden({ timeout: 5_000 });
+  const preferVi = page.getByRole("button", { name: /chọn tiếng việt/i });
+  if (await preferVi.isVisible().catch(() => false)) {
+    await preferVi.click();
+    await expect(preferVi).toBeHidden({ timeout: 5_000 });
   }
 }
 
@@ -52,6 +52,13 @@ export async function warmBotGuard(page: Page) {
   await page.mouse.move(200, 160);
 }
 
+/** Wait until a client-side form has bound its event handlers. */
+export async function waitForHydration(page: Page) {
+  await expect(page.locator('[data-hydrated="true"]').first()).toBeVisible({
+    timeout: 20_000,
+  });
+}
+
 /** Sign in as the local seed admin account. */
 export async function loginAsAlice(page: Page, next = "/") {
   await seedLocaleCookie(page);
@@ -60,17 +67,18 @@ export async function loginAsAlice(page: Page, next = "/") {
     waitUntil: "domcontentloaded",
   });
   await dismissLanguagePrompt(page);
-  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  await waitForHydration(page);
+  await expect(page.getByRole("heading", { name: /đăng nhập/i })).toBeVisible();
   await warmBotGuard(page);
 
-  const username = page.getByLabel(/username/i);
-  const password = page.getByLabel(/^password$/i);
+  const username = page.getByLabel(/tên người dùng/i);
+  const password = page.getByLabel(/^mật khẩu$/i);
   await username.fill(SEED_USER.username);
   await password.fill(SEED_USER.password);
   await page.keyboard.press("Tab");
 
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page.getByRole("button", { name: /signing in/i })).toBeVisible({
+  await page.getByRole("button", { name: /đăng nhập/i }).click();
+  await expect(page.getByRole("button", { name: /đang đăng nhập/i })).toBeVisible({
     timeout: 5_000,
   }).catch(() => undefined);
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
@@ -81,6 +89,6 @@ export async function loginAsAlice(page: Page, next = "/") {
 
 export async function expectSignedIn(page: Page) {
   await expect(
-    page.getByRole("button", { name: /account menu/i })
+    page.getByRole("button", { name: /menu tài khoản/i })
   ).toBeVisible({ timeout: 15_000 });
 }

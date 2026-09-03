@@ -23,33 +23,33 @@ INSERT OR IGNORE INTO "user" (
   karma, postKarma, commentKarma, role, status, bio, isNsfw, preferredLanguage, createdAt
 ) VALUES
   ('user_alice', 'Alice', 'alice@example.local', 1, 'alice', 'alice',
-   0, 0, 0, 'admin', 'active', 'Building red on Cloudflare.', 0, 'en', datetime('now', '-400 days')),
+   0, 0, 0, 'admin', 'active', 'Building Việt tại Hàn on Cloudflare.', 0, 'vi', datetime('now', '-400 days')),
   ('user_bob', 'Bob', 'bob@example.local', 1, 'bob', 'bob',
-   0, 0, 0, 'user', 'active', 'Virtuoso enjoyer.', 0, 'en', datetime('now', '-30 days')),
+   0, 0, 0, 'user', 'active', 'Virtuoso enjoyer.', 0, 'vi', datetime('now', '-30 days')),
   ('user_carol', 'Carol', 'carol@example.local', 1, 'carol', 'carol',
-   0, 0, 0, 'moderator', 'active', 'Mods webdev.', 0, 'en', datetime('now', '-120 days')),
+   0, 0, 0, 'moderator', 'active', 'Mods webdev.', 0, 'vi', datetime('now', '-120 days')),
   ('user_dave', 'Dave', 'dave@example.local', 1, 'dave', 'dave',
-   0, 0, 0, 'user', 'active', 'Edge runtime tinkerer.', 1, 'en', datetime('now', '-14 days')),
+   0, 0, 0, 'user', 'active', 'Edge runtime tinkerer.', 1, 'vi', datetime('now', '-14 days')),
   ('user_erin', 'Erin', 'erin@example.local', 1, 'erin', 'erin',
-   0, 0, 0, 'user', 'active', 'Writes about DX and tooling.', 0, 'en', datetime('now', '-220 days')),
+   0, 0, 0, 'user', 'active', 'Writes about DX and tooling.', 0, 'vi', datetime('now', '-220 days')),
   ('user_frank', 'Frank', 'frank@example.local', 1, 'frank', 'frank',
-   0, 0, 0, 'user', 'active', NULL, 0, 'en', datetime('now', '-3 days')),
+   0, 0, 0, 'user', 'active', NULL, 0, 'vi', datetime('now', '-3 days')),
   ('user_grace', 'Grace', 'grace@example.local', 1, 'grace', 'grace',
-   0, 0, 0, 'user', 'active', 'Comment thread archaeologist.', 0, 'en', datetime('now', '-90 days')),
+   0, 0, 0, 'user', 'active', 'Comment thread archaeologist.', 0, 'vi', datetime('now', '-90 days')),
   ('user_henry', 'Henry', 'henry@example.local', 1, 'henry', 'henry',
-   0, 0, 0, 'user', 'active', 'Mostly shares links.', 0, 'en', datetime('now', '-60 days')),
+   0, 0, 0, 'user', 'active', 'Mostly shares links.', 0, 'vi', datetime('now', '-60 days')),
   ('user_ivy', 'Ivy', 'ivy@example.local', 1, 'ivy', 'ivy',
-   0, 0, 0, 'user', 'active', 'Пишу на русском и английском.', 0, 'ru', datetime('now', '-45 days')),
+   0, 0, 0, 'user', 'active', 'Viết bằng tiếng Việt và tiếng Hàn.', 0, 'ko', datetime('now', '-45 days')),
   ('user_jake', 'Jake', 'jake@example.local', 1, 'jake', 'jake',
-   0, 0, 0, 'user', 'active', 'Gaming + CSS.', 0, 'en', datetime('now', '-18 days')),
+   0, 0, 0, 'user', 'active', 'Gaming + CSS.', 0, 'vi', datetime('now', '-18 days')),
   ('user_kate', 'Kate', 'kate@example.local', 1, 'kate', 'kate',
-   0, 0, 0, 'user', 'active', NULL, 0, 'en', datetime('now', '-7 days')),
+   0, 0, 0, 'user', 'active', NULL, 0, 'vi', datetime('now', '-7 days')),
   ('user_leo', 'Leo', 'leo@example.local', 1, 'leo', 'leo',
-   0, 0, 0, 'user', 'active', 'Photography hobbyist.', 0, 'en', datetime('now', '-150 days')),
+   0, 0, 0, 'user', 'active', 'Photography hobbyist.', 0, 'vi', datetime('now', '-150 days')),
   ('user_mira', 'Mira', 'mira@example.local', 1, 'mira', 'mira',
-   0, 0, 0, 'user', 'active', 'Ask me anything about Workers.', 0, 'en', datetime('now', '-80 days')),
+   0, 0, 0, 'user', 'active', 'Ask me anything about Workers.', 0, 'vi', datetime('now', '-80 days')),
   ('user_nate', 'Nate', 'nate@example.local', 1, 'nate', 'nate',
-   0, 0, 0, 'user', 'active', 'New here — testing the feed.', 0, 'en', datetime('now', '-1 day'));
+   0, 0, 0, 'user', 'active', 'New here — testing the feed.', 0, 'vi', datetime('now', '-1 day'));
 
 INSERT OR IGNORE INTO subreddits (id, name, title, description, created_by, subscriber_count) VALUES
   ('sub_cloudflare', 'cloudflare', 'Cloudflare', 'Workers, D1, Durable Objects, and the edge.', 'user_alice', 0),
@@ -57,7 +57,7 @@ INSERT OR IGNORE INTO subreddits (id, name, title, description, created_by, subs
   ('sub_webdev', 'webdev', 'Web Development', 'Front-end, back-end, and everything in between.', 'user_carol', 0),
   ('sub_gaming', 'gaming', 'Gaming', 'PC, console, indie, and everything in between.', 'user_jake', 0),
   ('sub_photography', 'photography', 'Photography', 'Cameras, light, and the decisive moment.', 'user_leo', 0),
-  ('sub_askred', 'askred', 'Ask red', 'Questions for the community.', 'user_mira', 0),
+  ('sub_askred', 'askvth', 'Hỏi Việt tại Hàn', 'Đặt câu hỏi và chia sẻ với cộng đồng.', 'user_mira', 0),
   ('sub_technology', 'technology', 'Technology', 'Gadgets, platforms, and industry news.', 'user_erin', 0);
 
 
@@ -67,7 +67,7 @@ INSERT OR IGNORE INTO posts (
   upvotes, downvotes, score, comment_count, created_at
 ) VALUES
   ('k7Qm2xR9pLw', 'sub_cloudflare', 'user_alice',
-   'Running a Reddit clone entirely on Cloudflare',
+   'Building a community platform for Việt tại Hàn on Cloudflare',
    'D1 for persistence, Durable Objects for vote buffering, R2 for media, OpenNext for Next.js on Workers.',
    NULL, 0, 0, 0, 0, 0, 0, datetime('now', '-2 hours')),
   ('n3Vt8cY1hKs', 'sub_programming', 'user_bob',
@@ -76,7 +76,7 @@ INSERT OR IGNORE INTO posts (
    NULL, 0, 0, 0, 0, 0, 0, datetime('now', '-5 hours')),
   ('b6Hj4mN0qXd', 'sub_webdev', 'user_carol',
    'Shadcn + Tailwind on the edge',
-   'Neutral Luma preset, Lucide icons, and a Reddit-style feed layout.',
+   'Neutral Luma preset, Lucide icons, and a community-first feed layout.',
    NULL, 0, 0, 0, 0, 0, 0, datetime('now', '-8 hours')),
   ('z2Fp5wL8rTc', 'sub_cloudflare', 'user_dave',
    'Batching writes from Durable Objects to D1',
@@ -115,7 +115,7 @@ INSERT OR IGNORE INTO posts (
    'Started from OKLCH tokens and resisted the glow tax.',
    NULL, 0, 0, 0, 0, 0, 0, datetime('now', '-4 hours')),
   ('z3Zz4Aa5Bb6', 'sub_askred', 'user_nate',
-   'How do you discover communities on a new Reddit-like site?',
+   'How do you discover communities on a new community platform?',
    'Search? Popular? Asking friends? Genuinely curious.',
    NULL, 0, 0, 0, 0, 0, 0, datetime('now', '-6 hours')),
   ('c7Cc8Dd9Ee0', 'sub_gaming', 'user_bob',
@@ -578,10 +578,10 @@ INSERT OR IGNORE INTO ad_campaigns (
   ),
   (
     'adcamp_footer',
-    'red · open source on Cloudflare',
+    'Việt tại Hàn · open source on Cloudflare',
     'active',
     'post_footer',
-    'A Reddit-style feed running entirely at the edge.',
+    'A community-first feed running entirely at the edge.',
     NULL,
     'https://developers.cloudflare.com/',
     1,
@@ -608,7 +608,7 @@ INSERT OR IGNORE INTO user_activity (user_id, subreddit_id, score) VALUES
   ('user_mira', 'sub_askred', 8),
   ('user_nate', 'sub_askred', 2);
 
-UPDATE "user" SET createdAt = datetime('now', '-400 days'), isNsfw = 0, preferredLanguage = 'en' WHERE id = 'user_alice';
+UPDATE "user" SET createdAt = datetime('now', '-400 days'), isNsfw = 0, preferredLanguage = 'vi' WHERE id = 'user_alice';
 UPDATE "user" SET createdAt = datetime('now', '-30 days'), isNsfw = 0 WHERE id = 'user_bob';
 UPDATE "user" SET createdAt = datetime('now', '-120 days'), isNsfw = 0 WHERE id = 'user_carol';
 UPDATE "user" SET createdAt = datetime('now', '-14 days'), isNsfw = 1 WHERE id = 'user_dave';
@@ -616,7 +616,7 @@ UPDATE "user" SET createdAt = datetime('now', '-220 days'), isNsfw = 0 WHERE id 
 UPDATE "user" SET createdAt = datetime('now', '-3 days'), isNsfw = 0 WHERE id = 'user_frank';
 UPDATE "user" SET createdAt = datetime('now', '-90 days'), isNsfw = 0 WHERE id = 'user_grace';
 UPDATE "user" SET createdAt = datetime('now', '-60 days'), isNsfw = 0 WHERE id = 'user_henry';
-UPDATE "user" SET createdAt = datetime('now', '-45 days'), isNsfw = 0, preferredLanguage = 'ru' WHERE id = 'user_ivy';
+UPDATE "user" SET createdAt = datetime('now', '-45 days'), isNsfw = 0, preferredLanguage = 'ko' WHERE id = 'user_ivy';
 UPDATE "user" SET createdAt = datetime('now', '-18 days'), isNsfw = 0 WHERE id = 'user_jake';
 UPDATE "user" SET createdAt = datetime('now', '-7 days'), isNsfw = 0 WHERE id = 'user_kate';
 UPDATE "user" SET createdAt = datetime('now', '-150 days'), isNsfw = 0 WHERE id = 'user_leo';

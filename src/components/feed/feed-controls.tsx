@@ -37,7 +37,7 @@ export function FeedSortTabs({
     <div
       className="mb-4 flex flex-wrap items-center gap-1"
       role="tablist"
-      aria-label="Feed sort"
+      aria-label={t("feed.sortLabel")}
     >
       {sorts.map((sort) => {
         const active = current === sort.id;
@@ -88,7 +88,7 @@ export function FeedModeTabs({
   }
 
   return (
-    <div className="mb-3 flex gap-1" role="tablist" aria-label="Feed">
+    <div className="mb-3 flex gap-1" role="tablist" aria-label={t("feed.modeLabel")}>
       {(
         [
           { id: "popular" as const, label: t("feed.popular") },

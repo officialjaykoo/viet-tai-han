@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -26,6 +26,10 @@ export function CommentComposer({ postId }: { postId: string }) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
   const bot = useBotGuard();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   function submit(event?: React.MouseEvent | React.FormEvent) {
     if (event) bot.markTrusted(event);
@@ -61,7 +65,7 @@ export function CommentComposer({ postId }: { postId: string }) {
   }
 
   return (
-    <div className="relative space-y-2">
+    <div className="relative space-y-2" data-hydrated={hydrated}>
       <ParserTraps setTrapRef={bot.setTrapRef} />
       <Textarea
         value={body}
@@ -82,7 +86,10 @@ export function CommentComposer({ postId }: { postId: string }) {
       <Button
         type="button"
         disabled={
-          pending || !body.trim() || requiresTurnstileToken(turnstileToken)
+          !hydrated ||
+          pending ||
+          !body.trim() ||
+          requiresTurnstileToken(turnstileToken)
         }
         onClick={submit}
       >

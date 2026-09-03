@@ -43,8 +43,8 @@ export default defineConfig({
     ? undefined
     : {
         command: process.env.CI
-          ? "npm run db:migrate:local && npm run db:seed:local && npm run dev:next"
-          : "npm run dev:next",
+          ? "npm run db:migrate:local && npm run db:seed:local && npm run dev"
+          : "npm run dev",
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,

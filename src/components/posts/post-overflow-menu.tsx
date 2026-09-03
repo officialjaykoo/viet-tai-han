@@ -10,6 +10,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { useI18n } from "@/components/i18n/i18n-provider";
+import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { apiFetch } from "@/lib/api-client";
 import {
   DropdownMenu,
@@ -22,12 +24,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const REPORT_REASONS = [
-  { value: "spam", label: "Spam" },
-  { value: "harassment", label: "Harassment" },
-  { value: "hate", label: "Hate / discrimination" },
-  { value: "misinformation", label: "Misinformation" },
-  { value: "nsfw", label: "Sexual / NSFW" },
-  { value: "other", label: "Other" },
+  { value: "spam", key: "post.reasonSpam" },
+  { value: "harassment", key: "post.reasonHarassment" },
+  { value: "hate", key: "post.reasonHate" },
+  { value: "misinformation", key: "post.reasonMisinformation" },
+  { value: "nsfw", key: "post.reasonNsfw" },
+  { value: "other", key: "post.reasonOther" },
 ] as const;
 
 type PostOverflowMenuProps = {
@@ -42,6 +44,8 @@ export function PostOverflowMenu({
   onDismiss,
 }: PostOverflowMenuProps) {
   const router = useRouter();
+  const { t } = useI18n();
+  const localizeError = useLocalizedError();
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"menu" | "report">("menu");
   const [message, setMessage] = useState<string | null>(null);
@@ -64,10 +68,10 @@ export function PostOverflowMenu({
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(payload?.error ?? "Could not hide post");
+        setError(localizeError(payload?.error, t("common.error")));
         return;
       }
-      setMessage("Hidden from your feeds");
+      setMessage(t("post.hiddenFromFeeds"));
       onDismiss?.();
       router.refresh();
     });
@@ -88,10 +92,10 @@ export function PostOverflowMenu({
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(payload?.error ?? "Could not block user");
+        setError(localizeError(payload?.error, t("common.error")));
         return;
       }
-      setMessage(`Blocked u/${authorUsername}`);
+      setMessage(t("post.blockedUser", { username: authorUsername }));
       onDismiss?.();
       router.refresh();
     });
@@ -110,11 +114,11 @@ export function PostOverflowMenu({
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(payload?.error ?? "Could not submit report");
+        setError(localizeError(payload?.error, t("common.error")));
         return;
       }
       setMode("menu");
-      setMessage("Report submitted");
+      setMessage(t("post.reportSubmitted"));
     });
   }
 
@@ -130,7 +134,7 @@ export function PostOverflowMenu({
       >
         <DropdownMenuTrigger
           className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-50"
-          aria-label="Post options"
+          aria-label={t("post.options")}
           disabled={pending}
         >
           <EllipsisIcon className="size-4" />
@@ -145,7 +149,7 @@ export function PostOverflowMenu({
                 onClick={hide}
               >
                 <EyeOffIcon />
-                Not interested
+                {t("post.notInterested")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="min-h-11"
@@ -153,7 +157,7 @@ export function PostOverflowMenu({
                 onClick={() => setMode("report")}
               >
                 <FlagIcon />
-                Report
+                {t("post.report")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -163,7 +167,7 @@ export function PostOverflowMenu({
                 onClick={blockAuthor}
               >
                 <BanIcon />
-                Block u/{authorUsername}
+                {t("post.blockUser", { username: authorUsername })}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="min-h-11"
@@ -172,12 +176,12 @@ export function PostOverflowMenu({
                 }
               >
                 <UserRoundIcon />
-                View profile
+                {t("post.viewProfile")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           ) : (
             <>
-              <DropdownMenuLabel>Why are you reporting?</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("post.reportWhy")}</DropdownMenuLabel>
               <DropdownMenuGroup>
                 {REPORT_REASONS.map((reason) => (
                   <DropdownMenuItem
@@ -186,7 +190,7 @@ export function PostOverflowMenu({
                     disabled={pending}
                     onClick={() => report(reason.value)}
                   >
-                    {reason.label}
+                    {t(reason.key)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
@@ -195,7 +199,7 @@ export function PostOverflowMenu({
                 className="min-h-11"
                 onClick={() => setMode("menu")}
               >
-                Back
+                {t("common.back")}
               </DropdownMenuItem>
             </>
           )}

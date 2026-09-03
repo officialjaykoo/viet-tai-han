@@ -6,6 +6,8 @@ import { DicesIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
+import { useI18n } from "@/components/i18n/i18n-provider";
+import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { authClient } from "@/lib/auth-client";
 import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,8 @@ export function ProfileAvatarEditor({
   compact?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
+  const localizeError = useLocalizedError();
   const [preview, setPreview] = useState(image);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +36,9 @@ export function ProfileAvatarEditor({
         image: next,
       });
       if (updateError) {
-        setError(updateError.message || "Could not generate avatar");
+        setError(
+          localizeError(updateError.message, t("common.error"))
+        );
         return;
       }
       setPreview(next);
@@ -55,8 +61,8 @@ export function ProfileAvatarEditor({
           className="absolute right-1 bottom-1 size-8 rounded-full shadow-sm"
           disabled={pending}
           onClick={shuffle}
-          aria-label={pending ? "Generating avatar" : "New avatar"}
-          title="New avatar"
+          aria-label={pending ? t("settings.saving") : t("settings.shuffleAvatar")}
+          title={t("settings.shuffleAvatar")}
         >
           <DicesIcon className="size-3.5" />
         </Button>
@@ -85,11 +91,10 @@ export function ProfileAvatarEditor({
           onClick={shuffle}
         >
           <DicesIcon className="size-4" />
-          {pending ? "Generating…" : "New avatar"}
+          {pending ? t("settings.saving") : t("settings.shuffleAvatar")}
         </Button>
         <p className="max-w-xs text-xs text-muted-foreground">
-          Shuffle a random Reddit-style avatar. Same look everywhere until you
-          generate again.
+          {t("settings.customizeProfileDesc")}
         </p>
         {error ? (
           <p className="text-xs text-destructive" role="alert">

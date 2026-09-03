@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
 import { Geist_Mono, Manrope } from "next/font/google";
 
 import { I18nProvider } from "@/components/i18n/i18n-provider";
 import { LanguagePrompt } from "@/components/i18n/language-prompt";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import {
   ThemeProvider,
   themeInitScript,
@@ -35,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: messages.meta.title,
     description: messages.meta.description,
-    applicationName: "red",
+    applicationName: "Việt tại Hàn",
     formatDetection: {
       telephone: false,
       email: false,
@@ -43,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     appleWebApp: {
       capable: true,
-      title: "red",
+      title: "Việt tại Hàn",
       statusBarStyle: "black-translucent",
     },
   };
@@ -60,7 +62,7 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const { locale, preferredLanguage, cookieLocale, signedIn } =
     await getRequestLocale();
   const pref: PreferredLanguage = isPreferredLanguage(preferredLanguage)
@@ -83,7 +85,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="flex min-h-dvh flex-col bg-background font-sans text-foreground">
+      <body className="mobile-nav-space flex min-h-dvh flex-col bg-background font-sans text-foreground">
         <ThemeProvider initialTheme={initialTheme}>
           <I18nProvider
             initialLocale={locale}
@@ -91,6 +93,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             initialCookieLocale={cookieLocale}
           >
             {children}
+            <MobileNav />
             <SiteFooter />
             <LanguagePrompt />
           </I18nProvider>

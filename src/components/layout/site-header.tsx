@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BellIcon,
@@ -40,14 +41,20 @@ const iconBtnClass =
 export function SiteHeader() {
   const { t } = useI18n();
   const { data: session, isPending } = useSession();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+  const visibleSession = hydrated ? session : null;
   const username =
-    (session?.user as { username?: string } | undefined)?.username ??
-    session?.user?.name;
-  const karma = (session?.user as { karma?: number } | undefined)?.karma;
+    (visibleSession?.user as { username?: string } | undefined)?.username ??
+    visibleSession?.user?.name;
+  const karma = (visibleSession?.user as { karma?: number } | undefined)?.karma;
   const isAdmin =
-    (session?.user as { role?: string } | undefined)?.role === "admin";
-  const image = session?.user?.image ?? null;
-  const signedIn = Boolean(session?.user);
+    (visibleSession?.user as { role?: string } | undefined)?.role === "admin";
+  const image = visibleSession?.user?.image ?? null;
+  const authReady = hydrated && !isPending;
+  const signedIn = authReady && Boolean(visibleSession?.user);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-[color-mix(in_oklch,var(--background)_88%,transparent)] backdrop-blur-md supports-[backdrop-filter]:bg-[color-mix(in_oklch,var(--background)_72%,transparent)] safe-pt-header">
@@ -61,10 +68,10 @@ export function SiteHeader() {
             aria-hidden
             className="grid size-8 place-items-center rounded-xl bg-[var(--brand)] text-sm font-bold text-[var(--brand-foreground)] shadow-[0_8px_20px_-10px_var(--brand)] transition-transform duration-200 motion-safe:group-hover:scale-105"
           >
-            r
+            v
           </span>
           <span className="hidden font-heading text-xl font-semibold tracking-tight sm:inline">
-            red
+            Việt tại Hàn
           </span>
         </Link>
 
@@ -96,8 +103,7 @@ export function SiteHeader() {
               <NotificationsBell />
             </>
           ) : null}
-
-          {!signedIn && !isPending ? (
+          {authReady && !signedIn ? (
             <div className="mr-0.5 hidden items-center gap-1 sm:flex">
               <Link
                 href="/login"
@@ -122,7 +128,7 @@ export function SiteHeader() {
               )}
               aria-label={signedIn ? t("nav.accountMenu") : t("nav.menu")}
             >
-              {isPending ? (
+              {!authReady ? (
                 <span className="size-8 animate-pulse rounded-full bg-muted" />
               ) : signedIn ? (
                 <UserAvatar
@@ -146,7 +152,7 @@ export function SiteHeader() {
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="font-normal">
                       <span className="block truncate text-sm font-medium text-foreground">
-                        u/{username}
+                        @{username}
                       </span>
                       {karma != null ? (
                         <span className="mt-0.5 block text-xs text-muted-foreground">

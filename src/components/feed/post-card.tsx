@@ -198,7 +198,7 @@ export function PostCard({
                     prefetch={false}
                     className="hover:underline"
                   >
-                    u/{post.author.username}
+                    @{post.author.username}
                   </Link>
                   <AccountTags tags={post.author.tags} />
                   <span aria-hidden>·</span>

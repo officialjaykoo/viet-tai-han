@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n/i18n-provider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,11 +14,15 @@ import {
 } from "@/components/security/bot-check";
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { apiFetch } from "@/lib/api-client";
+import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
 
 export function CreateCommunityForm() {
   const router = useRouter();
+  const { t } = useI18n();
+  const localizeError = useLocalizedError();
   const [name, setName] = useState("");
+  const [hydrated, setHydrated] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [pending, startTransition] = useTransition();
@@ -25,6 +30,9 @@ export function CreateCommunityForm() {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
   const bot = useBotGuard();
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,7 +41,7 @@ export function CreateCommunityForm() {
     startTransition(async () => {
       const check = await passBotCheck(bot, turnstileToken);
       if (!check.ok) {
-        setError(check.error);
+        setError(localizeError(check.error, t("common.error")));
         return;
       }
 
@@ -50,7 +58,7 @@ export function CreateCommunityForm() {
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(payload?.error ?? "Failed to create community");
+        setError(localizeError(payload?.error, t("common.error")));
         return;
       }
       const data = (await res.json()) as { name: string };
@@ -61,12 +69,12 @@ export function CreateCommunityForm() {
   }
 
   return (
-    <form onSubmit={submit} className="relative space-y-3">
+    <form onSubmit={submit} className="relative space-y-3" data-hydrated={hydrated}>
       <ParserTraps setTrapRef={bot.setTrapRef} />
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="name (e.g. cloudflare)"
+        placeholder={t("communities.namePlaceholder")}
         required
         minLength={3}
         maxLength={32}
@@ -74,7 +82,7 @@ export function CreateCommunityForm() {
       <Input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Display title"
+        placeholder={t("communities.titlePlaceholder")}
         required
         minLength={3}
         maxLength={100}
@@ -82,7 +90,7 @@ export function CreateCommunityForm() {
       <Textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="About this community"
+        placeholder={t("communities.descriptionPlaceholder")}
         rows={3}
       />
       <TurnstileWidget
@@ -96,9 +104,11 @@ export function CreateCommunityForm() {
       ) : null}
       <Button
         type="submit"
-        disabled={pending || requiresTurnstileToken(turnstileToken)}
+        disabled={
+          !hydrated || pending || requiresTurnstileToken(turnstileToken)
+        }
       >
-        Create community
+        {t("communities.createCommunity")}
       </Button>
     </form>
   );

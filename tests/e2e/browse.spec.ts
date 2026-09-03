@@ -10,8 +10,10 @@ test.describe("public browsing", () => {
   test("home feed sort controls are present", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
-    await expect(page.getByRole("tablist", { name: /feed sort/i })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /hot/i })).toBeVisible();
+    await expect(
+      page.getByRole("tablist", { name: /sắp xếp bảng tin/i })
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: /đề xuất/i })).toBeVisible();
   });
 
   test("community page loads from directory", async ({ page }) => {
@@ -19,7 +21,7 @@ test.describe("public browsing", () => {
     await dismissLanguagePrompt(page);
     await expect(page).toHaveURL(/\/r\/cloudflare/);
     await expect(
-      page.getByRole("heading", { name: /r\/cloudflare/i })
+      page.getByRole("heading", { name: /cloudflare/i })
     ).toBeVisible();
   });
 
@@ -27,7 +29,7 @@ test.describe("public browsing", () => {
     await page.goto("/search?q=cloudflare", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
     await expect(
-      page.getByRole("searchbox").or(page.getByPlaceholder(/search/i)).first()
+      page.getByRole("searchbox").or(page.getByPlaceholder(/tìm kiếm|cộng đồng/i)).first()
     ).toBeVisible();
   });
 

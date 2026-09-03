@@ -166,7 +166,7 @@ function CommentItem({
               prefetch={false}
               className="font-medium text-foreground hover:underline"
             >
-              u/{comment.author.username}
+              @{comment.author.username}
             </Link>
           ) : (
             <span>{t("comments.deleted")}</span>

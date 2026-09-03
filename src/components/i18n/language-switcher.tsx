@@ -13,7 +13,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         {t("language.settingsLabel")}
       </p>
       <div className="flex gap-2">
-        {(["en", "ru"] as Locale[]).map((code) => (
+        {(["vi", "ko"] as Locale[]).map((code) => (
           <button
             key={code}
             type="button"
@@ -27,7 +27,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
                 : "border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
-            {code === "en" ? t("language.english") : t("language.russian")}
+            {code === "vi" ? t("language.vietnamese") : t("language.korean")}
           </button>
         ))}
       </div>

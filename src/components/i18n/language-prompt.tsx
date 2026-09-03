@@ -21,10 +21,10 @@ export function LanguagePrompt() {
             id="language-prompt-title"
             className="font-heading text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
           >
-            {t("language.promptEn")}
+            {t("language.promptVi")}
           </p>
           <p className="font-heading text-lg text-muted-foreground sm:text-xl">
-            {t("language.promptRu")}
+            {t("language.promptKo")}
           </p>
         </div>
 
@@ -33,20 +33,20 @@ export function LanguagePrompt() {
             type="button"
             className="min-h-12 flex-1 rounded-2xl"
             onClick={() => {
-              void setLanguage("en");
+              void setLanguage("vi");
             }}
           >
-            {t("language.preferEnglish")}
+            {t("language.preferVietnamese")}
           </Button>
           <Button
             type="button"
             variant="outline"
             className="min-h-12 flex-1 rounded-2xl border-[color-mix(in_oklch,var(--brand)_40%,transparent)]"
             onClick={() => {
-              void setLanguage("ru");
+              void setLanguage("ko");
             }}
           >
-            {t("language.preferRussian")}
+            {t("language.preferKorean")}
           </Button>
         </div>
       </div>

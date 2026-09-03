@@ -95,7 +95,9 @@ export function formatAccountAge(
 ): string {
   const age = getAccountAge(createdAt, now);
   if (age.count === 0) {
-    return locale.startsWith("ru") ? "только что" : "just now";
+    if (locale.startsWith("ko")) return "방금 전";
+    if (locale.startsWith("vi")) return "vừa xong";
+    return "just now";
   }
 
   const unit = age.unit === "millisecond" ? "millisecond" : age.unit;
@@ -107,10 +109,34 @@ export function formatAccountAge(
     }).format(age.count);
   } catch {
     if (age.unit === "millisecond") {
+      if (locale.startsWith("ko")) return `${age.count}밀리초`;
+      if (locale.startsWith("vi")) return `${age.count} mili giây`;
       return pluralize(age.count, "millisecond", "milliseconds");
     }
     const chunk = TIME_CHUNKS.find((c) => c.singular === age.unit);
-    if (!chunk) return "just now";
+    if (!chunk) return locale.startsWith("ko") ? "방금 전" : "vừa xong";
+    if (locale.startsWith("ko")) {
+      const units: Record<string, string> = {
+        year: "년",
+        month: "개월",
+        day: "일",
+        hour: "시간",
+        minute: "분",
+        second: "초",
+      };
+      return `${age.count}${units[chunk.singular] ?? ""}`;
+    }
+    if (locale.startsWith("vi")) {
+      const units: Record<string, string> = {
+        year: "năm",
+        month: "tháng",
+        day: "ngày",
+        hour: "giờ",
+        minute: "phút",
+        second: "giây",
+      };
+      return `${age.count} ${units[chunk.singular] ?? ""}`.trim();
+    }
     return pluralize(age.count, chunk.singular, chunk.plural);
   }
 }

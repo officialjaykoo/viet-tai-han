@@ -232,7 +232,7 @@ export function MessagesClient() {
                       size="xs"
                     />
                     <span className="text-sm font-medium">
-                      u/{req.from.username}
+                      @{req.from.username}
                     </span>
                   </div>
                   <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">
@@ -292,7 +292,7 @@ export function MessagesClient() {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">
-                        u/{room.peer.username}
+                        @{room.peer.username}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
                         {room.lastBody ?? t("messages.noMessagesYet")}
@@ -310,7 +310,7 @@ export function MessagesClient() {
         {activeRoom ? (
           <>
             <header className="border-b border-border/50 px-4 py-3">
-              <p className="font-medium">u/{activeRoom.peer.username}</p>
+              <p className="font-medium">@{activeRoom.peer.username}</p>
             </header>
             <div className="flex-1 space-y-3 overflow-auto px-4 py-4">
               {messages.map((message) => (

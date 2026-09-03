@@ -1,9 +1,10 @@
 import type { Locale } from "@/lib/i18n/config";
 import { DEFAULT_LOCALE } from "@/lib/i18n/config";
-import { en, type MessageKey, type Messages } from "@/lib/i18n/messages/en";
-import { ru } from "@/lib/i18n/messages/ru";
+import { type MessageKey, type Messages } from "@/lib/i18n/messages/en";
+import { ko } from "@/lib/i18n/messages/ko";
+import { vi } from "@/lib/i18n/messages/vi";
 
-const catalogs: Record<Locale, Messages> = { en, ru };
+const catalogs: Record<Locale, Messages> = { vi, ko };
 
 export function getMessages(locale: Locale): Messages {
   return catalogs[locale] ?? catalogs[DEFAULT_LOCALE];

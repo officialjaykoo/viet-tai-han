@@ -9,7 +9,7 @@ import { AuthError } from "@/lib/session";
 export function toPublicErrorMessage(
   error: unknown,
   fallback = "Something went wrong",
-  locale: Locale = "en"
+  locale: Locale = "vi"
 ): string {
   if (!(error instanceof AuthError) && !(error instanceof Error)) {
     return localizeErrorMessage(fallback, locale, fallback);
@@ -27,7 +27,7 @@ export function jsonPublicError(
   error: unknown,
   fallback: string,
   status?: number,
-  locale: Locale = "en"
+  locale: Locale = "vi"
 ): Response {
   if (error instanceof AuthError) {
     return Response.json(

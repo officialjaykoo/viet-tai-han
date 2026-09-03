@@ -92,10 +92,10 @@ export function NotificationsClient() {
     const key = KIND_KEYS[item.kind];
     if (!key) return item.title;
     const actor = item.actor?.username
-      ? `u/${item.actor.username}`
-      : locale === "ru"
-        ? "Кто-то"
-        : "Someone";
+      ? `@${item.actor.username}`
+      : locale === "ko"
+        ? "누군가"
+        : "một người nào đó";
     return t(key, { actor });
   }
 

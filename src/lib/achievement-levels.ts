@@ -1,4 +1,5 @@
 import { accountAgeDays } from "@/lib/account-age";
+import type { Locale } from "@/lib/i18n/config";
 
 /** Thresholds: index 0 = level 1 */
 export const LEVEL_THRESHOLDS = {
@@ -45,17 +46,29 @@ export type KarmaBadgeTier = {
   id: string;
   labelEn: string;
   labelRu: string;
+  labelVi: string;
+  labelKo: string;
   minKarma: number;
 };
 
-/** Cooler badge as karma grows — shown on profiles. */
+/** Cooler badge as reputation grows — shown on profiles. */
 export const KARMA_BADGE_TIERS: KarmaBadgeTier[] = [
-  { level: 1, id: "new", labelEn: "New", labelRu: "Новичок", minKarma: 0 },
+  {
+    level: 1,
+    id: "new",
+    labelEn: "New",
+    labelRu: "Новичок",
+    labelVi: "Mới",
+    labelKo: "새 회원",
+    minKarma: 0,
+  },
   {
     level: 2,
     id: "bronze",
     labelEn: "Bronze",
     labelRu: "Бронза",
+    labelVi: "Đồng",
+    labelKo: "브론즈",
     minKarma: 100,
   },
   {
@@ -63,14 +76,26 @@ export const KARMA_BADGE_TIERS: KarmaBadgeTier[] = [
     id: "silver",
     labelEn: "Silver",
     labelRu: "Серебро",
+    labelVi: "Bạc",
+    labelKo: "실버",
     minKarma: 1_000,
   },
-  { level: 4, id: "gold", labelEn: "Gold", labelRu: "Золото", minKarma: 10_000 },
+  {
+    level: 4,
+    id: "gold",
+    labelEn: "Gold",
+    labelRu: "Золото",
+    labelVi: "Vàng",
+    labelKo: "골드",
+    minKarma: 10_000,
+  },
   {
     level: 5,
     id: "platinum",
     labelEn: "Platinum",
     labelRu: "Платина",
+    labelVi: "Bạch kim",
+    labelKo: "플래티넘",
     minKarma: 50_000,
   },
   {
@@ -78,6 +103,8 @@ export const KARMA_BADGE_TIERS: KarmaBadgeTier[] = [
     id: "diamond",
     labelEn: "Diamond",
     labelRu: "Алмаз",
+    labelVi: "Kim cương",
+    labelKo: "다이아몬드",
     minKarma: 100_000,
   },
 ];
@@ -88,20 +115,64 @@ export type AgeBadgeTier = {
   years: number;
   labelEn: string;
   labelRu: string;
+  labelVi: string;
+  labelKo: string;
 };
 
 export const AGE_BADGE_TIERS: AgeBadgeTier[] = [
-  { level: 1, id: "fresh", years: 0, labelEn: "Fresh", labelRu: "Свежий" },
-  { level: 2, id: "year1", years: 1, labelEn: "1 Year", labelRu: "1 год" },
-  { level: 3, id: "year2", years: 2, labelEn: "2 Years", labelRu: "2 года" },
-  { level: 4, id: "year3", years: 3, labelEn: "3 Years", labelRu: "3 года" },
-  { level: 5, id: "year5", years: 5, labelEn: "5 Years", labelRu: "5 лет" },
+  {
+    level: 1,
+    id: "fresh",
+    years: 0,
+    labelEn: "Fresh",
+    labelRu: "Свежий",
+    labelVi: "Mới tham gia",
+    labelKo: "새 회원",
+  },
+  {
+    level: 2,
+    id: "year1",
+    years: 1,
+    labelEn: "1 Year",
+    labelRu: "1 год",
+    labelVi: "1 năm",
+    labelKo: "1년차",
+  },
+  {
+    level: 3,
+    id: "year2",
+    years: 2,
+    labelEn: "2 Years",
+    labelRu: "2 года",
+    labelVi: "2 năm",
+    labelKo: "2년차",
+  },
+  {
+    level: 4,
+    id: "year3",
+    years: 3,
+    labelEn: "3 Years",
+    labelRu: "3 года",
+    labelVi: "3 năm",
+    labelKo: "3년차",
+  },
+  {
+    level: 5,
+    id: "year5",
+    years: 5,
+    labelEn: "5 Years",
+    labelRu: "5 лет",
+    labelVi: "5 năm",
+    labelKo: "5년차",
+  },
   {
     level: 6,
     id: "year10",
     years: 10,
     labelEn: "10 Years",
     labelRu: "10 лет",
+    labelVi: "10 năm",
+    labelKo: "10년차",
   },
 ];
 
@@ -133,9 +204,9 @@ export type AccountBadge = {
 export function resolveAccountBadges(input: {
   karma?: number | null;
   createdAt?: string | null;
-  locale?: "en" | "ru";
+  locale?: Locale;
 }): AccountBadge[] {
-  const locale = input.locale ?? "en";
+  const locale = input.locale ?? "vi";
   const karma = resolveKarmaBadge(input.karma ?? 0);
   const age = resolveAgeBadge(input.createdAt);
   return [
@@ -143,13 +214,23 @@ export function resolveAccountBadges(input: {
       kind: "karma",
       id: karma.id,
       level: karma.level,
-      label: locale === "ru" ? karma.labelRu : karma.labelEn,
+      label:
+        locale === "ko"
+          ? karma.labelKo
+          : locale === "vi"
+            ? karma.labelVi
+            : karma.labelEn,
     },
     {
       kind: "age",
       id: age.id,
       level: age.level,
-      label: locale === "ru" ? age.labelRu : age.labelEn,
+      label:
+        locale === "ko"
+          ? age.labelKo
+          : locale === "vi"
+            ? age.labelVi
+            : age.labelEn,
     },
   ];
 }

@@ -240,8 +240,8 @@ export async function createComment(input: {
         }>();
       if (!meta) return;
       const actorLabel = meta.actor_username
-        ? `u/${meta.actor_username}`
-        : "Someone";
+        ? `@${meta.actor_username}`
+        : "một người nào đó";
       const snippet = body.slice(0, 140);
       const href = `/post/${input.postId}`;
 

@@ -20,6 +20,8 @@ import {
   useTransition,
 } from "react";
 
+import { useI18n } from "@/components/i18n/i18n-provider";
+import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +36,7 @@ import { useSession } from "@/lib/auth-client";
 import { prepareImageForUpload } from "@/lib/prepare-image";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
 import { cn } from "@/lib/utils";
+import type { MessageKey } from "@/lib/i18n/messages/en";
 import { apiFetch } from "@/lib/api-client";
 
 type PostType = "text" | "image" | "link";
@@ -50,12 +53,11 @@ type Destination =
 
 const POST_TYPES: {
   id: PostType;
-  label: string;
   icon: typeof FileTextIcon;
 }[] = [
-  { id: "text", label: "Text", icon: FileTextIcon },
-  { id: "image", label: "Image", icon: ImageIcon },
-  { id: "link", label: "Link", icon: Link2Icon },
+  { id: "text", icon: FileTextIcon },
+  { id: "image", icon: ImageIcon },
+  { id: "link", icon: Link2Icon },
 ];
 
 const fieldRadius = "rounded-lg";
@@ -67,6 +69,8 @@ export function CreatePostForm({
 }) {
   const router = useRouter();
   const { data: session } = useSession();
+  const { t } = useI18n();
+  const localizeError = useLocalizedError();
   const username =
     (session?.user as { username?: string } | undefined)?.username ??
     session?.user?.name ??
@@ -98,6 +102,10 @@ export function CreatePostForm({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
   const bot = useBotGuard();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   // Default destination: own profile once session is known (unless community was prefills)
   useEffect(() => {
@@ -177,7 +185,7 @@ export function CreatePostForm({
       return;
     }
     if (!file.type.startsWith("image/")) {
-      setError("Only image files are allowed");
+      setError(t("post.imageOnly"));
       clearImage();
       return;
     }
@@ -200,23 +208,23 @@ export function CreatePostForm({
     bot.markTrusted(e);
 
     if (!destination) {
-      setError("Choose where to post");
+      setError(t("post.chooseDestinationError"));
       setPickerOpen(true);
       return;
     }
     if (postType === "link" && !url.trim()) {
-      setError("Add a link URL");
+      setError(t("post.linkRequired"));
       return;
     }
     if (postType === "image" && !imageFile) {
-      setError("Add an image");
+      setError(t("post.imageRequired"));
       return;
     }
 
     startTransition(async () => {
       const check = await passBotCheck(bot, turnstileToken);
       if (!check.ok) {
-        setError(check.error);
+        setError(localizeError(check.error, t("common.error")));
         return;
       }
 
@@ -229,8 +237,8 @@ export function CreatePostForm({
         } catch (prepareError) {
           setError(
             prepareError instanceof Error
-              ? prepareError.message
-              : "Could not process image"
+              ? localizeError(prepareError.message, t("post.imageProcessError"))
+              : t("post.imageProcessError")
           );
           return;
         }
@@ -249,7 +257,7 @@ export function CreatePostForm({
           const payload = (await upload.json().catch(() => null)) as {
             error?: string;
           } | null;
-          setError(payload?.error ?? "Image upload failed");
+          setError(localizeError(payload?.error, t("post.imageUploadFailed")));
           return;
         }
         const uploaded = (await upload.json()) as { mediaKey: string };
@@ -278,7 +286,7 @@ export function CreatePostForm({
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(payload?.error ?? "Failed to create post");
+        setError(localizeError(payload?.error, t("common.error")));
         return;
       }
       const data = (await res.json()) as { id: string };
@@ -288,12 +296,12 @@ export function CreatePostForm({
   }
 
   return (
-    <form onSubmit={submit} className="relative space-y-5">
+    <form onSubmit={submit} className="relative space-y-5" data-hydrated={hydrated}>
       <ParserTraps setTrapRef={bot.setTrapRef} />
       {/* Destination */}
       <div className="space-y-1.5" ref={pickerRef}>
         <label id={`${listId}-label`} className="text-sm font-medium">
-          Post to
+          {t("post.community")}
         </label>
         <button
           type="button"
@@ -320,10 +328,10 @@ export function CreatePostForm({
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
-                  My profile
+                  {t("nav.profile")}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  u/{username}
+                  @{username}
                 </span>
               </span>
             </>
@@ -333,11 +341,11 @@ export function CreatePostForm({
                 aria-hidden
                 className="grid size-7 shrink-0 place-items-center rounded-md bg-[color-mix(in_oklch,var(--brand)_18%,transparent)] text-xs font-bold text-[var(--brand)]"
               >
-                r/
+                c
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
-                  r/{destination.name}
+                  {destination.name}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {destination.title}
@@ -350,7 +358,7 @@ export function CreatePostForm({
                 <SearchIcon className="size-3.5" />
               </span>
               <span className="flex-1 text-sm text-muted-foreground">
-                Choose a community or your profile
+                {t("post.chooseDestination")}
               </span>
             </>
           )}
@@ -376,7 +384,7 @@ export function CreatePostForm({
                 <Input
                   value={communityQuery}
                   onChange={(e) => setCommunityQuery(e.target.value)}
-                  placeholder="Search communities"
+                  placeholder={t("search.communities")}
                   autoFocus
                   autoComplete="off"
                   className={cn("h-9 pl-8", fieldRadius)}
@@ -408,10 +416,10 @@ export function CreatePostForm({
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 text-sm font-medium">
                         <UserRoundIcon className="size-3.5 text-[var(--brand)]" />
-                        My profile
+                        {t("nav.profile")}
                       </span>
                       <span className="block text-xs text-muted-foreground">
-                        Post on your account · u/{username}
+                        {t("post.postToAccount", { username })}
                       </span>
                     </span>
                   </button>
@@ -419,17 +427,17 @@ export function CreatePostForm({
               ) : null}
 
               <li className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                Communities
+                {t("communities.title")}
               </li>
 
               {loadingCommunities && communities.length === 0 ? (
                 <li className="px-2.5 py-2 text-sm text-muted-foreground">
-                  Searching…
+                  {t("search.searching")}
                 </li>
               ) : null}
               {!loadingCommunities && communities.length === 0 ? (
                 <li className="px-2.5 py-2 text-sm text-muted-foreground">
-                  No communities found
+                  {t("pages.noCommunitiesMatched")}
                 </li>
               ) : null}
               {communities.map((community) => {
@@ -454,15 +462,16 @@ export function CreatePostForm({
                         aria-hidden
                         className="grid size-8 shrink-0 place-items-center rounded-md bg-muted text-xs font-bold text-muted-foreground"
                       >
-                        r/
+                        C
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
-                          r/{community.name}
+                          {community.name}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {community.title} ·{" "}
-                          {community.subscriberCount.toLocaleString()} members
+                          {community.subscriberCount.toLocaleString()}{" "}
+                          {t("communities.members")}
                         </span>
                       </span>
                     </button>
@@ -481,7 +490,7 @@ export function CreatePostForm({
           fieldRadius
         )}
         role="tablist"
-        aria-label="Post type"
+        aria-label={t("post.submitTitle")}
       >
         {POST_TYPES.map((type) => {
           const Icon = type.icon;
@@ -501,7 +510,7 @@ export function CreatePostForm({
               )}
             >
               <Icon className="size-4" aria-hidden />
-              {type.label}
+              {t(`post.${type.id}` as MessageKey)}
             </button>
           );
         })}
@@ -510,7 +519,7 @@ export function CreatePostForm({
       {/* Title — modest radius, not a pill */}
       <div className="space-y-1.5">
         <label htmlFor="title" className="text-sm font-medium">
-          Title
+          {t("post.title")}
         </label>
         <Input
           id="title"
@@ -519,7 +528,7 @@ export function CreatePostForm({
           required
           minLength={3}
           maxLength={300}
-          placeholder="An interesting title"
+          placeholder={t("post.titlePlaceholder")}
           className={cn(
             "h-11 font-heading text-base font-medium sm:text-[1.05rem]",
             fieldRadius
@@ -533,15 +542,17 @@ export function CreatePostForm({
       {postType === "text" ? (
         <div className="space-y-1.5">
           <label htmlFor="body" className="text-sm font-medium">
-            Body{" "}
-            <span className="font-normal text-muted-foreground">(optional)</span>
+            {t("post.body")}{" "}
+            <span className="font-normal text-muted-foreground">
+              ({t("post.optional")})
+            </span>
           </label>
           <Textarea
             id="body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={8}
-            placeholder="Share more context…"
+            placeholder={t("post.bodyPlaceholder")}
             className={cn("min-h-40", fieldRadius)}
           />
         </div>
@@ -550,7 +561,7 @@ export function CreatePostForm({
       {postType === "link" ? (
         <div className="space-y-1.5">
           <label htmlFor="url" className="text-sm font-medium">
-            Link
+            {t("post.url")}
           </label>
           <Input
             id="url"
@@ -566,7 +577,7 @@ export function CreatePostForm({
 
       {postType === "image" ? (
         <div className="space-y-1.5">
-          <span className="text-sm font-medium">Image</span>
+          <span className="text-sm font-medium">{t("post.image")}</span>
           <input
             ref={fileRef}
             type="file"
@@ -584,7 +595,7 @@ export function CreatePostForm({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imagePreview}
-                alt="Selected upload preview"
+                alt={t("post.selectImage")}
                 className="max-h-80 w-full object-contain"
               />
               <Button
@@ -593,7 +604,7 @@ export function CreatePostForm({
                 variant="secondary"
                 className="absolute top-2 right-2"
                 onClick={clearImage}
-                aria-label="Remove image"
+                aria-label={t("post.removeImage")}
               >
                 <XIcon />
               </Button>
@@ -622,10 +633,10 @@ export function CreatePostForm({
             >
               <ImageIcon className="size-8 text-muted-foreground" aria-hidden />
               <span className="text-sm font-medium">
-                Drop an image here, or click to browse
+                {t("post.dropImage")}
               </span>
               <span className="text-xs text-muted-foreground">
-                JPEG, PNG, or WebP · max 1 MB after compression
+                {t("post.imageRequirements")}
               </span>
             </button>
           )}
@@ -647,23 +658,25 @@ export function CreatePostForm({
         <Button
           type="button"
           variant="ghost"
-          disabled={pending}
+          disabled={!hydrated || pending}
           onClick={() => router.back()}
         >
-          Cancel
+          {t("post.cancel")}
         </Button>
         <Button
           type="submit"
-          disabled={pending || requiresTurnstileToken(turnstileToken)}
+          disabled={
+            !hydrated || pending || requiresTurnstileToken(turnstileToken)
+          }
           className="min-w-28"
         >
           {pending ? (
             <>
               <Loader2Icon className="animate-spin" />
-              Posting…
+              {t("post.posting")}
             </>
           ) : (
-            "Post"
+            t("post.submit")
           )}
         </Button>
       </div>

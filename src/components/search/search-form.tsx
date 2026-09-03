@@ -299,7 +299,7 @@ export function SearchForm({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
-                          r/{community.name}
+                          {community.name}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {community.title} ·{" "}
@@ -345,7 +345,7 @@ export function SearchForm({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
-                          u/{account.username}
+                          @{account.username}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {t("nav.karma", {
@@ -389,7 +389,9 @@ export function SearchForm({
                           {post.title}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
-                          r/{post.subredditName} ·{" "}
+                          {/^u_/i.test(post.subredditName)
+                            ? `@${post.subredditName.slice(2)}`
+                            : post.subredditName}{" "}
                           {t("search.points", { count: post.score })}
                         </span>
                       </span>

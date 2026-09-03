@@ -58,10 +58,10 @@ export default async function SubredditPage({
         <div className="mx-auto w-full max-w-3xl safe-px safe-pb py-6 sm:py-8">
           <section className="mb-6 space-y-3">
             <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              Community
+              {tLocale(locale, "communities.title")}
             </p>
             <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              r/{sub.name}
+              {sub.name}
             </h1>
             <p className="text-lg text-muted-foreground">{sub.title}</p>
             {sub.description ? (

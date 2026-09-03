@@ -1,5 +1,5 @@
 {
-  "name": "red",
+  "name": "viet-tai-han",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,7 +11,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "wrangler d1 execute DB --local --file=./seed.sql",
     "db:reset:local": "npm run db:migrate:local && npm run db:seed:local",
-    "vectors:create": "wrangler vectorize create red-posts --dimensions=768 --metric=cosine",
+    "vectors:create": "wrangler vectorize create vth-posts --dimensions=768 --metric=cosine",
     "test": "npm run test:unit && npm run test:workers",
     "test:unit": "vitest run --config vitest.config.mts",
     "test:workers": "vitest run --config vitest.workers.config.mts",

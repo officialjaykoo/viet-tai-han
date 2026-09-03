@@ -80,6 +80,25 @@ export function AdminPanel({
   const [message, setMessage] = useState<string | null>(null);
   const campaigns = initial.adCampaigns ?? [];
   const burstPosts = initial.burstPosts ?? [];
+  const countLabels: Record<string, string> = {
+    users: t("admin.users"),
+    posts: t("search.posts"),
+    comments: t("feed.comments"),
+    subreddits: t("communities.title"),
+    banned: t("admin.bans"),
+    shadowbanned: t("admin.bans"),
+    banned_words: t("admin.bannedWords"),
+  };
+  const placementLabels: Record<string, string> = {
+    feed_inline: t("admin.feedInline"),
+    sidebar: t("admin.sidebar"),
+    post_footer: t("admin.postFooter"),
+  };
+  const statusLabels: Record<string, string> = {
+    active: t("admin.activate"),
+    paused: t("admin.pause"),
+    ended: t("admin.end"),
+  };
 
   function run(op: string, payload: Record<string, unknown> = {}) {
     setError(null);
@@ -108,7 +127,7 @@ export function AdminPanel({
         {Object.entries(initial.counts).map(([key, value]) => (
           <div key={key} className="rounded-2xl border border-border/70 p-3">
             <p className="text-xs tracking-wide text-muted-foreground uppercase">
-              {key.replaceAll("_", " ")}
+              {countLabels[key] ?? key.replaceAll("_", " ")}
             </p>
             <p className="mt-1 font-heading text-2xl font-semibold tabular-nums">
               {value}
@@ -134,7 +153,7 @@ export function AdminPanel({
           <Input
             value={adName}
             onChange={(e) => setAdName(e.target.value)}
-            placeholder="Campaign name"
+            placeholder={t("admin.campaignName")}
           />
           <Input
             value={adUrl}
@@ -144,7 +163,7 @@ export function AdminPanel({
           <Textarea
             value={adBody}
             onChange={(e) => setAdBody(e.target.value)}
-            placeholder="Ad copy (optional)"
+            placeholder={t("admin.adCopyOptional")}
             rows={2}
           />
           <select
@@ -156,9 +175,9 @@ export function AdminPanel({
               )
             }
           >
-            <option value="feed_inline">Feed inline</option>
-            <option value="sidebar">Sidebar</option>
-            <option value="post_footer">Post footer</option>
+            <option value="feed_inline">{t("admin.feedInline")}</option>
+            <option value="sidebar">{t("admin.sidebar")}</option>
+            <option value="post_footer">{t("admin.postFooter")}</option>
           </select>
           <Button
             type="button"
@@ -174,7 +193,7 @@ export function AdminPanel({
               })
             }
           >
-            Create active campaign
+            {t("admin.createActiveCampaign")}
           </Button>
         </div>
         <ul className="space-y-2">
@@ -194,8 +213,10 @@ export function AdminPanel({
                   <div>
                     <p className="font-medium">{campaign.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {campaign.status} · {campaign.placement} · {impressions}{" "}
-                      imps · {clicks} clicks · {ctr}% CTR
+                      {statusLabels[campaign.status] ?? campaign.status} ·{" "}
+                      {placementLabels[campaign.placement] ?? campaign.placement} ·{" "}
+                      {impressions} {t("admin.impressions")} · {clicks}{" "}
+                      {t("admin.clicks")} · {ctr}% {t("admin.ctr")}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {campaign.targetUrl}
@@ -205,11 +226,11 @@ export function AdminPanel({
                 <div className="flex flex-wrap gap-1">
                   {(
                     [
-                      ["active", "Activate"],
-                      ["paused", "Pause"],
-                      ["ended", "End"],
+                      ["active", "admin.activate"],
+                      ["paused", "admin.pause"],
+                      ["ended", "admin.end"],
                     ] as const
-                  ).map(([status, label]) => (
+                  ).map(([status, labelKey]) => (
                     <Button
                       key={status}
                       type="button"
@@ -223,7 +244,7 @@ export function AdminPanel({
                         })
                       }
                     >
-                      {label}
+                      {t(labelKey)}
                     </Button>
                   ))}
                 </div>
@@ -231,7 +252,9 @@ export function AdminPanel({
             );
           })}
           {campaigns.length === 0 ? (
-            <li className="text-sm text-muted-foreground">No campaigns yet.</li>
+            <li className="text-sm text-muted-foreground">
+              {t("admin.noCampaigns")}
+            </li>
           ) : null}
         </ul>
       </section>
@@ -254,8 +277,9 @@ export function AdminPanel({
                   {post.title}
                 </a>
                 <p className="text-xs text-muted-foreground">
-                  {post.events} events · {post.low_karma_events} low-karma ·{" "}
-                  {post.weak_source_events} weak-source
+                  {post.events} {t("admin.events")} ·{" "}
+                  {post.low_karma_events} {t("admin.lowKarma")} ·{" "}
+                  {post.weak_source_events} {t("admin.weakSource")}
                 </p>
               </li>
             ))}
@@ -271,7 +295,7 @@ export function AdminPanel({
           <Input
             value={word}
             onChange={(e) => setWord(e.target.value)}
-            placeholder="word or phrase"
+            placeholder={t("admin.wordOrPhrase")}
           />
           <select
             className="h-11 rounded-xl border border-input bg-background px-3 text-sm sm:h-9"
@@ -280,15 +304,15 @@ export function AdminPanel({
               setSeverity(e.target.value as "shadow" | "block")
             }
           >
-            <option value="shadow">shadow</option>
-            <option value="block">block</option>
+            <option value="shadow">{t("admin.shadowban")}</option>
+            <option value="block">{t("admin.block")}</option>
           </select>
           <Button
             type="button"
             disabled={pending || !word.trim()}
             onClick={() => run("add_banned_word", { word, severity })}
           >
-            Add
+            {t("admin.add")}
           </Button>
         </div>
         <ul className="space-y-2">
@@ -300,7 +324,9 @@ export function AdminPanel({
               <span>
                 <span className="font-medium">{entry.word}</span>
                 <span className="ml-2 text-muted-foreground">
-                  {entry.severity}
+                  {entry.severity === "shadow"
+                    ? t("admin.shadowban")
+                    : t("admin.block")}
                 </span>
               </span>
               <Button
@@ -312,7 +338,7 @@ export function AdminPanel({
                   run("remove_banned_word", { wordId: entry.id })
                 }
               >
-                Remove
+                {t("common.delete")}
               </Button>
             </li>
           ))}
@@ -326,12 +352,12 @@ export function AdminPanel({
         <Input
           value={warnUserId}
           onChange={(e) => setWarnUserId(e.target.value)}
-          placeholder="user id"
+          placeholder={t("admin.userId")}
         />
         <Textarea
           value={warnMessage}
           onChange={(e) => setWarnMessage(e.target.value)}
-          placeholder="Warning message"
+          placeholder={t("admin.warningMessage")}
           rows={3}
         />
         <Button
@@ -341,7 +367,7 @@ export function AdminPanel({
             run("warn", { userId: warnUserId, message: warnMessage })
           }
         >
-          Issue warning
+          {t("admin.issueWarning")}
         </Button>
       </section>
 
@@ -356,22 +382,23 @@ export function AdminPanel({
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
                   <p className="font-medium">
-                    {user.username ? `u/${user.username}` : user.name}
+                    {user.username ? `@${user.username}` : user.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {user.role} · {user.status} · {user.karma} karma
+                    {user.role} · {user.status} ·{" "}
+                    {t("profile.karma", { count: user.karma })}
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-1">
                 {(
                   [
-                    ["ban", "Ban"],
-                    ["unban", "Unban"],
-                    ["shadowban", "Shadowban"],
-                    ["unshadowban", "Unshadow"],
+                    ["ban", "admin.ban"],
+                    ["unban", "admin.unban"],
+                    ["shadowban", "admin.shadowban"],
+                    ["unshadowban", "admin.unshadowban"],
                   ] as const
-                ).map(([action, label]) => (
+                ).map(([action, labelKey]) => (
                   <Button
                     key={action}
                     type="button"
@@ -382,7 +409,7 @@ export function AdminPanel({
                       run("user_status", { userId: user.id, action })
                     }
                   >
-                    {label}
+                    {t(labelKey)}
                   </Button>
                 ))}
                 <Button
@@ -394,7 +421,7 @@ export function AdminPanel({
                     run("delete_account", { userId: user.id })
                   }
                 >
-                  Delete
+                  {t("admin.delete")}
                 </Button>
               </div>
             </li>
@@ -407,8 +434,7 @@ export function AdminPanel({
           {t("admin.recommendations")}
         </h2>
         <p className="text-sm text-muted-foreground">
-          Index recent posts into Cloudflare Vectorize (Workers AI embeddings)
-          so For you can rank by semantic similarity.
+          {t("admin.embeddingHint")}
         </p>
         <Button
           type="button"
@@ -432,17 +458,19 @@ export function AdminPanel({
                 failed?: number;
               } | null;
               if (!res.ok) {
-                setError(localizeError(data?.error, "Backfill failed"));
+                setError(localizeError(data?.error, t("common.error")));
                 return;
               }
               setMessage(
-                `Indexed ${data?.indexed ?? 0} posts` +
-                  (data?.failed ? ` (${data.failed} failed)` : "")
+                t("admin.indexedPosts", { count: data?.indexed ?? 0 }) +
+                  (data?.failed
+                    ? ` (${t("admin.failedPosts", { count: data.failed })})`
+                    : "")
               );
             });
           }}
         >
-          Backfill post embeddings
+          {t("admin.backfillEmbeddings")}
         </Button>
       </section>
 

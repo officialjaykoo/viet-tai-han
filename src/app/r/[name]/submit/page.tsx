@@ -1,4 +1,6 @@
 import { SiteHeader } from "@/components/layout/site-header";
+import { getRequestLocale } from "@/lib/i18n/server";
+import { tLocale } from "@/lib/i18n/translate";
 import { CreatePostForm } from "@/components/posts/create-post-form";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +11,7 @@ export default async function SubmitInSubredditPage({
   params: Promise<{ name: string }>;
 }) {
   const { name } = await params;
+  const { locale } = await getRequestLocale();
 
   return (
     <>
@@ -21,13 +24,13 @@ export default async function SubmitInSubredditPage({
         <div className="relative mx-auto w-full max-w-3xl safe-px safe-pb py-6 sm:py-8">
           <section className="mb-6">
             <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              Compose
+              {tLocale(locale, "post.submitTitle")}
             </p>
             <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-              Post in r/{name}
+              {name}
             </h1>
             <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Share something with this community.
+              {tLocale(locale, "communities.submitBlurb")}
             </p>
           </section>
 

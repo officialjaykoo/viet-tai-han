@@ -229,8 +229,8 @@ export function SettingsClient({
       if (data.settings) {
         setSettings(data.settings);
         if (
-          data.settings.preferredLanguage === "en" ||
-          data.settings.preferredLanguage === "ru"
+          data.settings.preferredLanguage === "vi" ||
+          data.settings.preferredLanguage === "ko"
         ) {
           void setLanguage(data.settings.preferredLanguage);
         }
@@ -430,7 +430,7 @@ export function SettingsClient({
             </div>
 
             <Field label={t("settings.username")}>
-              <Input value={`u/${username}`} disabled readOnly />
+              <Input value={`@${username}`} disabled readOnly />
               <p className="text-xs text-muted-foreground">
                 {t("settings.usernamePermanent")}
               </p>
@@ -568,8 +568,8 @@ export function SettingsClient({
               <div className="flex flex-wrap gap-2">
                 {(
                   [
-                    ["en", t("language.english")],
-                    ["ru", t("language.russian")],
+                    ["vi", t("language.vietnamese")],
+                    ["ko", t("language.korean")],
                   ] as const
                 ).map(([code, label]) => (
                   <button
@@ -670,7 +670,7 @@ export function SettingsClient({
                           size="sm"
                         />
                         <span className="truncate text-sm font-medium">
-                          u/{user.username ?? "unknown"}
+                          @{user.username ?? "unknown"}
                         </span>
                       </Link>
                       {user.username ? (

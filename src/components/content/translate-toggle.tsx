@@ -7,6 +7,7 @@ export function shouldOfferTranslation(
   locale: string
 ): boolean {
   if (!translation || translation.status !== "ready") return false;
+  if (locale === "vi" || locale === "ko") return false;
   if (!translation.titleTranslated && !translation.bodyTranslated) {
     return false;
   }

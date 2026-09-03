@@ -43,7 +43,7 @@ export default async function CommunitiesPage() {
                   href={`/r/${community.name}`}
                   className="block rounded-2xl border border-border/60 px-4 py-3 transition-colors hover:bg-muted/50"
                 >
-                  <p className="font-medium">r/{community.name}</p>
+                  <p className="font-medium">{community.name}</p>
                   <p className="text-sm text-muted-foreground">
                     {community.title}
                     {community.subscriberCount != null

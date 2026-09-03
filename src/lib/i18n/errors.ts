@@ -4,7 +4,10 @@ import type { Locale } from "@/lib/i18n/config";
  * Canonical English AuthError / API messages → localized copy.
  * Keep AuthError.message in English (stable key); translate at response / display time.
  */
-const ERROR_CATALOG: Record<string, { en: string; ru: string }> = {
+const ERROR_CATALOG: Record<
+  string,
+  { en: string; ru: string; vi?: string; ko?: string }
+> = {
   "Sign in to continue": {
     en: "Sign in to continue",
     ru: "Войдите, чтобы продолжить",
@@ -377,9 +380,11 @@ const ERROR_CATALOG: Record<string, { en: string; ru: string }> = {
     en: "Failed to load ad",
     ru: "Не удалось загрузить рекламу",
   },
-  "preferredLanguage must be en or ru": {
-    en: "preferredLanguage must be en or ru",
-    ru: "Язык должен быть en или ru",
+  "preferredLanguage must be vi or ko": {
+    en: "preferredLanguage must be vi or ko",
+    ru: "Язык должен быть vi или ko",
+    vi: "preferredLanguage phải là vi hoặc ko",
+    ko: "언어는 vi 또는 ko여야 합니다",
   },
   "Could not update language": {
     en: "Could not update language",
@@ -675,6 +680,10 @@ const ERROR_CATALOG: Record<string, { en: string; ru: string }> = {
   },
 };
 
+function genericError(locale: Locale): string {
+  return locale === "ko" ? "문제가 발생했습니다" : "요청을 처리하지 못했습니다";
+}
+
 function normalizeKey(message: string): string {
   return message
     .replace(/\u2019/g, "'")
@@ -691,34 +700,23 @@ export function localizeErrorMessage(
 ): string {
   const key = normalizeKey(message);
   const entry = ERROR_CATALOG[key];
-  if (entry) return entry[locale] ?? entry.en;
+  if (entry) return entry[locale] ?? genericError(locale);
 
   // Policy / infra sanitization (mirror public-error rules)
   if (/banned words/i.test(key)) {
-    return ERROR_CATALOG["This content isn't allowed"]![locale];
+    return genericError(locale);
   }
   if (/shadow/i.test(key)) {
-    return ERROR_CATALOG["This content isn't allowed"]![locale];
+    return genericError(locale);
   }
   if (/rate limit/i.test(key)) {
-    return ERROR_CATALOG["You're doing that too often. Try again later."]![
-      locale
-    ];
+    return genericError(locale);
   }
   if (
     /sql|d1|sqlite|vectorize|workers ai|durable object|r2|wrangler/i.test(key)
   ) {
-    return (
-      fallback ??
-      ERROR_CATALOG["Something went wrong"]![locale]
-    );
+    return genericError(locale);
   }
 
-  if (locale === "en") return message || (fallback ?? key);
-
-  // Unknown English string for RU users — prefer generic fallback over raw EN
-  return (
-    fallback ??
-    ERROR_CATALOG["Something went wrong"]![locale]
-  );
+  return genericError(locale);
 }

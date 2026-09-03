@@ -44,7 +44,7 @@ export async function ProfileHeader({
   const badges = resolveAccountBadges({
     karma: profile.karma,
     createdAt: profile.createdAt,
-    locale: locale === "ru" ? "ru" : "en",
+    locale,
   });
 
   return (
@@ -122,7 +122,7 @@ export async function ProfileHeader({
             <AccountTags tags={profile.tags} size="md" />
             <AccountBadges badges={badges} size="md" />
           </div>
-          <p className="text-sm text-muted-foreground">u/{username}</p>
+          @{username}
         </div>
 
         {profile.bio ? (
@@ -139,7 +139,7 @@ export async function ProfileHeader({
             {tLocale(locale, "profile.karma")}
           </span>
           <span>
-            {tLocale(locale, "profile.redditorFor")}{" "}
+            {tLocale(locale, "profile.memberFor")}{" "}
             <span className="font-medium text-foreground">{ageLabel}</span>
           </span>
           <span

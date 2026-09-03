@@ -238,4 +238,18 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+
+  .safe-pb-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-nav-space {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 640px) {
+    .mobile-nav-space {
+      padding-bottom: 0;
+    }
+  }
 }

@@ -34,7 +34,7 @@ function createAuthFromDb(db: D1Database, env: {
       "http://127.0.0.1:3000",
       "http://localhost:3100",
       "http://127.0.0.1:3100",
-      // Add your production origin after deploy, e.g. "https://red.example.com"
+      // Add the verified production origin before deployment, e.g. "https://vth.kr"
     ],
     // Logical path only — browser never hits /api/auth directly; POST /i/api tunnels it.
     basePath: "/api/auth",

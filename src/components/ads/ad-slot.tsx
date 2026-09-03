@@ -5,6 +5,7 @@ import {
   type AdPlacement,
 } from "@/lib/ads";
 import { getSession } from "@/lib/session";
+import { getRequestLocale } from "@/lib/i18n/server";
 
 /**
  * Server-rendered ad slot. Selection + impression happen on the server so
@@ -16,6 +17,7 @@ export async function AdSlot({
   placement: AdPlacement;
 }) {
   try {
+    const { locale } = await getRequestLocale();
     const campaign = await pickAdForPlacement(placement);
     if (!campaign) return null;
 
@@ -36,6 +38,7 @@ export async function AdSlot({
           body: campaign.body,
           clickUrl: `/api/ads/${campaign.id}/click`,
         }}
+        locale={locale}
       />
     );
   } catch {

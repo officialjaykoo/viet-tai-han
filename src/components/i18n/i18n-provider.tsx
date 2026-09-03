@@ -142,6 +142,7 @@ export function I18nProvider({
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.title = getMessages(locale).meta.title;
   }, [locale]);
 
   useEffect(() => {

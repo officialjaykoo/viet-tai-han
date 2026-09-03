@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -37,6 +37,10 @@ export default function SignupPage() {
   const [pending, startTransition] = useTransition();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const bot = useBotGuard();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -78,7 +82,7 @@ export default function SignupPage() {
           </CardTitle>
           <CardDescription>{t("auth.signUpDescription")}</CardDescription>
         </CardHeader>
-        <form onSubmit={onSubmit} noValidate className="relative">
+        <form onSubmit={onSubmit} noValidate className="relative" data-hydrated={hydrated}>
           <ParserTraps setTrapRef={bot.setTrapRef} />
           <CardContent className="flex flex-col gap-3">
             <label className="grid gap-1.5 text-sm">
@@ -144,7 +148,9 @@ export default function SignupPage() {
           <CardFooter className="flex flex-col items-stretch gap-3">
             <Button
               type="submit"
-              disabled={pending || requiresTurnstileToken(turnstileToken)}
+              disabled={
+                !hydrated || pending || requiresTurnstileToken(turnstileToken)
+              }
               className="min-h-11"
             >
               {pending ? t("auth.creating") : t("auth.createAccount")}

@@ -1,16 +1,18 @@
-# red
+# Việt tại Hàn
 
-A Reddit-style community platform that runs **entirely on Cloudflare**.
+Một nền tảng cộng đồng dành cho người Việt tại Hàn Quốc, chạy **hoàn toàn trên Cloudflare**.
 
-No separate app servers. No managed Postgres elsewhere. No S3 account on another cloud. The app, database, media, AI, search vectors, bot protection, and edge rate limits all live on Cloudflare’s network.
+Không cần máy chủ ứng dụng riêng, PostgreSQL bên ngoài hay tài khoản S3 ở nền tảng khác. Ứng dụng, cơ sở dữ liệu, tệp phương tiện, AI, vector tìm kiếm, chống bot và giới hạn tốc độ biên đều chạy trên mạng Cloudflare.
 
-Built end-to-end with [Cursor](https://cursor.com) (AI pair-programming), with human steering on architecture and product direction — a practical example of shipping a full product without leaving Cloudflare’s platform.
+Trang chính: **[vth.kr](https://vth.kr)**
 
-[![Watch the red walkthrough on YouTube](https://img.youtube.com/vi/mexvSvUr52c/maxresdefault.jpg)](https://www.youtube.com/watch?v=mexvSvUr52c)
+Được xây dựng end-to-end với [Cursor](https://cursor.com) (AI pair-programming), dưới sự định hướng của con người về kiến trúc và sản phẩm.
+
+![Việt tại Hàn walkthrough](https://img.youtube.com/vi/mexvSvUr52c/maxresdefault.jpg)
 
 **[Watch the walkthrough →](https://www.youtube.com/watch?v=mexvSvUr52c)**
 
-> **Source + deploy instructions.** Fork it and deploy your own instance on Cloudflare.
+> **Mã nguồn + hướng dẫn triển khai.** Fork repository này rồi triển khai instance riêng trên Cloudflare.
 
 ---
 
@@ -21,7 +23,7 @@ Built end-to-end with [Cursor](https://cursor.com) (AI pair-programming), with h
 
 ## Cloudflare stack
 
-| Product | Role in `red` |
+| Product | Role in `Việt tại Hàn` |
 | --- | --- |
 | **Workers** + **OpenNext** | Next.js app + custom edge entry (`src/worker.ts`) |
 | **D1** | Primary SQL database (users, posts, votes, DMs, …) |
@@ -54,7 +56,7 @@ flowchart LR
 - Media uploads (R2)
 - Ads + post analytics
 - Admin / moderation tools
-- Achievements, karma, badges, tags
+- Achievements, reputation, badges, tags
 - Content translation via Workers AI
 - Sealed Protobuf API tunnel (`/i/api`) with bot / PoW challenges
 - Personal API keys
@@ -64,8 +66,8 @@ flowchart LR
 Prerequisites: **Node 22+**, a Cloudflare account (AI / Vectorize are remote; D1 works locally).
 
 ```bash
-git clone https://github.com/koval01/red.git
-cd red
+git clone https://github.com/officialjaykoo/viet-tai-han.git
+cd viet-tai-han
 npm ci
 cp .dev.vars.example .dev.vars
 
@@ -95,9 +97,9 @@ Turnstile test keys in `.dev.vars.example` always pass locally. Replace them wit
 
    ```bash
    npx wrangler login
-   npx wrangler d1 create red-db
-   npx wrangler r2 bucket create red-media
-   npm run vectors:create   # Vectorize index red-posts (768 dims, cosine)
+   npx wrangler d1 create vth-db
+   npx wrangler r2 bucket create vth-media
+   npm run vectors:create   # Vectorize index vth-posts (768 dims, cosine)
    # optional:
    npx wrangler kv namespace create CACHE
    npx wrangler kv namespace create CACHE --preview

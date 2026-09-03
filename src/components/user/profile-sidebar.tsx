@@ -40,14 +40,14 @@ export function ProfileSidebar({
   const badges = resolveAccountBadges({
     karma: profile.karma,
     createdAt: profile.createdAt,
-    locale: locale === "ru" ? "ru" : "en",
+    locale,
   });
 
   return (
     <aside className="space-y-4">
       <section className="rounded-2xl border border-border/60 bg-card/90 p-4 shadow-sm">
         <h2 className="font-heading text-sm font-semibold">
-          {profile.name || `u/${profile.username}`}
+          {profile.name || `@${profile.username}`}
         </h2>
         {profile.bio ? (
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -72,7 +72,7 @@ export function ProfileSidebar({
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">
-              {t("profile.redditorFor")}
+              {t("profile.memberFor")}
             </dt>
             <dd className="mt-0.5 text-sm font-medium">{ageLabel}</dd>
           </div>
@@ -139,7 +139,7 @@ export function ProfileSidebar({
               {t("profile.settings")}
             </Link>
             <p className="text-xs text-muted-foreground">
-              Avatar, banner, password, theme, privacy, and more.
+              {t("settings.customizeProfileDesc")}
             </p>
           </div>
         </section>
