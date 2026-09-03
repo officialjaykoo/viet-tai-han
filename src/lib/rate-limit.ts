@@ -137,7 +137,10 @@ type CreateKind =
   | "dm_message"
   | "question"
   | "answer"
-  | "listing";
+  | "listing"
+  | "business"
+  | "business_verification"
+  | "booking";
 
 const CREATE_DEFAULTS: Record<
   CreateKind,
@@ -189,6 +192,24 @@ const CREATE_DEFAULTS: Record<
     hourKey: "max_listings_per_hour",
     hour: 10,
     burstKey: "max_listings_burst_per_min",
+    burst: 3,
+  },
+  business: {
+    hourKey: "max_businesses_per_hour",
+    hour: 3,
+    burstKey: "max_businesses_burst_per_min",
+    burst: 1,
+  },
+  business_verification: {
+    hourKey: "max_business_verification_per_hour",
+    hour: 3,
+    burstKey: "max_business_verification_burst_per_min",
+    burst: 1,
+  },
+  booking: {
+    hourKey: "max_booking_requests_per_hour",
+    hour: 10,
+    burstKey: "max_booking_requests_burst_per_min",
     burst: 3,
   },
 };

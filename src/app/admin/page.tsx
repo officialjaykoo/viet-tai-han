@@ -58,6 +58,7 @@ export default async function AdminPage() {
             adCampaigns: overview.adCampaigns,
             burstPosts: overview.burstPosts,
             listingReports: overview.listingReports,
+            businessVerifications: overview.businessVerifications,
           }}
         />
       </main>

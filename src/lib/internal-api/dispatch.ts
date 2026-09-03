@@ -218,6 +218,36 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/listing-alerts/route"),
   },
   {
+    methods: ["GET", "POST"],
+    pattern: "/api/businesses",
+    load: () => import("@/app/api/businesses/route"),
+  },
+  {
+    methods: ["GET"],
+    pattern: "/api/businesses/mine",
+    load: () => import("@/app/api/businesses/mine/route"),
+  },
+  {
+    methods: ["GET", "PATCH"],
+    pattern: "/api/businesses/:id",
+    load: () => import("@/app/api/businesses/[id]/route"),
+  },
+  {
+    methods: ["POST"],
+    pattern: "/api/businesses/:id/verification",
+    load: () => import("@/app/api/businesses/[id]/verification/route"),
+  },
+  {
+    methods: ["GET", "POST"],
+    pattern: "/api/businesses/:id/bookings",
+    load: () => import("@/app/api/businesses/[id]/bookings/route"),
+  },
+  {
+    methods: ["PATCH"],
+    pattern: "/api/business-bookings/:id",
+    load: () => import("@/app/api/business-bookings/[id]/route"),
+  },
+  {
     methods: ["GET"],
     pattern: "/api/recommendations",
     load: () => import("@/app/api/recommendations/route"),

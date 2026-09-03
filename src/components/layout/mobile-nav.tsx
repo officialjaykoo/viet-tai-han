@@ -45,6 +45,7 @@ export function MobileNav() {
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
     { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
+    { href: "/businesses", label: t("nav.businesses"), icon: CompassIcon },
     { href: "/submit", label: t("nav.createPost"), icon: PlusIcon },
     {
       href: "/notifications",

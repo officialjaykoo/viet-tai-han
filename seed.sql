@@ -14,6 +14,15 @@ DELETE FROM ad_impressions WHERE campaign_id LIKE 'adcamp_%';
 DELETE FROM ad_clicks WHERE campaign_id LIKE 'adcamp_%';
 DELETE FROM ad_campaigns WHERE id LIKE 'adcamp_%';
 DELETE FROM banned_words WHERE id LIKE 'bw_%';
+DELETE FROM business_bookings
+WHERE requester_id LIKE 'user_%'
+   OR business_id IN (SELECT id FROM businesses WHERE owner_id LIKE 'user_%');
+DELETE FROM business_verification_requests
+WHERE requester_id LIKE 'user_%'
+   OR business_id IN (SELECT id FROM businesses WHERE owner_id LIKE 'user_%');
+DELETE FROM business_services
+WHERE business_id IN (SELECT id FROM businesses WHERE owner_id LIKE 'user_%');
+DELETE FROM businesses WHERE owner_id LIKE 'user_%';
 DELETE FROM account WHERE userId LIKE 'user_%';
 DELETE FROM subreddits WHERE id LIKE 'sub_%';
 DELETE FROM "user" WHERE id LIKE 'user_%';
@@ -405,6 +414,64 @@ INSERT OR IGNORE INTO listings (
     'Giá thỏa thuận',
     'Incheon',
     'closed'
+  );
+INSERT OR IGNORE INTO businesses (
+  id, owner_id, slug, name, description, category, address, location,
+  phone, website_url, latitude, longitude, opening_hours, status, verification_status
+) VALUES
+  (
+    'business_saigon_kitchen_01',
+    'user_mira',
+    'saigon-kitchen-seoul',
+    'Saigon Kitchen Seoul',
+    'Món Việt gia đình tại Seoul với thực đơn dễ gọi và hỗ trợ bằng tiếng Việt.',
+    'Ẩm thực',
+    'Seoul, Mapo-gu, World Cup buk-ro 12',
+    'Seoul, Mapo-gu',
+    '02-1234-5678',
+    'https://example.com/saigon-kitchen',
+    37.5665,
+    126.9780,
+    'Thứ 2–Thứ 7 11:00–21:00',
+    'active',
+    'verified'
+  ),
+  (
+    'business_hanviet_translation_01',
+    'user_ivy',
+    'hanviet-translation-incheon',
+    'HanViet Translation',
+    'Hỗ trợ biên dịch Việt–Hàn cho hồ sơ hành chính và giao tiếp hằng ngày.',
+    'Dịch vụ hành chính',
+    'Incheon, Namdong-gu, Arts Center-daero 88',
+    'Incheon, Namdong-gu',
+    '032-2345-6789',
+    NULL,
+    37.4475,
+    126.7314,
+    'Thứ 2–Thứ 6 09:00–18:00',
+    'active',
+    'verified'
+  );
+
+INSERT OR IGNORE INTO business_services (
+  id, business_id, name, description, price, duration_minutes
+) VALUES
+  (
+    'business_service_kitchen_01',
+    'business_saigon_kitchen_01',
+    'Bữa trưa Việt',
+    'Set cơm Việt và món gọi thêm tại quán.',
+    '12000 KRW',
+    60
+  ),
+  (
+    'business_service_translation_01',
+    'business_hanviet_translation_01',
+    'Biên dịch hồ sơ Việt–Hàn',
+    'Kiểm tra và dịch giấy tờ thông dụng theo lịch hẹn.',
+    'Từ 30000 KRW',
+    60
   );
 
 

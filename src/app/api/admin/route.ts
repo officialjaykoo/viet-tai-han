@@ -8,6 +8,7 @@ import {
   setUserStatus,
   warnUser,
 } from "@/lib/admin";
+import { reviewBusinessVerification } from "@/lib/businesses";
 import { reviewListingReport } from "@/lib/marketplace";
 import { listSiteSettings, setSiteSetting } from "@/lib/settings";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest) {
       reportStatus?: "reviewed" | "dismissed";
       removeListing?: boolean;
       resolutionNote?: string;
+      verificationId?: string;
+      verificationStatus?: "approved" | "rejected";
+      verificationNote?: string;
     };
 
     switch (body.op) {
@@ -133,6 +137,25 @@ export async function POST(request: NextRequest) {
           status: body.reportStatus,
           removeListing: body.removeListing,
           resolutionNote: body.resolutionNote,
+        });
+        return NextResponse.json(result);
+      }
+      case "review_business_verification": {
+        if (
+          !body.verificationId ||
+          !body.verificationStatus ||
+          !["approved", "rejected"].includes(body.verificationStatus)
+        ) {
+          return await jsonLocalizedError(
+            "Missing business verification fields",
+            400
+          );
+        }
+        const result = await reviewBusinessVerification({
+          requestId: body.verificationId,
+          reviewerId: actor.id,
+          status: body.verificationStatus,
+          resolutionNote: body.verificationNote,
         });
         return NextResponse.json(result);
       }

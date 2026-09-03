@@ -21,7 +21,7 @@
 - auth: Better Auth + username plugin
 - browser API: POST `/i/api` Protobuf tunnel
 - direct API: `/api/*` + `Authorization: Bearer <personal_api_key>`
-- local DB: migrations `0001`~`0021`, `seed.sql`
+- local DB: migrations `0001`~`0022`, `seed.sql`
 
 ## P0-1 identity와 환경
 
@@ -120,7 +120,7 @@
 
 1. Q&A와 답변 채택/검색 — **완료**. `0020_questions_answers.sql`, `/questions`, `/ask`, 답변·채택 API를 적용했다.
 2. 중고거래·구인·서비스 listing과 scam/report workflow — **완료**. `0021_marketplace.sql`, `/marketplace`, listing/save/alert/report API, 운영 리포트 큐와 통합 회귀 테스트를 적용했다.
-3. business profile, verification, 지도/예약.
+3. business profile, verification, 지도/예약 — **완료**. `0022_business_profiles.sql`, `/businesses`, 인증 심사 큐, 지도 링크, 예약 요청/상태 변경 API와 통합 테스트를 적용했다.
 4. Facebook/Zalo OAuth, WebAuthn/passkey, account linking.
 5. push notification, DM moderation, unread fanout.
 6. Vietnamese content translation, multilingual embedding/recommendation.

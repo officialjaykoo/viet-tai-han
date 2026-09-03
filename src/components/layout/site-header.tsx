@@ -212,6 +212,13 @@ export function SiteHeader() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"
+                  render={<Link href="/businesses" />}
+                >
+                  <CompassIcon />
+                  {t("nav.businesses")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
                   render={<Link href="/recommended" />}
                 >
                   <SparklesIcon />

@@ -62,6 +62,17 @@ type ListingReport = {
   createdAt: string;
 };
 
+type BusinessVerification = {
+  id: string;
+  businessSlug: string;
+  businessName: string;
+  category: string;
+  location: string;
+  ownerUsername: string | null;
+  ownerName: string;
+  evidence: string;
+  createdAt: string;
+};
 
 export function AdminPanel({
   initial,
@@ -74,6 +85,7 @@ export function AdminPanel({
     recentActions: Array<Record<string, unknown>>;
     adCampaigns?: AdCampaign[];
     burstPosts?: BurstPost[];
+    businessVerifications?: BusinessVerification[];
     listingReports?: ListingReport[];
   };
 }) {
@@ -96,11 +108,14 @@ export function AdminPanel({
   const campaigns = initial.adCampaigns ?? [];
   const burstPosts = initial.burstPosts ?? [];
   const listingReports = initial.listingReports ?? [];
+  const businessVerifications = initial.businessVerifications ?? [];
   const countLabels: Record<string, string> = {
     users: t("admin.users"),
     posts: t("search.posts"),
     comments: t("feed.comments"),
     subreddits: t("communities.title"),
+    businesses: t("nav.businesses"),
+    pending_business_verifications: t("admin.businessVerification"),
     listings: t("search.listings"),
     open_listing_reports: t("admin.listingReports"),
     banned: t("admin.bans"),
@@ -375,6 +390,78 @@ export function AdminPanel({
                     }
                   >
                     {t("admin.removeListing")}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-heading text-xl font-semibold">
+          {t("admin.businessVerification")}
+        </h2>
+        {businessVerifications.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t("admin.noBusinessVerifications")}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {businessVerifications.map((verification) => (
+              <li
+                key={verification.id}
+                className="space-y-3 rounded-xl border border-border/60 p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <a
+                    href={`/businesses/${verification.businessSlug}`}
+                    className="font-medium hover:underline"
+                  >
+                    {verification.businessName}
+                  </a>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(verification.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {verification.category} · {verification.location} ·{" "}
+                  @{verification.ownerUsername ?? "unknown"} (
+                  {verification.ownerName})
+                </p>
+                <div className="rounded-lg bg-muted/40 p-2 text-sm">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    {t("admin.verificationEvidence")}
+                  </p>
+                  <p className="whitespace-pre-wrap">{verification.evidence}</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_business_verification", {
+                        verificationId: verification.id,
+                        verificationStatus: "approved",
+                      })
+                    }
+                  >
+                    {t("admin.approveVerification")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_business_verification", {
+                        verificationId: verification.id,
+                        verificationStatus: "rejected",
+                      })
+                    }
+                  >
+                    {t("admin.rejectVerification")}
                   </Button>
                 </div>
               </li>

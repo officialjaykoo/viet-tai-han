@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 import { listAdCampaigns } from "@/lib/ads";
 import { listBurstPosts } from "@/lib/score-integrity";
+import { listBusinessVerificationQueue } from "@/lib/businesses";
 import { listListingReportQueue } from "@/lib/marketplace";
 import { invalidateBannedWordsCache } from "@/lib/moderation";
 import { AuthError } from "@/lib/session";
@@ -243,6 +244,8 @@ export async function getAdminOverview() {
          (SELECT COUNT(*) FROM comments WHERE is_removed = 0) AS comments,
          (SELECT COUNT(*) FROM subreddits WHERE is_removed = 0) AS subreddits,
          (SELECT COUNT(*) FROM listings WHERE status != 'removed') AS listings,
+         (SELECT COUNT(*) FROM businesses WHERE status != 'removed') AS businesses,
+         (SELECT COUNT(*) FROM business_verification_requests WHERE status = 'pending') AS pending_business_verifications,
          (SELECT COUNT(*) FROM listing_reports WHERE status = 'open') AS open_listing_reports,
          (SELECT COUNT(*) FROM "user" WHERE status = 'banned') AS banned,
          (SELECT COUNT(*) FROM "user" WHERE status = 'shadowbanned') AS shadowbanned,
@@ -252,6 +255,8 @@ export async function getAdminOverview() {
       users: number;
       posts: number;
       comments: number;
+      businesses: number;
+      pending_business_verifications: number;
       subreddits: number;
       listings: number;
       open_listing_reports: number;
@@ -293,11 +298,13 @@ export async function getAdminOverview() {
     )
     .all();
 
-  const [burstPosts, adCampaigns, listingReports] = await Promise.all([
-    listBurstPosts(15),
-    listAdCampaigns(),
-    listListingReportQueue("open"),
-  ]);
+  const [burstPosts, adCampaigns, listingReports, businessVerifications] =
+    await Promise.all([
+      listBurstPosts(15),
+      listAdCampaigns(),
+      listListingReportQueue("open"),
+      listBusinessVerificationQueue("pending"),
+    ]);
 
   return {
     counts: counts ?? {
@@ -306,6 +313,8 @@ export async function getAdminOverview() {
       comments: 0,
       subreddits: 0,
       listings: 0,
+      businesses: 0,
+      pending_business_verifications: 0,
       open_listing_reports: 0,
       banned: 0,
       shadowbanned: 0,
@@ -316,6 +325,7 @@ export async function getAdminOverview() {
     bannedWords: bannedWords ?? [],
     users: users ?? [],
     burstPosts,
+    businessVerifications,
     adCampaigns,
     listingReports,
   };
