@@ -188,6 +188,36 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/search/route"),
   },
   {
+    methods: ["GET", "POST"],
+    pattern: "/api/listings",
+    load: () => import("@/app/api/listings/route"),
+  },
+  {
+    methods: ["GET"],
+    pattern: "/api/listings/saved",
+    load: () => import("@/app/api/listings/saved/route"),
+  },
+  {
+    methods: ["GET", "PATCH"],
+    pattern: "/api/listings/:id",
+    load: () => import("@/app/api/listings/[id]/route"),
+  },
+  {
+    methods: ["POST"],
+    pattern: "/api/listings/:id/save",
+    load: () => import("@/app/api/listings/[id]/save/route"),
+  },
+  {
+    methods: ["POST"],
+    pattern: "/api/listings/:id/report",
+    load: () => import("@/app/api/listings/[id]/report/route"),
+  },
+  {
+    methods: ["GET", "POST", "DELETE"],
+    pattern: "/api/listing-alerts",
+    load: () => import("@/app/api/listing-alerts/route"),
+  },
+  {
     methods: ["GET"],
     pattern: "/api/recommendations",
     load: () => import("@/app/api/recommendations/route"),

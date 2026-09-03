@@ -9,6 +9,7 @@ import {
   CircleHelpIcon,
   HomeIcon,
   PlusIcon,
+  ShoppingBagIcon,
   UserRoundIcon,
 } from "lucide-react";
 
@@ -42,6 +43,7 @@ export function MobileNav() {
   const items = [
     { href: "/", label: t("nav.home"), icon: HomeIcon },
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
+    { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
     { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
     { href: "/submit", label: t("nav.createPost"), icon: PlusIcon },
     {

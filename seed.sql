@@ -370,6 +370,42 @@ INSERT OR IGNORE INTO answers (
     0,
     datetime('now', '-45 minutes')
   );
+INSERT OR IGNORE INTO listings (
+  id, seller_id, kind, category, title, body, price, location, status
+) VALUES
+  (
+    'listing_bicycle_01',
+    'user_mira',
+    'market',
+    'Đồ gia dụng',
+    'Xe đạp gấp nhẹ, đã bảo dưỡng',
+    'Xe đạp gấp phù hợp đi làm trong thành phố. Có thể xem tình trạng trực tiếp tại khu vực Seoul.',
+    '120000 KRW',
+    'Seoul, Mapo-gu',
+    'active'
+  ),
+  (
+    'listing_restaurant_job_01',
+    'user_nate',
+    'job',
+    'Nhà hàng',
+    'Cần nhân viên phục vụ cuối tuần',
+    'Quán ăn Việt cần người hỗ trợ ca cuối tuần. Ưu tiên người có thể giao tiếp tiếng Hàn cơ bản và làm việc đúng giờ.',
+    'Thỏa thuận',
+    'Seoul, Gwanak-gu',
+    'active'
+  ),
+  (
+    'listing_translation_01',
+    'user_ivy',
+    'service',
+    'Biên dịch',
+    'Nhận hỗ trợ dịch hồ sơ Việt–Hàn',
+    'Hỗ trợ đọc và dịch nội dung hồ sơ thông dụng. Vui lòng mô tả loại giấy tờ và thời hạn cần xử lý khi nhắn tin.',
+    'Giá thỏa thuận',
+    'Incheon',
+    'closed'
+  );
 
 
 INSERT OR IGNORE INTO subscriptions (user_id, subreddit_id) VALUES

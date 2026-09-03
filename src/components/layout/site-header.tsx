@@ -15,6 +15,7 @@ import {
   SearchIcon,
   SettingsIcon,
   ShieldIcon,
+  ShoppingBagIcon,
   SparklesIcon,
   UserRoundIcon,
 } from "lucide-react";
@@ -201,6 +202,13 @@ export function SiteHeader() {
                 >
                   <CircleHelpIcon />
                   {t("nav.questions")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  render={<Link href="/marketplace" />}
+                >
+                  <ShoppingBagIcon />
+                  {t("nav.marketplace")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"

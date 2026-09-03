@@ -136,7 +136,8 @@ type CreateKind =
   | "dm_request"
   | "dm_message"
   | "question"
-  | "answer";
+  | "answer"
+  | "listing";
 
 const CREATE_DEFAULTS: Record<
   CreateKind,
@@ -183,6 +184,12 @@ const CREATE_DEFAULTS: Record<
     hour: 30,
     burstKey: "max_answers_burst_per_min",
     burst: 6,
+  },
+  listing: {
+    hourKey: "max_listings_per_hour",
+    hour: 10,
+    burstKey: "max_listings_burst_per_min",
+    burst: 3,
   },
 };
 

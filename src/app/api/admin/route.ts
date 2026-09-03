@@ -8,6 +8,7 @@ import {
   setUserStatus,
   warnUser,
 } from "@/lib/admin";
+import { reviewListingReport } from "@/lib/marketplace";
 import { listSiteSettings, setSiteSetting } from "@/lib/settings";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
@@ -47,6 +48,10 @@ export async function POST(request: NextRequest) {
       value?: string;
       limit?: number;
       action?: "ban" | "unban" | "shadowban" | "unshadowban";
+      reportId?: string;
+      reportStatus?: "reviewed" | "dismissed";
+      removeListing?: boolean;
+      resolutionNote?: string;
     };
 
     switch (body.op) {
@@ -114,12 +119,22 @@ export async function POST(request: NextRequest) {
         await removeBannedWord(body.wordId);
         return NextResponse.json({ ok: true });
       }
-      case "set_setting": {
-        if (!body.key || body.value == null) {
-          return await jsonLocalizedError("Missing fields", 400);
+      case "review_listing_report": {
+        if (
+          !body.reportId ||
+          !body.reportStatus ||
+          !["reviewed", "dismissed"].includes(body.reportStatus)
+        ) {
+          return await jsonLocalizedError("Missing listing report fields", 400);
         }
-        await setSiteSetting(body.key, body.value, actor.id);
-        return NextResponse.json({ ok: true });
+        const result = await reviewListingReport({
+          reportId: body.reportId,
+          reviewerId: actor.id,
+          status: body.reportStatus,
+          removeListing: body.removeListing,
+          resolutionNote: body.resolutionNote,
+        });
+        return NextResponse.json(result);
       }
       case "backfill_embeddings": {
         const { backfillPostEmbeddings } = await import("@/lib/embeddings");

@@ -48,6 +48,20 @@ type BurstPost = {
   low_karma_events: number;
   weak_source_events: number;
 };
+type ListingReport = {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  listingKind: string;
+  listingStatus: string;
+  reporterUsername: string | null;
+  sellerUsername: string | null;
+  reason: string;
+  details: string | null;
+  status: string;
+  createdAt: string;
+};
+
 
 export function AdminPanel({
   initial,
@@ -60,6 +74,7 @@ export function AdminPanel({
     recentActions: Array<Record<string, unknown>>;
     adCampaigns?: AdCampaign[];
     burstPosts?: BurstPost[];
+    listingReports?: ListingReport[];
   };
 }) {
   const router = useRouter();
@@ -80,11 +95,14 @@ export function AdminPanel({
   const [message, setMessage] = useState<string | null>(null);
   const campaigns = initial.adCampaigns ?? [];
   const burstPosts = initial.burstPosts ?? [];
+  const listingReports = initial.listingReports ?? [];
   const countLabels: Record<string, string> = {
     users: t("admin.users"),
     posts: t("search.posts"),
     comments: t("feed.comments"),
     subreddits: t("communities.title"),
+    listings: t("search.listings"),
+    open_listing_reports: t("admin.listingReports"),
     banned: t("admin.bans"),
     shadowbanned: t("admin.bans"),
     banned_words: t("admin.bannedWords"),
@@ -98,6 +116,24 @@ export function AdminPanel({
     active: t("admin.activate"),
     paused: t("admin.pause"),
     ended: t("admin.end"),
+  };
+  const listingKindLabels: Record<string, string> = {
+    market: t("marketplace.market"),
+    job: t("marketplace.job"),
+    service: t("marketplace.service"),
+  };
+  const listingStatusLabels: Record<string, string> = {
+    active: t("marketplace.active"),
+    sold: t("marketplace.sold"),
+    closed: t("marketplace.closed"),
+    removed: t("marketplace.removed"),
+  };
+  const reportReasonLabels: Record<string, string> = {
+    scam: t("marketplace.reasonScam"),
+    prohibited: t("marketplace.reasonProhibited"),
+    misleading: t("marketplace.reasonMisleading"),
+    unsafe: t("marketplace.reasonUnsafe"),
+    other: t("marketplace.reasonOther"),
   };
 
   function run(op: string, payload: Record<string, unknown> = {}) {
@@ -257,6 +293,94 @@ export function AdminPanel({
             </li>
           ) : null}
         </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-heading text-xl font-semibold">
+          {t("admin.listingReports")}
+        </h2>
+        {listingReports.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t("admin.noListingReports")}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {listingReports.map((report) => (
+              <li
+                key={report.id}
+                className="space-y-3 rounded-xl border border-border/60 p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <a
+                    href={`/marketplace/${report.listingId}`}
+                    className="font-medium hover:underline"
+                  >
+                    {report.listingTitle}
+                  </a>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(report.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {listingKindLabels[report.listingKind] ?? report.listingKind} ·{" "}
+                  {listingStatusLabels[report.listingStatus] ?? report.listingStatus} ·{" "}
+                  {t("admin.reportReason")}:{" "}
+                  {reportReasonLabels[report.reason] ?? report.reason} ·{" "}
+                  {t("admin.reportDetails")}: {report.details || "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  @{report.reporterUsername ?? "unknown"} → @
+                  {report.sellerUsername ?? "unknown"}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_listing_report", {
+                        reportId: report.id,
+                        reportStatus: "reviewed",
+                      })
+                    }
+                  >
+                    {t("admin.reviewReport")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_listing_report", {
+                        reportId: report.id,
+                        reportStatus: "dismissed",
+                      })
+                    }
+                  >
+                    {t("admin.dismissReport")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_listing_report", {
+                        reportId: report.id,
+                        reportStatus: "reviewed",
+                        removeListing: true,
+                      })
+                    }
+                  >
+                    {t("admin.removeListing")}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {burstPosts.length > 0 ? (

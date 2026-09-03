@@ -5,6 +5,7 @@ import {
   CircleHelpIcon,
   FileTextIcon,
   SearchIcon,
+  ShoppingBagIcon,
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,6 +26,7 @@ import { apiFetch } from "@/lib/api-client";
 import type {
   SearchAccountHit,
   SearchCommunityHit,
+  SearchListingHit,
   SearchPostHit,
   SearchQuestionHit,
   SearchResults,
@@ -35,6 +37,7 @@ type SuggestionItem =
   | { kind: "account"; href: string; data: SearchAccountHit }
   | { kind: "post"; href: string; data: SearchPostHit }
   | { kind: "question"; href: string; data: SearchQuestionHit }
+  | { kind: "listing"; href: string; data: SearchListingHit }
   | { kind: "all"; href: string; label: string };
 
 function buildItems(
@@ -72,6 +75,13 @@ function buildItems(
       kind: "question",
       href: `/questions/${question.id}`,
       data: question,
+    });
+  }
+  for (const listing of results.listings) {
+    items.push({
+      kind: "listing",
+      href: `/marketplace/${listing.id}`,
+      data: listing,
     });
   }
 
@@ -212,7 +222,8 @@ export function SearchForm({
     (results?.communities.length ?? 0) +
       (results?.accounts.length ?? 0) +
       (results?.posts.length ?? 0) +
-      (results?.questions.length ?? 0) >
+      (results?.questions.length ?? 0) +
+      (results?.listings.length ?? 0) >
     0;
 
   return (
@@ -445,6 +456,44 @@ export function SearchForm({
                           {t("questions.answerCount", {
                             count: question.answerCount,
                           })}
+                        </span>
+                      </span>
+                    </SuggestionRow>
+                  );
+                })}
+              </SuggestionGroup>
+            ) : null}
+            {results && results.listings.length > 0 ? (
+              <SuggestionGroup label={t("search.listings")}>
+                {results.listings.map((listing) => {
+                  const index = items.findIndex(
+                    (item) => item.kind === "listing" && item.data.id === listing.id
+                  );
+                  return (
+                    <SuggestionRow
+                      key={`l-${listing.id}`}
+                      id={`${listId}-option-${index}`}
+                      href={`/marketplace/${listing.id}`}
+                      active={activeIndex === index}
+                      onHover={() => setActiveIndex(index)}
+                      onSelect={() =>
+                        activateItem({
+                          kind: "listing",
+                          href: `/marketplace/${listing.id}`,
+                          data: listing,
+                        })
+                      }
+                    >
+                      <ShoppingBagIcon
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {listing.title}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {listing.category} · {listing.location}
                         </span>
                       </span>
                     </SuggestionRow>

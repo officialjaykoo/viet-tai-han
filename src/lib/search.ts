@@ -39,6 +39,18 @@ export type SearchQuestionHit = {
   authorUsername: string;
   subredditName: string;
 };
+export type SearchListingHit = {
+  id: string;
+  kind: "market" | "job" | "service";
+  category: string;
+  title: string;
+  body: string;
+  price: string | null;
+  location: string;
+  status: "active" | "sold" | "closed";
+  createdAt: string;
+  authorUsername: string;
+};
 
 export type SearchResults = {
   query: string;
@@ -46,6 +58,7 @@ export type SearchResults = {
   accounts: SearchAccountHit[];
   posts: SearchPostHit[];
   questions: SearchQuestionHit[];
+  listings: SearchListingHit[];
 };
 
 export function normalizeSearchQuery(raw: string): string {
@@ -65,6 +78,7 @@ export async function searchAll(
     accounts?: number;
     posts?: number;
     questions?: number;
+    listings?: number;
   } = {}
 ): Promise<SearchResults> {
   const query = normalizeSearchQuery(rawQuery);
@@ -75,6 +89,7 @@ export async function searchAll(
       accounts: [],
       posts: [],
       questions: [],
+      listings: [],
     };
   }
 
@@ -82,17 +97,17 @@ export async function searchAll(
   const accountLimit = limits.accounts ?? DEFAULT_LIMIT;
   const postLimit = limits.posts ?? 12;
   const questionLimit = limits.questions ?? 12;
+  const listingLimit = limits.listings ?? 12;
   const pattern = likeContains(query);
-  const db = await getDb();
-
-  const [communities, accounts, posts, questions] = await Promise.all([
+  const [communities, accounts, posts, questions, listings] = await Promise.all([
     searchCommunities(pattern, communityLimit),
     searchAccounts(pattern, accountLimit),
     searchPosts(pattern, postLimit),
     searchQuestions(pattern, questionLimit),
+    searchListings(pattern, listingLimit),
   ]);
 
-  return { query, communities, accounts, posts, questions };
+  return { query, communities, accounts, posts, questions, listings };
 }
 
 async function searchCommunities(
@@ -219,6 +234,56 @@ async function searchPosts(
     createdAt: row.created_at,
     authorUsername: row.author_username,
     subredditName: row.subreddit_name,
+  }));
+}
+async function searchListings(
+  pattern: string,
+  limit: number
+): Promise<SearchListingHit[]> {
+  const db = await getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT
+         l.id, l.kind, l.category, l.title, l.body, l.price, l.location,
+         l.status, l.created_at,
+         u.username AS author_username
+       FROM listings l
+       INNER JOIN "user" u ON u.id = l.seller_id
+       WHERE l.status IN ('active', 'sold', 'closed')
+         AND l.is_shadow_hidden = 0
+         AND u.status = 'active'
+         AND (l.title LIKE ? ESCAPE '\\'
+              OR l.body LIKE ? ESCAPE '\\'
+              OR l.category LIKE ? ESCAPE '\\'
+              OR l.location LIKE ? ESCAPE '\\')
+       ORDER BY l.status = 'active' DESC, l.created_at DESC, l.id DESC
+       LIMIT ?`
+    )
+    .bind(pattern, pattern, pattern, pattern, limit)
+    .all<{
+      id: string;
+      kind: "market" | "job" | "service";
+      category: string;
+      title: string;
+      body: string;
+      price: string | null;
+      location: string;
+      status: "active" | "sold" | "closed";
+      created_at: string;
+      author_username: string;
+    }>();
+
+  return (results ?? []).map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    category: row.category,
+    title: row.title,
+    body: row.body,
+    price: row.price,
+    location: row.location,
+    status: row.status,
+    createdAt: row.created_at,
+    authorUsername: row.author_username,
   }));
 }
 async function searchQuestions(

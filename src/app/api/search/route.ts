@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const results = await searchAll(
       q,
       suggest
-        ? { communities: 4, accounts: 4, posts: 5, questions: 5 }
+        ? { communities: 4, accounts: 4, posts: 5, questions: 5, listings: 5 }
         : undefined
     );
     return NextResponse.json(results);

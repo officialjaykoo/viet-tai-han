@@ -1,4 +1,7 @@
 import { getDb } from "@/lib/db";
+import { listAdCampaigns } from "@/lib/ads";
+import { listBurstPosts } from "@/lib/score-integrity";
+import { listListingReportQueue } from "@/lib/marketplace";
 import { invalidateBannedWordsCache } from "@/lib/moderation";
 import { AuthError } from "@/lib/session";
 
@@ -239,6 +242,8 @@ export async function getAdminOverview() {
          (SELECT COUNT(*) FROM posts WHERE is_removed = 0) AS posts,
          (SELECT COUNT(*) FROM comments WHERE is_removed = 0) AS comments,
          (SELECT COUNT(*) FROM subreddits WHERE is_removed = 0) AS subreddits,
+         (SELECT COUNT(*) FROM listings WHERE status != 'removed') AS listings,
+         (SELECT COUNT(*) FROM listing_reports WHERE status = 'open') AS open_listing_reports,
          (SELECT COUNT(*) FROM "user" WHERE status = 'banned') AS banned,
          (SELECT COUNT(*) FROM "user" WHERE status = 'shadowbanned') AS shadowbanned,
          (SELECT COUNT(*) FROM banned_words) AS banned_words`
@@ -248,6 +253,8 @@ export async function getAdminOverview() {
       posts: number;
       comments: number;
       subreddits: number;
+      listings: number;
+      open_listing_reports: number;
       banned: number;
       shadowbanned: number;
       banned_words: number;
@@ -286,11 +293,10 @@ export async function getAdminOverview() {
     )
     .all();
 
-  const { listBurstPosts } = await import("@/lib/score-integrity");
-  const { listAdCampaigns } = await import("@/lib/ads");
-  const [burstPosts, adCampaigns] = await Promise.all([
+  const [burstPosts, adCampaigns, listingReports] = await Promise.all([
     listBurstPosts(15),
     listAdCampaigns(),
+    listListingReportQueue("open"),
   ]);
 
   return {
@@ -299,6 +305,8 @@ export async function getAdminOverview() {
       posts: 0,
       comments: 0,
       subreddits: 0,
+      listings: 0,
+      open_listing_reports: 0,
       banned: 0,
       shadowbanned: 0,
       banned_words: 0,
@@ -309,5 +317,6 @@ export async function getAdminOverview() {
     users: users ?? [],
     burstPosts,
     adCampaigns,
+    listingReports,
   };
 }
