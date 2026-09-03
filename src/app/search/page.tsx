@@ -177,6 +177,48 @@ export default async function SearchPage({
                   ))}
                 </ul>
               </SearchSection>
+              <SearchSection
+                title={tLocale(locale, "search.listings")}
+                empty={tLocale(locale, "pages.noListingsMatched")}
+                count={results.listings.length}
+              >
+                <ul className="space-y-2">
+                  {results.listings.map((listing) => (
+                    <li key={listing.id}>
+                      <Link
+                        href={`/marketplace/${listing.id}`}
+                        className="block rounded-2xl border border-border/60 bg-card/70 px-4 py-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-medium text-[var(--brand)]">
+                            {listing.category}
+                          </span>
+                          <span aria-hidden>·</span>
+                          <span>{listing.location}</span>
+                          <span aria-hidden>·</span>
+                          <span>
+                            {listing.status === "active"
+                              ? tLocale(locale, "marketplace.active")
+                              : listing.status === "sold"
+                                ? tLocale(locale, "marketplace.sold")
+                                : tLocale(locale, "marketplace.closed")}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-heading text-sm font-semibold leading-snug text-balance">
+                          {listing.title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          @{listing.authorUsername}
+                          {listing.price ? ` · ${listing.price}` : ""}
+                        </p>
+                        <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+                          {listing.body}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </SearchSection>
             </div>
           ) : null}
         </div>
