@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   BellIcon,
   CompassIcon,
+  CircleHelpIcon,
   HomeIcon,
   PlusIcon,
   UserRoundIcon,
@@ -40,6 +41,7 @@ export function MobileNav() {
 
   const items = [
     { href: "/", label: t("nav.home"), icon: HomeIcon },
+    { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
     { href: "/submit", label: t("nav.createPost"), icon: PlusIcon },
     {

@@ -118,7 +118,7 @@
 
 ## P0 완료 후 P1 연결 순서
 
-1. Q&A와 답변 채택/검색.
+1. Q&A와 답변 채택/검색 — **완료**. `0020_questions_answers.sql`, `/questions`, `/ask`, 답변·채택 API를 적용했다.
 2. 중고거래·구인·서비스 listing과 scam/report workflow.
 3. business profile, verification, 지도/예약.
 4. Facebook/Zalo OAuth, WebAuthn/passkey, account linking.

@@ -129,7 +129,14 @@ async function settingInt(key: string, fallback: number): Promise<number> {
   return Number.isFinite(n) ? n : fallback;
 }
 
-type CreateKind = "post" | "comment" | "vote" | "dm_request" | "dm_message";
+type CreateKind =
+  | "post"
+  | "comment"
+  | "vote"
+  | "dm_request"
+  | "dm_message"
+  | "question"
+  | "answer";
 
 const CREATE_DEFAULTS: Record<
   CreateKind,
@@ -164,6 +171,18 @@ const CREATE_DEFAULTS: Record<
     hour: 30,
     burstKey: "max_dm_messages_burst_per_min",
     burst: 8,
+  },
+  question: {
+    hourKey: "max_questions_per_hour",
+    hour: 5,
+    burstKey: "max_questions_burst_per_min",
+    burst: 2,
+  },
+  answer: {
+    hourKey: "max_answers_per_hour",
+    hour: 30,
+    burstKey: "max_answers_burst_per_min",
+    burst: 6,
   },
 };
 

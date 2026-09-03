@@ -29,12 +29,23 @@ export type SearchPostHit = {
   authorUsername: string;
   subredditName: string;
 };
+export type SearchQuestionHit = {
+  id: string;
+  title: string;
+  body: string;
+  answerCount: number;
+  acceptedAnswerId: string | null;
+  createdAt: string;
+  authorUsername: string;
+  subredditName: string;
+};
 
 export type SearchResults = {
   query: string;
   communities: SearchCommunityHit[];
   accounts: SearchAccountHit[];
   posts: SearchPostHit[];
+  questions: SearchQuestionHit[];
 };
 
 export function normalizeSearchQuery(raw: string): string {
@@ -53,26 +64,35 @@ export async function searchAll(
     communities?: number;
     accounts?: number;
     posts?: number;
+    questions?: number;
   } = {}
 ): Promise<SearchResults> {
   const query = normalizeSearchQuery(rawQuery);
   if (query.length < 1) {
-    return { query, communities: [], accounts: [], posts: [] };
+    return {
+      query,
+      communities: [],
+      accounts: [],
+      posts: [],
+      questions: [],
+    };
   }
 
   const communityLimit = limits.communities ?? DEFAULT_LIMIT;
   const accountLimit = limits.accounts ?? DEFAULT_LIMIT;
   const postLimit = limits.posts ?? 12;
+  const questionLimit = limits.questions ?? 12;
   const pattern = likeContains(query);
   const db = await getDb();
 
-  const [communities, accounts, posts] = await Promise.all([
+  const [communities, accounts, posts, questions] = await Promise.all([
     searchCommunities(pattern, communityLimit),
     searchAccounts(pattern, accountLimit),
     searchPosts(pattern, postLimit),
+    searchQuestions(pattern, questionLimit),
   ]);
 
-  return { query, communities, accounts, posts };
+  return { query, communities, accounts, posts, questions };
 }
 
 async function searchCommunities(
@@ -201,6 +221,54 @@ async function searchPosts(
     subredditName: row.subreddit_name,
   }));
 }
+async function searchQuestions(
+  pattern: string,
+  limit: number
+): Promise<SearchQuestionHit[]> {
+  const db = await getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT
+         q.id, q.title, q.body, q.answer_count, q.accepted_answer_id,
+         q.created_at,
+         COALESCE(u.username, u.name) AS author_username,
+         s.name AS subreddit_name
+       FROM questions q
+       INNER JOIN "user" u ON u.id = q.author_id
+       INNER JOIN subreddits s ON s.id = q.subreddit_id
+       WHERE q.is_removed = 0
+         AND q.is_shadow_hidden = 0
+         AND s.is_removed = 0
+         AND (q.title LIKE ? ESCAPE '\\'
+              OR q.body LIKE ? ESCAPE '\\')
+       ORDER BY (q.accepted_answer_id IS NOT NULL) DESC,
+                q.updated_at DESC, q.id DESC
+       LIMIT ?`
+    )
+    .bind(pattern, pattern, limit)
+    .all<{
+      id: string;
+      title: string;
+      body: string;
+      answer_count: number;
+      accepted_answer_id: string | null;
+      created_at: string;
+      author_username: string;
+      subreddit_name: string;
+    }>();
+
+  return (results ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    answerCount: Number(row.answer_count ?? 0),
+    acceptedAnswerId: row.accepted_answer_id,
+    createdAt: row.created_at,
+    authorUsername: row.author_username,
+    subredditName: row.subreddit_name,
+  }));
+}
+
 
 /** Lightweight community lookup for the compose community picker. */
 export async function searchCommunitiesQuery(

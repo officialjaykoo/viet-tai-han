@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BellIcon,
+  CircleHelpIcon,
   CircleUserRoundIcon,
   CompassIcon,
   HomeIcon,
@@ -193,6 +194,13 @@ export function SiteHeader() {
                 >
                   <CompassIcon />
                   {t("nav.communities")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  render={<Link href="/questions" />}
+                >
+                  <CircleHelpIcon />
+                  {t("nav.questions")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"

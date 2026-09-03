@@ -148,6 +148,35 @@ export default async function SearchPage({
                   ))}
                 </ul>
               </SearchSection>
+              <SearchSection
+                title={tLocale(locale, "search.questions")}
+                empty={tLocale(locale, "pages.noQuestionsMatched")}
+                count={results.questions.length}
+              >
+                <ul className="space-y-2">
+                  {results.questions.map((question) => (
+                    <li key={question.id}>
+                      <Link
+                        href={`/questions/${question.id}`}
+                        className="block rounded-2xl border border-border/60 bg-card/70 px-4 py-3 transition-colors hover:bg-muted/50"
+                      >
+                        <p className="font-heading text-sm font-semibold leading-snug text-balance">
+                          {question.title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {question.subredditName} · @{question.authorUsername} ·{" "}
+                          {tLocale(locale, "questions.answerCount", {
+                            count: question.answerCount,
+                          })}
+                        </p>
+                        <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+                          {question.body}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </SearchSection>
             </div>
           ) : null}
         </div>

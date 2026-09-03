@@ -318,6 +318,59 @@ INSERT OR IGNORE INTO comments (
   ('cmtW01frank1', 'j1Jj2Kk3Ll4', 'user_grace', NULL, 'Because Button is never just a button.', 0, 0, 0, 0, datetime('now', '-27 hours')),
   ('cmtX01dave01', 'c1Cc2Dd3Ee4', 'user_carol', NULL, 'Checking NSFW blur on this one.', 0, 0, 0, 0, datetime('now', '-7 days'));
 
+INSERT OR IGNORE INTO questions (
+  id, subreddit_id, author_id, title, body, answer_count, accepted_answer_id,
+  created_at
+) VALUES
+  (
+    'question_housing_01',
+    'sub_askred',
+    'user_mira',
+    'Hàn Quốc thuê nhà cần chuẩn bị giấy tờ gì?',
+    'Mình sắp chuyển đến Seoul và muốn biết những giấy tờ, khoản đặt cọc và lưu ý quan trọng khi thuê phòng lần đầu.',
+    2,
+    'answer_housing_01',
+    datetime('now', '-3 hours')
+  ),
+  (
+    'question_phone_01',
+    'sub_askred',
+    'user_nate',
+    '한국에서 선불 유심을 어디서 개통할 수 있나요?',
+    '처음 한국에 도착한 뒤 바로 사용할 수 있는 선불 유심과 개통 장소를 추천해 주세요.',
+    1,
+    NULL,
+    datetime('now', '-90 minutes')
+  );
+
+INSERT OR IGNORE INTO answers (
+  id, question_id, author_id, body, is_accepted, created_at
+) VALUES
+  (
+    'answer_housing_01',
+    'question_housing_01',
+    'user_alice',
+    '계약 전에 외국인등록증, 여권과 소득 또는 재직 증빙을 준비하세요. 보증금과 중개수수료는 계약서에서 금액과 반환 조건을 확인하고, 입주 전 상태를 사진으로 남기는 것이 안전합니다.',
+    1,
+    datetime('now', '-2 hours')
+  ),
+  (
+    'answer_housing_02',
+    'question_housing_01',
+    'user_ivy',
+    '계약서에 관리비 포함 항목과 계약 해지 조건도 꼭 적어 달라고 하세요. 모르는 조항은 서명 전에 통역이나 행정복지센터에 확인하는 편이 좋습니다.',
+    0,
+    datetime('now', '-80 minutes')
+  ),
+  (
+    'answer_phone_01',
+    'question_phone_01',
+    'user_mira',
+    '공항 편의점이나 통신사 매장에서 여권으로 개통할 수 있습니다. 체류 기간과 데이터 사용량을 먼저 정하면 선불 요금제를 비교하기 쉽습니다.',
+    0,
+    datetime('now', '-45 minutes')
+  );
+
 
 INSERT OR IGNORE INTO subscriptions (user_id, subreddit_id) VALUES
   ('user_alice', 'sub_cloudflare'),

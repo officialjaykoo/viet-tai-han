@@ -2,6 +2,7 @@
 
 import {
   ArrowRightIcon,
+  CircleHelpIcon,
   FileTextIcon,
   SearchIcon,
   UsersIcon,
@@ -25,14 +26,15 @@ import type {
   SearchAccountHit,
   SearchCommunityHit,
   SearchPostHit,
+  SearchQuestionHit,
   SearchResults,
 } from "@/lib/search";
 import { cn } from "@/lib/utils";
-
 type SuggestionItem =
   | { kind: "community"; href: string; data: SearchCommunityHit }
   | { kind: "account"; href: string; data: SearchAccountHit }
   | { kind: "post"; href: string; data: SearchPostHit }
+  | { kind: "question"; href: string; data: SearchQuestionHit }
   | { kind: "all"; href: string; label: string };
 
 function buildItems(
@@ -63,6 +65,13 @@ function buildItems(
       kind: "post",
       href: `/post/${post.id}`,
       data: post,
+    });
+  }
+  for (const question of results.questions) {
+    items.push({
+      kind: "question",
+      href: `/questions/${question.id}`,
+      data: question,
     });
   }
 
@@ -202,7 +211,8 @@ export function SearchForm({
   const hasHits =
     (results?.communities.length ?? 0) +
       (results?.accounts.length ?? 0) +
-      (results?.posts.length ?? 0) >
+      (results?.posts.length ?? 0) +
+      (results?.questions.length ?? 0) >
     0;
 
   return (
@@ -393,6 +403,48 @@ export function SearchForm({
                             ? `@${post.subredditName.slice(2)}`
                             : post.subredditName}{" "}
                           {t("search.points", { count: post.score })}
+                        </span>
+                      </span>
+                    </SuggestionRow>
+                  );
+                })}
+              </SuggestionGroup>
+            ) : null}
+            {results && results.questions.length > 0 ? (
+              <SuggestionGroup label={t("search.questions")}>
+                {results.questions.map((question) => {
+                  const index = items.findIndex(
+                    (item) =>
+                      item.kind === "question" && item.data.id === question.id
+                  );
+                  return (
+                    <SuggestionRow
+                      key={`q-${question.id}`}
+                      id={`${listId}-option-${index}`}
+                      href={`/questions/${question.id}`}
+                      active={activeIndex === index}
+                      onHover={() => setActiveIndex(index)}
+                      onSelect={() =>
+                        activateItem({
+                          kind: "question",
+                          href: `/questions/${question.id}`,
+                          data: question,
+                        })
+                      }
+                    >
+                      <CircleHelpIcon
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {question.title}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {question.subredditName} ·{" "}
+                          {t("questions.answerCount", {
+                            count: question.answerCount,
+                          })}
                         </span>
                       </span>
                     </SuggestionRow>
