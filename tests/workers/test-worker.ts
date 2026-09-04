@@ -1,6 +1,7 @@
 /**
  * Slim Worker entry for vitest-pool-workers (local tests only — not deployed).
  */
+export { ChatRoom } from "../../src/workers/ChatRoom";
 export { PostObject } from "../../src/workers/PostObject";
 
 export default {

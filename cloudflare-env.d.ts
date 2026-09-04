@@ -12,6 +12,7 @@ interface CloudflareEnv {
 	DB: D1Database;
 	CACHE?: KVNamespace;
 	POST_OBJECT: DurableObjectNamespace;
+	CHAT_ROOM: DurableObjectNamespace;
 	MEDIA_BUCKET: R2Bucket;
 	AI: Ai;
 	VECTORIZE: VectorizeIndex;

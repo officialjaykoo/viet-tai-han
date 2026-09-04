@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { broadcastChatMessage } from "@/lib/chat-realtime";
 import { getChatMessages, sendChatMessage } from "@/lib/messages";
+
 import { requireCanMessage } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
@@ -61,6 +63,15 @@ export async function POST(
       userId: user.id,
       body: body.body,
       userStatus: user.status,
+    });
+
+    await broadcastChatMessage({
+      roomId,
+      id: message.id,
+      body: message.body,
+      createdAt: message.createdAt,
+      senderId: user.id,
+      senderUsername: user.username ?? null,
     });
 
     return NextResponse.json(message, { status: 201 });

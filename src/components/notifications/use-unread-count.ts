@@ -28,16 +28,14 @@ export function useUnreadCount(kind: UnreadCountKind): number {
             : Number(data?.messageCount ?? 0)
         );
       } catch {
-        // Polling is best-effort; retain the last known count on network failure.
+        // Unread refresh is best-effort; retain the last known count on network failure.
       }
     }
     void load();
-    const interval = window.setInterval(() => void load(), 60_000);
     const refresh = () => void load();
     window.addEventListener("vth-unread-changed", refresh);
     return () => {
       active = false;
-      window.clearInterval(interval);
       window.removeEventListener("vth-unread-changed", refresh);
     };
   }, [kind]);

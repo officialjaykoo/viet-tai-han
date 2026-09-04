@@ -7,9 +7,14 @@
  * @see https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
  */
 
-export { PostObject } from "./workers/PostObject";
+import { createAuth } from "./lib/auth";
+import { ChatRoom } from "./workers/ChatRoom";
+import { PostObject } from "./workers/PostObject";
+
+export { ChatRoom, PostObject };
 
 // `.open-next/worker.js` is produced by `opennextjs-cloudflare build`
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- generated before build
 // @ts-ignore — missing until first OpenNext build; present in deploy/preview
 import { default as handler } from "../.open-next/worker.js";
 
@@ -37,6 +42,67 @@ type EnvWithLimits = CloudflareEnv & {
   TUNNEL_IP_RATE_LIMITER?: RateLimit;
   EXPENSIVE_IP_RATE_LIMITER?: RateLimit;
 };
+const REALTIME_PATH = "/api/messages/realtime";
+
+function realtimeJson(data: unknown, status: number): Response {
+  return Response.json(data, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+async function handleRealtime(
+  request: Request,
+  env: EnvWithLimits
+): Promise<Response> {
+  if (
+    request.method !== "GET" ||
+    request.headers.get("Upgrade")?.toLowerCase() !== "websocket"
+  ) {
+    return realtimeJson({ error: "WebSocket upgrade required" }, 426);
+  }
+
+  const url = new URL(request.url);
+  const roomId = url.searchParams.get("room")?.trim();
+  if (!roomId || roomId.length > 200) {
+    return realtimeJson({ error: "A valid room is required" }, 400);
+  }
+  if (!env.CHAT_ROOM) {
+    return realtimeJson({ error: "Realtime chat is unavailable" }, 503);
+  }
+
+  let session: Awaited<ReturnType<ReturnType<typeof createAuth>["api"]["getSession"]>>;
+  try {
+    const auth = createAuth(env.DB, {
+      BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+      BETTER_AUTH_URL: env.BETTER_AUTH_URL,
+      VTH_AUTH_ORIGINS: env.VTH_AUTH_ORIGINS,
+      FACEBOOK_CLIENT_ID: env.FACEBOOK_CLIENT_ID,
+      FACEBOOK_CLIENT_SECRET: env.FACEBOOK_CLIENT_SECRET,
+      ZALO_APP_ID: env.ZALO_APP_ID,
+      ZALO_APP_SECRET: env.ZALO_APP_SECRET,
+    });
+    session = await auth.api.getSession({ headers: request.headers });
+  } catch (error) {
+    console.error("realtime session verification failed", error);
+    return realtimeJson({ error: "Unauthorized" }, 401);
+  }
+
+  const user = session?.user as { id?: string; status?: string | null } | null;
+  if (!user?.id) {
+    return realtimeJson({ error: "Unauthorized" }, 401);
+  }
+  if (user.status === "banned") {
+    return realtimeJson({ error: "Forbidden" }, 403);
+  }
+
+  const headers = new Headers(request.headers);
+  headers.set("X-VTH-User-ID", user.id);
+  headers.set("X-VTH-Realtime-Token", env.BETTER_AUTH_SECRET);
+
+  const stub = env.CHAT_ROOM.get(env.CHAT_ROOM.idFromName(roomId));
+  return stub.fetch(new Request(request, { headers }));
+}
 
 export default {
   async fetch(
@@ -75,6 +141,10 @@ export default {
           });
           if (!success) return tooManyRequests(60);
         }
+      }
+
+      if (pathname === REALTIME_PATH) {
+        return await handleRealtime(request, env);
       }
 
       const response = await handler.fetch(request, env, ctx);

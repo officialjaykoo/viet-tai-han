@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useCallback } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -45,6 +45,65 @@ type ChatMessage = {
   isMine: boolean;
   senderUsername: string | null;
 };
+
+type RealtimeMessageEvent = {
+  type: "message";
+  roomId: string;
+  message: ChatMessage;
+};
+
+function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
+  if (!value || typeof value !== "object") return null;
+  const event = value as {
+    type?: unknown;
+    roomId?: unknown;
+    message?: unknown;
+  };
+  if (
+    event.type !== "message" ||
+    typeof event.roomId !== "string" ||
+    !event.message ||
+    typeof event.message !== "object"
+  ) {
+    return null;
+  }
+
+  const message = event.message as Partial<ChatMessage>;
+  if (
+    typeof message.id !== "string" ||
+    typeof message.body !== "string" ||
+    typeof message.createdAt !== "string" ||
+    typeof message.isMine !== "boolean" ||
+    (typeof message.senderUsername !== "string" &&
+      message.senderUsername !== null)
+  ) {
+    return null;
+  }
+
+  return {
+    type: "message",
+    roomId: event.roomId,
+    message: {
+      id: message.id,
+      body: message.body,
+      createdAt: message.createdAt,
+      isMine: message.isMine,
+      senderUsername: message.senderUsername,
+    },
+  };
+}
+
+function mergeMessages(
+  current: ChatMessage[],
+  incoming: ChatMessage[]
+): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+  for (const message of current) byId.set(message.id, message);
+  for (const message of incoming) byId.set(message.id, message);
+  return [...byId.values()].sort(
+    (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)
+  );
+}
 type ChatReportReason =
   | "spam"
   | "harassment"
@@ -112,29 +171,124 @@ export function MessagesClient() {
     });
   }
 
-  useEffect(() => {
-    loadInbox();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (!selectedRoom) {
-      // Reading a different room clears the previous room's local state.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMessages([]);
-      setReportingMessageId(null);
-      return;
-    }
-    startTransition(async () => {
-      const res = await apiFetch(`/api/messages/${selectedRoom}`);
+  const loadRoom = useCallback(
+    async (roomId: string) => {
+      const res = await apiFetch(`/api/messages/${roomId}`);
       if (!res.ok) {
         setError(localizeError("Couldn't load chat"));
         return;
       }
       const data = (await res.json()) as { messages: ChatMessage[] };
-      setMessages(data.messages);
+      setMessages((current) => mergeMessages(current, data.messages));
+      setRooms((current) =>
+        current.map((room) =>
+          room.id === roomId ? { ...room, unreadCount: 0 } : room
+        )
+      );
       announceUnreadChanged();
+    },
+    [localizeError]
+  );
+
+  useEffect(() => {
+    loadInbox();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    // A room switch must not display the previous room while the new room loads.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages([]);
+    setReportingMessageId(null);
+    if (!selectedRoom) return;
+
+    startTransition(() => {
+      void loadRoom(selectedRoom);
     });
-  }, [selectedRoom, localizeError]);
+  }, [selectedRoom, loadRoom]);
+
+  useEffect(() => {
+    if (!selectedRoom) return;
+
+    let active = true;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const endpoint = `${protocol}//${window.location.host}/api/messages/realtime?room=${encodeURIComponent(selectedRoom)}`;
+
+    const scheduleReconnect = () => {
+      if (!active || reconnectTimer !== null) return;
+      const delay = Math.min(
+        1_000 * 2 ** Math.min(reconnectAttempt, 4),
+        10_000
+      );
+      reconnectAttempt += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    const connect = () => {
+      if (!active) return;
+      try {
+        socket = new WebSocket(endpoint);
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+
+      socket.onopen = () => {
+        reconnectAttempt = 0;
+      };
+      socket.onmessage = (event) => {
+        if (!active || typeof event.data !== "string") return;
+        let payload: unknown;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        const live = parseRealtimeMessage(payload);
+        if (!live || live.roomId !== selectedRoom) return;
+
+        setMessages((current) =>
+          current.some((message) => message.id === live.message.id)
+            ? current
+            : mergeMessages(current, [live.message])
+        );
+        setRooms((current) =>
+          current.map((room) =>
+            room.id === live.roomId
+              ? {
+                  ...room,
+                  lastBody: live.message.body,
+                  lastMessageAt: live.message.createdAt,
+                  unreadCount: 0,
+                }
+              : room
+          )
+        );
+        // This event-driven read marks the new message as seen; it is not polling.
+        void loadRoom(selectedRoom);
+      };
+      socket.onerror = () => {
+        socket?.close();
+      };
+      socket.onclose = () => {
+        scheduleReconnect();
+      };
+    };
+
+    connect();
+    return () => {
+      active = false;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      socket?.close(1000, "room changed");
+    };
+  }, [selectedRoom, loadRoom]);
 
   function startRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -203,7 +357,7 @@ export function MessagesClient() {
         return;
       }
       const message = (await res.json()) as ChatMessage;
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => mergeMessages(prev, [message]));
       setReply("");
       loadInbox();
     });

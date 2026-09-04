@@ -17,6 +17,10 @@
 			{
 				"name": "POST_OBJECT",
 				"class_name": "PostObject"
+			},
+			{
+				"name": "CHAT_ROOM",
+				"class_name": "ChatRoom"
 			}
 		]
 	},
@@ -24,6 +28,10 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["PostObject"]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": ["ChatRoom"]
 		}
 	]
 }
