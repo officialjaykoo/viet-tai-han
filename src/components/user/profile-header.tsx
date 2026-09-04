@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Cake, UsersRound } from "lucide-react";
+import { Cake } from "lucide-react";
 
 import { AccountBadges } from "@/components/user/account-badges";
 import { AccountTags } from "@/components/user/account-tags";
@@ -82,21 +82,12 @@ export async function ProfileHeader({
 
           <div className="flex flex-wrap items-center gap-2 pb-1">
             {isOwner ? (
-              <>
-                <Link
-                  href="/friends"
-                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
-                >
-                  <UsersRound className="size-4" aria-hidden />
-                  {tLocale(locale, "profile.manageFriends")}
-                </Link>
-                <Link
-                  href="/settings"
-                  className="inline-flex min-h-9 items-center justify-center rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
-                >
-                  {tLocale(locale, "profile.editProfile")}
-                </Link>
-              </>
+              <Link
+                href="/settings"
+                className="inline-flex min-h-9 items-center justify-center rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                {tLocale(locale, "profile.editProfile")}
+              </Link>
             ) : (
               <ProfileActions
                 username={username}

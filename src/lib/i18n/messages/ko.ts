@@ -508,7 +508,6 @@ export const ko: Messages = {
     declineFriend: "거절",
     cancelFriend: "요청 취소",
     removeFriend: "친구 삭제",
-    manageFriends: "친구 관리",
   },
   friends: {
     title: "친구",

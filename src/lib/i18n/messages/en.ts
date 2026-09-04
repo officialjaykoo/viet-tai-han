@@ -514,7 +514,6 @@ export const en = {
     declineFriend: "Decline",
     cancelFriend: "Cancel request",
     removeFriend: "Remove friend",
-    manageFriends: "Manage friends",
   },
   friends: {
     title: "Friends",

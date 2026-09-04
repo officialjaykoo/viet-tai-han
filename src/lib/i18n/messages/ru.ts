@@ -515,7 +515,6 @@ export const ru: Messages = {
     declineFriend: "Отклонить",
     cancelFriend: "Отменить запрос",
     removeFriend: "Удалить из друзей",
-    manageFriends: "Управление друзьями",
   },
   friends: {
     title: "Друзья",

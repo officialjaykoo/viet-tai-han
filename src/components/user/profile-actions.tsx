@@ -203,16 +203,6 @@ export function ProfileActions({
                   : t("profile.friends")}
             </Button>
           )}
-          <Link
-            href="/friends"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "min-h-11 gap-1.5 sm:min-h-8"
-            )}
-          >
-            <UsersRoundIcon className="size-4" aria-hidden />
-            {t("profile.manageFriends")}
-          </Link>
         </>
       ) : null}
       {!blocked ? (

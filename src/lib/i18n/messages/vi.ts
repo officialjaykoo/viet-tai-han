@@ -514,7 +514,6 @@ export const vi: Messages = {
     declineFriend: "Từ chối",
     cancelFriend: "Hủy lời mời",
     removeFriend: "Xóa bạn",
-    manageFriends: "Quản lý bạn bè",
   },
   friends: {
     title: "Bạn bè",
