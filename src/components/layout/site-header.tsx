@@ -10,6 +10,7 @@ import {
   HomeIcon,
   LogInIcon,
   LogOutIcon,
+  MenuIcon,
   MessageSquareIcon,
   PlusIcon,
   SearchIcon,
@@ -23,6 +24,7 @@ import {
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { SearchForm } from "@/components/search/search-form";
 import { MessagesNavIcon } from "@/components/messages/messages-nav-icon";
+import { useScrollVisibility } from "@/components/layout/use-scroll-visibility";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import {
   DropdownMenu,
@@ -58,13 +60,20 @@ export function SiteHeader() {
   const image = visibleSession?.user?.image ?? null;
   const authReady = hydrated && !isPending;
   const signedIn = authReady && Boolean(visibleSession?.user);
+  const mobileChromeVisible = useScrollVisibility();
 
   return (
-    <header className="sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header">
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header transition-transform duration-200 ease-out",
+        !mobileChromeVisible &&
+          "-translate-y-full pointer-events-none sm:translate-y-0 sm:pointer-events-auto"
+      )}
+    >
       <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
         <Link
           href="/"
-          className="group flex min-h-11 shrink-0 items-center gap-2"
+          className="group order-2 flex min-h-11 shrink-0 items-center gap-2 sm:order-0"
           aria-label={t("brand.homeAria")}
         >
           <span
@@ -78,51 +87,9 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <SearchForm compact className="hidden min-w-0 flex-1 sm:block" />
+        <SearchForm compact className="hidden min-w-0 flex-1 sm:order-1 sm:block" />
 
-        <Link
-          href="/search"
-          className={cn(iconBtnClass, "sm:hidden")}
-          aria-label={t("nav.search")}
-        >
-          <SearchIcon className="size-5" />
-        </Link>
-
-        <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
-          {signedIn ? (
-            <>
-              <Link
-                href="/submit"
-                className={cn(
-                  iconBtnClass,
-                  "bg-[color-mix(in_oklch,var(--brand)_12%,transparent)] text-[var(--brand)] hover:bg-[color-mix(in_oklch,var(--brand)_20%,transparent)] hover:text-[var(--brand)]"
-                )}
-                aria-label={t("nav.createPost")}
-                title={t("nav.createPost")}
-              >
-                <PlusIcon className="size-5" strokeWidth={2.25} />
-              </Link>
-              <MessagesNavIcon />
-              <NotificationsBell />
-            </>
-          ) : null}
-          {authReady && !signedIn ? (
-            <div className="mr-0.5 hidden items-center gap-1 sm:flex">
-              <Link
-                href="/login"
-                className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {t("nav.logIn")}
-              </Link>
-              <Link
-                href="/signup"
-                className="inline-flex min-h-9 items-center rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-              >
-                {t("nav.signUp")}
-              </Link>
-            </div>
-          ) : null}
-
+        <div className="order-1 sm:order-3">
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
@@ -132,16 +99,29 @@ export function SiteHeader() {
               aria-label={signedIn ? t("nav.accountMenu") : t("nav.menu")}
             >
               {!authReady ? (
-                <span className="size-8 animate-pulse rounded-full bg-muted" />
-              ) : signedIn ? (
-                <UserAvatar
-                  username={username}
-                  image={image}
-                  size="md"
-                  className="pointer-events-none"
-                />
+                <>
+                  <MenuIcon className="size-6 sm:hidden" strokeWidth={1.9} />
+                  <span className="hidden size-8 animate-pulse rounded-full bg-muted sm:inline-flex" />
+                </>
               ) : (
-                <CircleUserRoundIcon className="size-7" strokeWidth={1.75} />
+                <>
+                  <MenuIcon className="size-6 sm:hidden" strokeWidth={1.9} />
+                  <span className="hidden items-center sm:inline-flex">
+                    {signedIn ? (
+                      <UserAvatar
+                        username={username}
+                        image={image}
+                        size="md"
+                        className="pointer-events-none"
+                      />
+                    ) : (
+                      <CircleUserRoundIcon
+                        className="size-7"
+                        strokeWidth={1.75}
+                      />
+                    )}
+                  </span>
+                </>
               )}
             </DropdownMenuTrigger>
 
@@ -315,6 +295,49 @@ export function SiteHeader() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+        <div className="order-3 ml-auto flex shrink-0 items-center gap-0.5 sm:order-2 sm:gap-1">
+          <Link
+            href="/search"
+            className={cn(iconBtnClass, "order-2 sm:order-none sm:hidden")}
+            aria-label={t("nav.search")}
+          >
+            <SearchIcon className="size-5" />
+          </Link>
+          {signedIn ? (
+            <>
+              <Link
+                href="/submit"
+                className={cn(
+                  iconBtnClass,
+                  "order-1 sm:order-none bg-[color-mix(in_oklch,var(--brand)_12%,transparent)] text-[var(--brand)] hover:bg-[color-mix(in_oklch,var(--brand)_20%,transparent)] hover:text-[var(--brand)]"
+                )}
+                aria-label={t("nav.createPost")}
+                title={t("nav.createPost")}
+              >
+                <PlusIcon className="size-5" strokeWidth={2.25} />
+              </Link>
+              <MessagesNavIcon className="order-3 sm:order-none" />
+              <NotificationsBell className="hidden order-4 sm:order-none sm:inline-flex" />
+            </>
+          ) : null}
+          {authReady && !signedIn ? (
+            <div className="mr-0.5 hidden items-center gap-1 sm:flex">
+              <Link
+                href="/login"
+                className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {t("nav.logIn")}
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex min-h-9 items-center rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+              >
+                {t("nav.signUp")}
+              </Link>
+            </div>
+          ) : null}
+
         </div>
       </div>
     </header>

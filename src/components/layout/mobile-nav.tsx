@@ -8,12 +8,12 @@ import {
   CompassIcon,
   CircleHelpIcon,
   HomeIcon,
-  PlusIcon,
   ShoppingBagIcon,
   UserRoundIcon,
 } from "lucide-react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
+import { useScrollVisibility } from "@/components/layout/use-scroll-visibility";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +25,10 @@ export function MobileNav() {
   const { t } = useI18n();
   const { data: session } = useSession();
   const [hydrated, setHydrated] = useState(false);
+  const chromeVisible = useScrollVisibility();
   useEffect(() => {
-    setHydrated(true);
+    const hydrationId = window.setTimeout(() => setHydrated(true), 0);
+    return () => window.clearTimeout(hydrationId);
   }, []);
   const username = hydrated
     ? (session?.user as { username?: string } | undefined)?.username ?? null
@@ -46,7 +48,6 @@ export function MobileNav() {
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
     { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
     { href: "/businesses", label: t("nav.businesses"), icon: CompassIcon },
-    { href: "/submit", label: t("nav.createPost"), icon: PlusIcon },
     {
       href: "/notifications",
       label: t("nav.notifications"),
@@ -58,7 +59,10 @@ export function MobileNav() {
   return (
     <nav
       aria-label={t("nav.menu")}
-      className="safe-pb-nav fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-[color-mix(in_oklch,var(--background)_90%,transparent)] backdrop-blur-md sm:hidden"
+      className={cn(
+        "safe-pb-nav fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-[color-mix(in_oklch,var(--background)_90%,transparent)] backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none sm:hidden",
+        !chromeVisible && "pointer-events-none translate-y-full"
+      )}
     >
       <div className="mx-auto flex h-16 w-full max-w-3xl items-stretch gap-1 px-2">
         {items.map(({ href, label, icon: Icon }) => {
@@ -71,9 +75,8 @@ export function MobileNav() {
               aria-label={label}
               className={cn(
                 itemClass,
-                isActive && "bg-[color-mix(in_oklch,var(--brand)_10%,transparent)] text-[var(--brand)]",
-                href === "/submit" &&
-                  "text-[var(--brand)] hover:bg-[color-mix(in_oklch,var(--brand)_12%,transparent)]"
+                isActive &&
+                  "bg-[color-mix(in_oklch,var(--brand)_10%,transparent)] text-[var(--brand)]"
               )}
             >
               <Icon className="size-5" strokeWidth={isActive ? 2.25 : 1.8} />

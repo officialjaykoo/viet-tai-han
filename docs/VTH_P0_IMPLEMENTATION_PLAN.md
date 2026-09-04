@@ -51,8 +51,8 @@
 
 | 단계 | 파일/경로 | 구현 |
 |---|---|---|
-| 1 | `src/components/layout/site-header.tsx` | 390px에서 logo/search/menu가 충돌하지 않게 intrinsic width를 제한. menu panel은 viewport-safe padding과 focus return을 보장. |
-| 2 | `src/components/layout/mobile-nav.tsx` 신규 또는 기존 layout component | 모바일 하단 5개 primary action: 홈, 탐색, 만들기, 알림, 프로필. signed-out 상태는 로그인/가입 진입으로 대체. 현재 desktop nav는 보조로 유지. |
+| 1 | `src/components/layout/site-header.tsx` | 390px에서 hamburger·VTH logo·글쓰기·검색·메시지 순서를 유지하고, 모바일 hamburger가 기존 account menu를 연다. panel은 viewport-safe padding과 focus return을 보장한다. |
+| 2 | `src/components/layout/mobile-nav.tsx` 신규 또는 기존 layout component | 모바일 하단 navigation은 홈, 질문, 마켓플레이스, 커뮤니티, 비즈니스, 알림, 프로필을 유지한다. 글쓰기 primary는 상단 header로 이동하고, 스크롤 방향에 따라 header/footer chrome을 자동 표시·숨김한다. signed-out 프로필은 로그인 진입으로 대체한다. |
 | 3 | `src/app/layout.tsx` | body에 mobile nav를 한 번만 배치하고 `pb-[safe-area]`/bottom padding을 적용. footer와 겹치지 않게 한다. |
 | 4 | `src/app/globals.css` | `env(safe-area-inset-bottom)`, tap highlight, focus-visible, min touch target, text wrap 규칙 추가. global horizontal overflow hidden은 문제를 가리는 용도로 사용하지 않는다. |
 | 5 | page surfaces | `/`, `/communities`, `/search`, `/submit`, `/post/[id]`, `/u/[username]`, `/settings`를 390/768/1280에서 확인. table/analytics는 mobile horizontal scroll container로 처리. |
@@ -133,7 +133,7 @@
 - 게시물 카드는 Facebook-style의 작성자 헤더, 본문 중심 흰색 카드, 가로형 반응·댓글 action row를 사용한다. 내부 vote API와 reputation 계산은 변경하지 않는다.
 - 색상은 Facebook blue가 아니라 베트남 국기 컨셉의 `flag red`·`white`·`flag gold`를 사용한다. 배경은 중립 회색, 카드는 흰색, primary와 focus는 red, 선택 상태의 보조 강조는 gold다.
 - PC root는 기존 feed 데이터를 재사용하는 left navigation·center feed·right context의 3단 shell로 정리한다. 새 backend 기능은 추가하지 않는다.
-- 상단 header는 VTH 로고·검색·핵심 이동·알림·계정의 익숙한 social shell로 유지하고, 모바일 하단 navigation은 기존 항목과 동작을 유지한다.
+- 상단 header는 VTH 로고·검색·핵심 이동·알림·계정의 익숙한 social shell로 유지한다. 모바일은 hamburger·VTH logo·글쓰기·검색·메시지 순서이며, account menu는 hamburger에서 연다. 하단 navigation의 글쓰기는 제거하고 스크롤 방향에 따라 header/footer chrome을 자동 표시·숨김한다.
 - 사용자 노출 Reddit 시각 잔재는 제거하되, `/r/*`, `/u/*`, `subreddits`, `upvote/downvote` 내부 호환 계약은 유지한다.
 - 광고·Pro·결제 등 직접적인 commercial surface는 제품 규모가 커질 때까지 보류하고 기본 비활성 상태를 유지한다.
 
