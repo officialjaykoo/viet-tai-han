@@ -5,11 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BellIcon,
-  CompassIcon,
   CircleHelpIcon,
   HomeIcon,
   ShoppingBagIcon,
+  StoreIcon,
   UserRoundIcon,
+  UsersRoundIcon,
 } from "lucide-react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
@@ -34,6 +35,7 @@ export function MobileNav() {
     ? (session?.user as { username?: string } | undefined)?.username ?? null
     : null;
   const profileHref = username ? `/u/${username}` : "/login";
+  if (pathname === "/login" || pathname === "/signup") return null;
 
   function active(href: string) {
     if (href === "/") return pathname === "/";
@@ -46,13 +48,9 @@ export function MobileNav() {
     { href: "/", label: t("nav.home"), icon: HomeIcon },
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
-    { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
-    { href: "/businesses", label: t("nav.businesses"), icon: CompassIcon },
-    {
-      href: "/notifications",
-      label: t("nav.notifications"),
-      icon: BellIcon,
-    },
+    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
+    { href: "/businesses", label: t("nav.businesses"), icon: StoreIcon },
+    { href: "/notifications", label: t("nav.notifications"), icon: BellIcon },
     { href: profileHref, label: t("nav.profile"), icon: UserRoundIcon },
   ];
 

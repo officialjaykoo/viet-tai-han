@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useSyncExternalStore, useTransition } from "react";
 
 import { IdentityAuthButtons } from "@/components/auth/identity-auth-buttons";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import {
@@ -127,18 +128,27 @@ function LoginForm() {
 
 
   return (
-    <Card className="w-full rounded-2xl">
-      <CardHeader>
-        <CardTitle className="font-heading text-2xl">
+    <Card className="w-full rounded-[1.75rem] border-border/80 bg-card/95 shadow-[0_24px_80px_-28px_rgb(27_24_20_/_35%)] ring-1 ring-white/60 dark:ring-white/5">
+      <CardHeader className="gap-2 px-6 pb-3 pt-7 sm:px-8">
+        <CardTitle className="font-heading text-2xl tracking-tight sm:text-[1.7rem]">
           <h1 className="text-inherit">{t("auth.signInTitle")}</h1>
         </CardTitle>
-        <CardDescription>{t("auth.signInDescription")}</CardDescription>
+        <CardDescription className="max-w-sm leading-relaxed">
+          {t("auth.signInDescription")}
+        </CardDescription>
       </CardHeader>
-      <form onSubmit={onSubmit} noValidate className="relative" data-hydrated={hydrated}>
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="relative"
+        data-hydrated={hydrated}
+      >
         <ParserTraps setTrapRef={bot.setTrapRef} />
-        <CardContent className="flex flex-col gap-3">
-          <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">{t("auth.username")}</span>
+        <CardContent className="flex flex-col gap-4 px-6 sm:px-8">
+          <label className="grid gap-2 text-sm">
+            <span className="font-semibold text-foreground/80">
+              {t("auth.username")}
+            </span>
             <Input
               required
               name="username"
@@ -151,8 +161,10 @@ function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
             />
           </label>
-          <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">{t("auth.password")}</span>
+          <label className="grid gap-2 text-sm">
+            <span className="font-semibold text-foreground/80">
+              {t("auth.password")}
+            </span>
             <Input
               required
               name="password"
@@ -164,19 +176,19 @@ function LoginForm() {
             />
           </label>
           {displayError ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-sm text-destructive" role="alert">
               {displayError}
             </p>
           ) : null}
           <TurnstileWidget onToken={setTurnstileToken} />
         </CardContent>
-        <CardFooter className="flex flex-col items-stretch gap-3">
+        <CardFooter className="flex flex-col items-stretch gap-4 px-6 pb-7 sm:px-8">
           <Button
             type="submit"
             disabled={
               !hydrated || pending || requiresTurnstileToken(turnstileToken)
             }
-            className="min-h-11"
+            className="h-12 rounded-xl bg-[var(--flag-red)] font-semibold shadow-[0_12px_24px_-14px_var(--flag-red)] hover:bg-[color-mix(in_oklch,var(--flag-red)_88%,black)]"
           >
             {pending ? t("auth.signingIn") : t("auth.signIn")}
           </Button>
@@ -186,9 +198,12 @@ function LoginForm() {
             onZalo={(event) => startIdentity(event, "zalo")}
             onPasskey={(event) => startIdentity(event, "passkey")}
           />
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="border-t border-border/70 pt-4 text-center text-sm text-muted-foreground">
             {t("auth.noAccount")}{" "}
-            <Link href="/signup" className="text-foreground underline">
+            <Link
+              href="/signup"
+              className="font-semibold text-[var(--flag-red)] underline decoration-[var(--flag-gold)] decoration-2 underline-offset-4 hover:text-[var(--brand-ink)]"
+            >
               {t("auth.createOne")}
             </Link>
           </p>
@@ -201,7 +216,7 @@ function LoginForm() {
 export default function LoginPage() {
   const { t } = useI18n();
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 items-center safe-px safe-pb py-10 sm:py-16">
+    <AuthShell>
       <Suspense
         fallback={
           <div className="w-full rounded-2xl border border-border/60 p-8 text-center text-sm text-muted-foreground">
@@ -211,6 +226,6 @@ export default function LoginPage() {
       >
         <LoginForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }

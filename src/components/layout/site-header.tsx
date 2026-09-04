@@ -7,7 +7,7 @@ import {
   BellIcon,
   CircleHelpIcon,
   CircleUserRoundIcon,
-  CompassIcon,
+  FlameIcon,
   HomeIcon,
   LogInIcon,
   LogOutIcon,
@@ -19,8 +19,11 @@ import {
   ShieldIcon,
   ShoppingBagIcon,
   SparklesIcon,
+  StoreIcon,
   UserRoundIcon,
+  UsersRoundIcon,
 } from "lucide-react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { SearchForm } from "@/components/search/search-form";
@@ -64,10 +67,10 @@ export function SiteHeader() {
   const signedIn = authReady && Boolean(visibleSession?.user);
   const mobileChromeVisible = useScrollVisibility();
   const primaryNav = [
-    { href: "/", label: t("nav.popular"), icon: HomeIcon },
+    { href: "/", label: t("nav.popular"), icon: FlameIcon },
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
-    { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
+    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
     { href: "/recommended", label: t("nav.forYou"), icon: SparklesIcon },
   ];
 
@@ -79,21 +82,13 @@ export function SiteHeader() {
           "-translate-y-full pointer-events-none sm:translate-y-0 sm:pointer-events-auto"
       )}
     >
-      <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
+      <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
         <Link
           href="/"
-          className="group order-2 flex min-h-11 shrink-0 items-center gap-2 sm:order-0"
+          className="group order-2 flex min-h-11 shrink-0 items-center sm:order-0"
           aria-label={t("brand.homeAria")}
         >
-          <span
-            aria-hidden
-            className="grid size-8 place-items-center rounded-xl bg-[var(--brand)] text-sm font-bold text-[var(--brand-foreground)] shadow-[0_8px_20px_-10px_var(--brand)] transition-transform duration-200 motion-safe:group-hover:scale-105"
-          >
-            v
-          </span>
-          <span className="hidden font-heading text-xl font-semibold tracking-tight sm:inline">
-            Việt tại Hàn
-          </span>
+          <BrandLogo size="md" />
         </Link>
 
         <SearchForm
@@ -197,7 +192,7 @@ export function SiteHeader() {
                   className="min-h-11"
                   render={<Link href="/" />}
                 >
-                  <HomeIcon />
+                  <FlameIcon />
                   {t("nav.popular")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -211,7 +206,7 @@ export function SiteHeader() {
                   className="min-h-11"
                   render={<Link href="/communities" />}
                 >
-                  <CompassIcon />
+                  <UsersRoundIcon />
                   {t("nav.communities")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -232,7 +227,7 @@ export function SiteHeader() {
                   className="min-h-11"
                   render={<Link href="/businesses" />}
                 >
-                  <CompassIcon />
+                  <StoreIcon />
                   {t("nav.businesses")}
                 </DropdownMenuItem>
                 <DropdownMenuItem

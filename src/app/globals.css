@@ -55,9 +55,10 @@
   color-scheme: light;
   --flag-red: #da251d;
   --flag-gold: #ffcd00;
+  --flag-gold-text: #9a7100;
+  --brand-ink: #171717;
   --brand: var(--flag-red);
   --brand-foreground: #ffffff;
-  --background: oklch(0.965 0.005 95);
   --foreground: oklch(0.22 0.015 30);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.22 0.015 30);
@@ -94,6 +95,8 @@
 
 .dark {
   color-scheme: dark;
+  --flag-gold-text: #ffd83d;
+  --brand-ink: #fff7df;
   --brand: var(--flag-red);
   --brand-foreground: #ffffff;
   --background: oklch(0.18 0.015 30);

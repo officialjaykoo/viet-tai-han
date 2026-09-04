@@ -1,11 +1,13 @@
 import {
   CircleHelpIcon,
-  CompassIcon,
+  FlameIcon,
   HomeIcon,
   PlusIcon,
   ShoppingBagIcon,
   SparklesIcon,
+  StoreIcon,
   UserRoundIcon,
+  UsersRoundIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -70,7 +72,7 @@ export default async function HomePage({
     : "/login";
   const image = session?.user?.image ?? null;
   const desktopLinks = [
-    { href: "/", label: tLocale(locale, "nav.popular"), icon: SparklesIcon },
+    { href: "/", label: tLocale(locale, "nav.popular"), icon: FlameIcon },
     { href: "/?feed=home", label: tLocale(locale, "nav.home"), icon: HomeIcon },
     {
       href: "/questions",
@@ -85,12 +87,12 @@ export default async function HomePage({
     {
       href: "/communities",
       label: tLocale(locale, "nav.communities"),
-      icon: CompassIcon,
+      icon: UsersRoundIcon,
     },
     {
       href: "/businesses",
       label: tLocale(locale, "nav.businesses"),
-      icon: CompassIcon,
+      icon: StoreIcon,
     },
     {
       href: "/recommended",
@@ -112,7 +114,7 @@ export default async function HomePage({
     {
       href: "/communities",
       label: tLocale(locale, "nav.communities"),
-      icon: CompassIcon,
+      icon: UsersRoundIcon,
     },
     {
       href: "/questions",
@@ -127,7 +129,7 @@ export default async function HomePage({
     {
       href: "/businesses",
       label: tLocale(locale, "nav.businesses"),
-      icon: CompassIcon,
+      icon: StoreIcon,
     },
   ];
   const sort = parseSort(params.sort);
