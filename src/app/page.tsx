@@ -16,8 +16,10 @@ import { FeedComposer } from "@/components/feed/feed-composer";
 import { FeedShortcutRail } from "@/components/feed/feed-shortcut-rail";
 import { FeedModeTabs, FeedSortTabs } from "@/components/feed/feed-controls";
 import { SiteHeader } from "@/components/layout/site-header";
+import { OnlinePeopleList } from "@/components/online/online-people-list";
 import { withFeedAds } from "@/lib/ads";
 import { getFeedPosts, type FeedMode, type FeedSort } from "@/lib/db";
+import { listOnlineUsers } from "@/lib/presence";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { UserAvatar } from "@/components/user/user-avatar";
@@ -53,6 +55,14 @@ async function loadInitialFeed(options: {
   } catch (error) {
     console.error("Failed to load initial feed", error);
     return { posts: [], nextCursor: null, hasMore: false };
+  }
+}
+async function loadOnlineUsers(viewerUserId: string | null) {
+  try {
+    return await listOnlineUsers(viewerUserId, 12);
+  } catch (error) {
+    console.error("Failed to load online users", error);
+    return [];
   }
 }
 
@@ -134,11 +144,14 @@ export default async function HomePage({
   ];
   const sort = parseSort(params.sort);
   const mode = parseMode(params.feed);
-  const initialFeed = await loadInitialFeed({
-    sort,
-    mode,
-    viewerUserId: session?.user?.id ?? null,
-  });
+  const [initialFeed, onlineUsers] = await Promise.all([
+    loadInitialFeed({
+      sort,
+      mode,
+      viewerUserId: session?.user?.id ?? null,
+    }),
+    loadOnlineUsers(session?.user?.id ?? null),
+  ]);
 
   return (
     <>
@@ -234,69 +247,12 @@ export default async function HomePage({
           </div>
 
           <aside className="hidden xl:col-start-3 xl:block">
-            <div className="sticky top-[4.5rem] space-y-4">
-            <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-[0_1px_2px_rgb(0_0_0_/_8%)]">
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="size-2 rounded-full bg-[var(--flag-gold)]"
-                />
-                <p className="text-xs font-semibold tracking-[0.14em] text-[var(--brand)] uppercase">
-                  {tLocale(locale, "nav.communities")}
-                </p>
-              </div>
-              <h2 className="mt-2 font-heading text-lg font-semibold">
-                Việt tại Hàn
-              </h2>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                {tLocale(locale, "meta.description")}
-              </p>
-              <Link
-                href="/communities"
-                className="mt-4 inline-flex min-h-10 items-center rounded-xl bg-[var(--brand)] px-3 text-sm font-semibold text-[var(--brand-foreground)] transition-colors hover:bg-[color-mix(in_oklch,var(--brand)_88%,black)]"
-              >
-                {tLocale(locale, "nav.communities")}
-              </Link>
-            </section>
-
-            <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-[0_1px_2px_rgb(0_0_0_/_8%)]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">
-                  {tLocale(locale, "nav.forYou")}
-                </h2>
-                <SparklesIcon
-                  className="size-4 text-[var(--flag-gold)]"
-                  aria-hidden
-                />
-              </div>
-              <div className="mt-2 divide-y divide-border/70">
-                {shortcutLinks.slice(0, 3).map(({ href, label, icon: Icon }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="flex min-h-11 items-center gap-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <Icon className="size-4 text-[var(--brand)]" aria-hidden />
-                    <span className="truncate">{label}</span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-[0_1px_2px_rgb(0_0_0_/_8%)]">
-              <p className="text-xs font-semibold tracking-[0.14em] text-[var(--brand)] uppercase">
-                {tLocale(locale, "nav.questions")}
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {tLocale(locale, "questions.blurb")}
-              </p>
-              <Link
-                href="/questions"
-                className="mt-3 inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-semibold text-[var(--brand)] transition-colors hover:bg-[color-mix(in_oklch,var(--flag-gold)_18%,transparent)]"
-              >
-                {tLocale(locale, "questions.ask")}
-              </Link>
-            </section>
+            <div className="sticky top-[4.5rem]">
+              <OnlinePeopleList
+                initialUsers={onlineUsers}
+                heading={tLocale(locale, "online.title")}
+                empty={tLocale(locale, "online.empty")}
+              />
             </div>
           </aside>
         </div>

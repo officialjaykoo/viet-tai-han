@@ -7,12 +7,13 @@ import { useI18n } from "@/components/i18n/i18n-provider";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import { cn } from "@/lib/utils";
 
-export type ProfileTab = "overview" | "posts" | "comments";
+export type ProfileTab = "overview" | "posts" | "comments" | "friends";
 
 const TABS: { id: ProfileTab; labelKey: MessageKey }[] = [
   { id: "overview", labelKey: "profile.overview" },
   { id: "posts", labelKey: "profile.posts" },
   { id: "comments", labelKey: "profile.comments" },
+  { id: "friends", labelKey: "profile.friends" },
 ];
 
 export function ProfileTabs({ current }: { current: ProfileTab }) {

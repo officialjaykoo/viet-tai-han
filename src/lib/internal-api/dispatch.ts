@@ -133,6 +133,11 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/friends/route"),
   },
   {
+    methods: ["GET", "POST"],
+    pattern: "/api/presence",
+    load: () => import("@/app/api/presence/route"),
+  },
+  {
     methods: ["POST"],
     pattern: "/api/me/language",
     load: () => import("@/app/api/me/language/route"),

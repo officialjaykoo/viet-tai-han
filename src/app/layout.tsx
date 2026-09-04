@@ -7,6 +7,7 @@ import { I18nProvider } from "@/components/i18n/i18n-provider";
 import { LanguagePrompt } from "@/components/i18n/language-prompt";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { OnlinePresenceBeacon } from "@/components/online/online-presence-beacon";
 import {
   ThemeProvider,
   themeInitScript,
@@ -98,6 +99,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             initialCookieLocale={cookieLocale}
           >
             {children}
+            <OnlinePresenceBeacon enabled={signedIn} />
             <MobileNav />
             <SiteFooter />
             <LanguagePrompt />

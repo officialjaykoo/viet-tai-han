@@ -30,6 +30,10 @@ export const en = {
     businesses: "Businesses",
     friends: "Friends",
   },
+  online: {
+    title: "People online",
+    empty: "No one else is online right now.",
+  },
   language: {
     promptVi: "Are you comfortable with Vietnamese?",
     promptKo: "Would you like to switch to Korean?",
@@ -501,6 +505,7 @@ export const en = {
     emptyOverview: "Nothing to show yet.",
     emptyPosts: "No posts yet.",
     emptyComments: "No comments yet.",
+    emptyFriends: "No friends to show yet.",
     sectionsAria: "Profile sections",
     addFriend: "Add friend",
     friendRequestSent: "Request sent",

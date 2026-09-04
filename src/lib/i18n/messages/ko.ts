@@ -32,6 +32,10 @@ export const ko: Messages = {
     marketplace: "장터",
     friends: "친구",
   },
+  online: {
+    title: "지금 온라인인 사람",
+    empty: "지금 온라인인 사람이 없습니다.",
+  },
   language: {
     promptVi: "베트남어로 사용하시겠어요?",
     promptKo: "한국어로 사용하시겠어요?",
@@ -495,6 +499,7 @@ export const ko: Messages = {
     emptyOverview: "아직 표시할 내용이 없습니다.",
     emptyPosts: "아직 글이 없습니다.",
     emptyComments: "아직 댓글이 없습니다.",
+    emptyFriends: "아직 표시할 친구가 없습니다.",
     sectionsAria: "프로필 섹션",
     addFriend: "친구 추가",
     friendRequestSent: "친구 요청 보냄",

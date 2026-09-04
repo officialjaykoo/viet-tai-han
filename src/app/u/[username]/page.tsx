@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PostCard } from "@/components/feed/post-card";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ProfileCommentCard } from "@/components/user/profile-comment-card";
+import { ProfileFriends } from "@/components/user/profile-friends";
 import { ProfileHeader } from "@/components/user/profile-header";
 import { ProfileSidebar } from "@/components/user/profile-sidebar";
 import {
@@ -17,6 +18,7 @@ import {
   listUserComments,
   type ProfileComment,
 } from "@/lib/content";
+import { listFriends } from "@/lib/friends";
 import { getFeedPosts } from "@/lib/db";
 import { parseSqliteDate } from "@/lib/format-time";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -28,7 +30,9 @@ import { getProfileRelation } from "@/lib/user-actions";
 export const dynamic = "force-dynamic";
 
 function parseTab(value: string | undefined): ProfileTab {
-  if (value === "posts" || value === "comments") return value;
+  if (value === "posts" || value === "comments" || value === "friends") {
+    return value;
+  }
   return "overview";
 }
 
@@ -104,7 +108,7 @@ export default async function ProfilePage({
     }
   }
 
-  const [display, achievements, postsFeed, comments] = await Promise.all([
+  const [display, achievements, postsFeed, comments, friends] = await Promise.all([
     getPublicProfile(username),
     listUserAchievements(profile.id),
     getFeedPosts({
@@ -115,6 +119,7 @@ export default async function ProfilePage({
       viewerUserId: session?.user?.id ?? null,
     }),
     listUserComments(profile.id, 30),
+    listFriends(profile.id),
   ]);
   const user = display ?? profile;
   const posts = postsFeed.posts;
@@ -185,6 +190,13 @@ export default async function ProfilePage({
                       locale={locale}
                     />
                   ))}
+                />
+              ) : null}
+              {tab === "friends" ? (
+                <ProfileFriends
+                  friends={friends}
+                  heading={tLocale(locale, "profile.friends")}
+                  empty={tLocale(locale, "profile.emptyFriends")}
                 />
               ) : null}
             </div>

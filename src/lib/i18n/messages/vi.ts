@@ -32,6 +32,10 @@ export const vi: Messages = {
     businesses: "Doanh nghiệp",
     friends: "Bạn bè",
   },
+  online: {
+    title: "Mọi người đang trực tuyến",
+    empty: "Hiện không có ai khác đang trực tuyến.",
+  },
   language: {
     promptVi: "Bạn muốn sử dụng tiếng Việt?",
     promptKo: "Bạn muốn sử dụng tiếng Hàn?",
@@ -501,6 +505,7 @@ export const vi: Messages = {
     emptyOverview: "Chưa có nội dung để hiển thị.",
     emptyPosts: "Chưa có bài đăng.",
     emptyComments: "Chưa có bình luận.",
+    emptyFriends: "Chưa có bạn bè để hiển thị.",
     sectionsAria: "Các mục trên trang cá nhân",
     addFriend: "Thêm bạn",
     friendRequestSent: "Đã gửi lời mời",

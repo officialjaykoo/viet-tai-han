@@ -32,6 +32,10 @@ export const ru: Messages = {
     businesses: "Компании",
     friends: "Друзья",
   },
+  online: {
+    title: "Сейчас онлайн",
+    empty: "Сейчас больше никого нет онлайн.",
+  },
   language: {
     promptVi: "Хотите использовать вьетнамский?",
     promptKo: "Хотите переключиться на корейский?",
@@ -502,6 +506,7 @@ export const ru: Messages = {
     emptyOverview: "Пока нечего показать.",
     emptyPosts: "Постов пока нет.",
     emptyComments: "Комментариев пока нет.",
+    emptyFriends: "Пока нет друзей для отображения.",
     sectionsAria: "Разделы профиля",
     addFriend: "Добавить в друзья",
     friendRequestSent: "Запрос отправлен",
