@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
+  MessageSquareIcon,
   UserMinusIcon,
   UserPlusIcon,
   UserRoundCheckIcon,
+  UserRoundPlusIcon,
   UsersRoundIcon,
 } from "lucide-react";
 
@@ -129,9 +131,10 @@ export function ProfileActions({
           href={`/messages?to=${encodeURIComponent(username)}`}
           className={cn(
             buttonVariants({ variant: "secondary", size: "sm" }),
-            "min-h-11 sm:min-h-8"
+            "min-h-11 gap-1.5 sm:min-h-8"
           )}
         >
+          <MessageSquareIcon className="size-4" aria-hidden />
           {t("profile.message")}
         </Link>
       ) : null}
@@ -217,10 +220,15 @@ export function ProfileActions({
           type="button"
           size="sm"
           variant={following ? "outline" : "default"}
-          className="min-h-11 sm:min-h-8"
+          className="min-h-11 gap-1.5 sm:min-h-8"
           disabled={pending}
           onClick={() => run(following ? "unfollow" : "follow")}
         >
+          {following ? (
+            <UserRoundCheckIcon className="size-4" aria-hidden />
+          ) : (
+            <UserRoundPlusIcon className="size-4" aria-hidden />
+          )}
           {following ? t("profile.unfollow") : t("profile.follow")}
         </Button>
       ) : null}
