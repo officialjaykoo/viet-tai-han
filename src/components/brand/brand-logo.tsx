@@ -41,9 +41,9 @@ export function BrandLogo({ size = "md", className }: BrandLogoProps) {
           wordmarkSize[size]
         )}
       >
-        <span className="text-[var(--flag-red)]">viet</span>
-        <span className="text-[var(--flag-gold-text)]">tai</span>
-        <span className="text-[var(--brand-ink)]">han</span>
+        <span className="text-[var(--flag-red)]">Việt</span>
+        <span className="text-[var(--flag-gold-text)]">tại</span>
+        <span className="text-[var(--flag-red)]">Hàn</span>
       </span>
     </span>
   );

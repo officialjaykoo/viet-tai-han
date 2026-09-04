@@ -127,7 +127,9 @@ export async function ProfileHeader({
             <AccountTags tags={profile.tags} size="md" />
             <AccountBadges badges={badges} size="md" />
           </div>
-          @{username}
+          <span className="bg-[linear-gradient(90deg,var(--flag-red)_0%,var(--flag-red)_32%,var(--flag-gold-text)_32%,var(--flag-gold-text)_68%,var(--flag-red)_68%,var(--flag-red)_100%)] bg-clip-text font-semibold text-transparent">
+            @{username}
+          </span>
         </div>
 
         {profile.bio ? (
