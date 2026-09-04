@@ -51,7 +51,7 @@ export async function ProfileHeader({
   return (
     <header className="overflow-hidden rounded-2xl border border-border/60 bg-card/90 shadow-sm">
       <div
-        className="h-1 bg-[linear-gradient(90deg,var(--flag-red)_0%,var(--flag-red)_38%,var(--flag-gold)_38%,var(--flag-gold)_100%)]"
+        className="h-1 bg-[linear-gradient(90deg,var(--flag-red)_0%,var(--flag-red)_38%,var(--flag-gold)_38%,var(--flag-gold)_68%,var(--flag-red)_68%,var(--flag-red)_100%)]"
         aria-hidden
       />
       <div className="relative px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
