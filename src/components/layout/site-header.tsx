@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   BellIcon,
   CircleHelpIcon,
@@ -44,6 +45,7 @@ const iconBtnClass =
 
 export function SiteHeader() {
   const { t } = useI18n();
+  const pathname = usePathname();
   const { data: session, isPending } = useSession();
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
@@ -61,11 +63,18 @@ export function SiteHeader() {
   const authReady = hydrated && !isPending;
   const signedIn = authReady && Boolean(visibleSession?.user);
   const mobileChromeVisible = useScrollVisibility();
+  const primaryNav = [
+    { href: "/", label: t("nav.popular"), icon: HomeIcon },
+    { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
+    { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
+    { href: "/communities", label: t("nav.communities"), icon: CompassIcon },
+    { href: "/recommended", label: t("nav.forYou"), icon: SparklesIcon },
+  ];
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header transition-transform duration-200 ease-out",
+        "sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header transition-transform duration-200 ease-out motion-reduce:transition-none",
         !mobileChromeVisible &&
           "-translate-y-full pointer-events-none sm:translate-y-0 sm:pointer-events-auto"
       )}
@@ -87,7 +96,35 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <SearchForm compact className="hidden min-w-0 flex-1 sm:order-1 sm:block" />
+        <SearchForm
+          compact
+          className="hidden min-w-0 flex-none sm:order-1 sm:block sm:w-56 xl:w-72"
+        />
+
+        <nav
+          aria-label={t("nav.menu")}
+          className="hidden min-w-0 flex-1 items-stretch justify-center gap-1 xl:order-2 xl:flex"
+        >
+          {primaryNav.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                aria-label={label}
+                title={label}
+                className={cn(
+                  "relative inline-flex min-h-11 min-w-16 flex-1 items-center justify-center rounded-xl px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  active &&
+                    "text-[var(--brand)] after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--brand)]"
+                )}
+              >
+                <Icon className="size-5" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+              </Link>
+            );
+          })}
+        </nav>
 
         <div className="order-1 sm:order-3">
           <DropdownMenu>

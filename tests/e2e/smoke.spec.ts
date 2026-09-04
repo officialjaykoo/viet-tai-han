@@ -14,6 +14,8 @@ test.describe("cross-platform smoke", () => {
       page.getByRole("heading", { name: "Việt tại Hàn", level: 1 })
     ).toBeVisible();
     await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.getByTestId("feed-composer")).toBeVisible();
+    await expect(page.getByTestId("feed-shortcuts")).toBeVisible();
     await expect(
       page.getByRole("link", { name: /đăng ký|đăng nhập|trang chủ/i }).first()
     ).toBeVisible();

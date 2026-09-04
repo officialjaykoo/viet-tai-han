@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircleIcon } from "lucide-react";
+import { MessageCircleIcon, Share2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -135,6 +135,21 @@ export function PostCard({
   }
 
   const postHref = `/post/${post.id}?src=${discoverySource}`;
+  async function sharePost(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const url = new URL(postHref, window.location.origin).toString();
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: displayTitle, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      // Sharing can be cancelled by the user.
+    }
+  }
 
 
   function openPost(event: React.MouseEvent | React.KeyboardEvent) {
@@ -258,6 +273,16 @@ export function PostCard({
                   : t("feed.comments")}
               </span>
             </Link>
+            <button
+              type="button"
+              data-no-nav
+              className="inline-flex min-h-10 min-w-[7rem] flex-1 items-center justify-center gap-2 rounded-lg px-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label={t("post.share")}
+              onClick={sharePost}
+            >
+              <Share2Icon className="size-4 shrink-0" aria-hidden />
+              <span>{t("post.share")}</span>
+            </button>
             {offerTranslation ? (
               <button
                 type="button"
