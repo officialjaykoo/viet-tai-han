@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowBigDown, ArrowBigUp } from "lucide-react";
+import { ThumbsDownIcon, ThumbsUpIcon } from "lucide-react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { Button } from "@/components/ui/button";
@@ -33,10 +33,10 @@ export function VoteControls({
   return (
     <div
       className={cn(
-        "flex items-center gap-0",
+        "flex items-center",
         vertical
-          ? "w-12 shrink-0 flex-col pt-0.5 sm:w-14"
-          : "flex-row"
+          ? "w-12 shrink-0 flex-col gap-0 pt-0.5 sm:w-14"
+          : "w-full min-w-0 flex-1 flex-row gap-1"
       )}
       role="group"
       aria-label={t("vote.group")}
@@ -44,24 +44,32 @@ export function VoteControls({
       <Button
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size={vertical ? "icon-sm" : "default"}
         aria-label={t("vote.upvote")}
         aria-pressed={viewerVote === "upvote"}
         disabled={pending}
         onClick={() => onVote("upvote")}
         className={cn(
-          "touch-target text-muted-foreground hover:text-[var(--brand)]",
-          viewerVote === "upvote" && "text-[var(--brand)]"
+          vertical
+            ? "touch-target text-muted-foreground hover:text-[var(--brand)]"
+            : "min-h-10 min-w-0 flex-1 rounded-lg px-2 text-muted-foreground hover:bg-muted hover:text-[var(--brand)]",
+          viewerVote === "upvote" &&
+            "bg-[color-mix(in_oklch,var(--flag-gold)_32%,transparent)] text-[var(--brand)]"
         )}
       >
-        <ArrowBigUp className="size-5" aria-hidden />
+        <ThumbsUpIcon className="size-5" aria-hidden />
+        {!vertical ? (
+          <span className="truncate text-xs font-semibold">
+            {t("vote.upvote")}
+          </span>
+        ) : null}
       </Button>
       <span
         className={cn(
           "font-heading text-xs font-semibold tabular-nums",
           score > 0 && "text-foreground",
           score < 0 && "text-muted-foreground",
-          !vertical && "px-1"
+          !vertical && "min-w-8 px-1 text-center"
         )}
       >
         {formatScore(score)}
@@ -69,17 +77,25 @@ export function VoteControls({
       <Button
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size={vertical ? "icon-sm" : "default"}
         aria-label={t("vote.downvote")}
         aria-pressed={viewerVote === "downvote"}
         disabled={pending}
         onClick={() => onVote("downvote")}
         className={cn(
-          "touch-target text-muted-foreground hover:text-sky-600",
-          viewerVote === "downvote" && "text-sky-600"
+          vertical
+            ? "touch-target text-muted-foreground hover:text-[var(--brand)]"
+            : "min-h-10 min-w-0 flex-1 rounded-lg px-2 text-muted-foreground hover:bg-muted hover:text-[var(--brand)]",
+          viewerVote === "downvote" &&
+            "bg-[color-mix(in_oklch,var(--flag-gold)_32%,transparent)] text-[var(--brand)]"
         )}
       >
-        <ArrowBigDown className="size-5" aria-hidden />
+        <ThumbsDownIcon className="size-5" aria-hidden />
+        {!vertical ? (
+          <span className="truncate text-xs font-semibold">
+            {t("vote.downvote")}
+          </span>
+        ) : null}
       </Button>
     </div>
   );

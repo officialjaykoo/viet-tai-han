@@ -756,9 +756,9 @@ export const ru: Messages = {
     events: "событий",
   },
   vote: {
-    upvote: "За",
-    downvote: "Против",
-    group: "Голосование",
+    upvote: "Нравится",
+    downvote: "Не нравится",
+    group: "Реакции",
   },
   common: {
     loading: "Загрузка…",

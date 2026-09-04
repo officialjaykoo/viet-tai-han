@@ -752,9 +752,9 @@ export const vi: Messages = {
     events: "sự kiện",
   },
   vote: {
-    upvote: "Ủng hộ",
-    downvote: "Không ủng hộ",
-    group: "Bình chọn",
+    upvote: "Thích",
+    downvote: "Không thích",
+    group: "Cảm xúc",
   },
   common: {
     loading: "Đang tải…",

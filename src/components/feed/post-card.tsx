@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquare } from "lucide-react";
+import { MessageCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -31,7 +31,7 @@ import type {
   ViewerVote,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 interface PostCardProps {
   post: FeedPost;
@@ -53,10 +53,13 @@ export function PostCard({
   const [showTranslation, setShowTranslation] = useState(false);
 
   useEffect(() => {
-    setScore(post.score);
-    setViewerVote(post.viewerVote);
-    setDismissed(false);
-    setShowTranslation(false);
+    const resetId = window.setTimeout(() => {
+      setScore(post.score);
+      setViewerVote(post.viewerVote);
+      setDismissed(false);
+      setShowTranslation(false);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [post.id, post.score, post.viewerVote]);
 
   const offerTranslation = shouldOfferTranslation(post.translation, locale);
@@ -151,127 +154,133 @@ export function PostCard({
       <Card
         size="sm"
         className={cn(
-          "rounded-2xl bg-card/90 shadow-sm ring-border/60 backdrop-blur-sm",
-          "transition-[transform,box-shadow] duration-200",
-          "motion-safe:hover:shadow-md [@media(hover:hover)_and_(pointer:fine)]:motion-safe:hover:-translate-y-0.5"
+          "rounded-xl border border-border/80 bg-card shadow-[0_1px_2px_rgb(0_0_0_/_8%)]",
+          "transition-[box-shadow] duration-200",
+          "motion-safe:hover:shadow-md"
         )}
       >
-        <div className="flex gap-1 sm:gap-2">
-          <div data-no-nav>
-            <VoteControls
-              score={score}
-              viewerVote={viewerVote}
-              pending={pending}
-              onVote={applyVote}
-            />
-          </div>
-
-          <div
-            className="min-w-0 flex-1 cursor-pointer overflow-hidden"
-            onClick={openPost}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                // Let nested links/buttons handle their own keys
-                const target = event.target as HTMLElement;
-                if (target !== event.currentTarget) return;
-                event.preventDefault();
-                router.push(postHref);
-              }
-            }}
-          >
-            <CardHeader className="gap-1 px-3 pt-3 pb-0">
-              <div className="flex items-start justify-between gap-2">
-                <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 break-anywhere text-xs text-muted-foreground">
-                  <UserAvatar
-                    username={post.author.username}
-                    image={post.author.image}
-                    size="xs"
-                    className="ring-0"
-                  />
-                  <SubredditLabel
-                    name={post.subreddit.name}
-                    className="font-medium text-foreground"
-                  />
-                  <span aria-hidden>·</span>
+        <div
+          className="min-w-0 cursor-pointer overflow-hidden"
+          onClick={openPost}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              // Let nested links/buttons handle their own keys
+              const target = event.target as HTMLElement;
+              if (target !== event.currentTarget) return;
+              event.preventDefault();
+              router.push(postHref);
+            }
+          }}
+        >
+          <CardHeader className="gap-3 px-4 pt-4 pb-0">
+            <div className="flex items-center gap-2.5">
+              <UserAvatar
+                username={post.author.username}
+                image={post.author.image}
+                size="sm"
+                className="ring-0"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 break-anywhere text-sm">
                   <Link
                     href={`/u/${post.author.username}`}
                     prefetch={false}
-                    className="hover:underline"
+                    className="font-semibold text-foreground hover:underline"
                   >
                     @{post.author.username}
                   </Link>
-                  <AccountTags tags={post.author.tags} />
-                  <span aria-hidden>·</span>
-                  <RelativeTime value={post.createdAt} />
-                </p>
-                <div data-no-nav>
-                  <PostOverflowMenu
-                    postId={post.id}
-                    authorUsername={post.author.username}
-                    onDismiss={() => setDismissed(true)}
+                  <span aria-hidden className="text-muted-foreground">
+                    ·
+                  </span>
+                  <SubredditLabel
+                    name={post.subreddit.name}
+                    className="font-medium text-muted-foreground hover:text-foreground"
                   />
-                </div>
-              </div>
-              <CardTitle className="font-heading break-anywhere text-base leading-snug font-semibold tracking-tight text-balance sm:text-[1.05rem]">
-                <Link href={postHref} className="hover:underline">
-                  {displayTitle}
-                </Link>
-              </CardTitle>
-            </CardHeader>
-
-            {displayBody ? (
-              <CardContent className="px-3 pt-2 pb-0">
-                <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
-                  {displayBody}
                 </p>
-              </CardContent>
-            ) : null}
-
-            {post.mediaKey ? (
-              <CardContent className="px-3 pt-2 pb-0">
-                <PostMedia
-                  mediaKey={post.mediaKey}
-                  alt={displayTitle}
-                  className="max-h-80"
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                  <RelativeTime value={post.createdAt} />
+                  <AccountTags tags={post.author.tags} />
+                </p>
+              </div>
+              <div data-no-nav>
+                <PostOverflowMenu
+                  postId={post.id}
+                  authorUsername={post.author.username}
+                  onDismiss={() => setDismissed(true)}
                 />
-              </CardContent>
-            ) : null}
+              </div>
+            </div>
+            <CardTitle className="break-anywhere text-lg leading-snug font-semibold tracking-tight text-balance">
+              <Link href={postHref} className="hover:underline">
+                {displayTitle}
+              </Link>
+            </CardTitle>
+          </CardHeader>
 
-            <CardFooter className="flex-wrap gap-3 px-3 pt-3 pb-3">
-              <Link
-                href={postHref}
-                className="inline-flex min-h-8 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <MessageSquare className="size-3.5 shrink-0" aria-hidden />
+          {displayBody ? (
+            <CardContent className="px-4 pt-2 pb-0">
+              <p className="line-clamp-4 text-[15px] leading-relaxed text-card-foreground/85 [overflow-wrap:anywhere]">
+                {displayBody}
+              </p>
+            </CardContent>
+          ) : null}
+
+          {post.mediaKey ? (
+            <CardContent className="px-4 pt-3 pb-0">
+              <PostMedia
+                mediaKey={post.mediaKey}
+                alt={displayTitle}
+                className="max-h-[32rem]"
+              />
+            </CardContent>
+          ) : null}
+
+          <CardFooter className="mt-3 flex flex-wrap gap-1 border-t border-border/70 px-3 py-1.5">
+            <div data-no-nav className="min-w-0 flex-1">
+              <VoteControls
+                score={score}
+                viewerVote={viewerVote}
+                pending={pending}
+                layout="horizontal"
+                onVote={applyVote}
+              />
+            </div>
+            <Link
+              href={postHref}
+              data-no-nav
+              className="inline-flex min-h-10 min-w-[7rem] flex-1 items-center justify-center gap-2 rounded-lg px-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <MessageCircleIcon className="size-4 shrink-0" aria-hidden />
+              <span>
                 {post.commentCount}{" "}
                 {post.commentCount === 1
                   ? t("feed.comment")
                   : t("feed.comments")}
-              </Link>
-              {offerTranslation ? (
-                <button
-                  type="button"
-                  data-no-nav
-                  className="inline-flex min-h-8 items-center gap-1.5 text-xs font-medium text-[var(--brand)] hover:underline"
-                  aria-pressed={showTranslation}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowTranslation((v) => !v);
-                  }}
-                >
-                  {showTranslation
-                    ? t("translate.showOriginal")
-                    : t("translate.action")}
-                </button>
-              ) : null}
-              {error ? (
-                <span className="text-xs text-destructive" role="alert">
-                  {error}
-                </span>
-              ) : null}
-            </CardFooter>
-          </div>
+              </span>
+            </Link>
+            {offerTranslation ? (
+              <button
+                type="button"
+                data-no-nav
+                className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-semibold text-[var(--brand)] transition-colors hover:bg-[color-mix(in_oklch,var(--flag-gold)_18%,transparent)]"
+                aria-pressed={showTranslation}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowTranslation((v) => !v);
+                }}
+              >
+                {showTranslation
+                  ? t("translate.showOriginal")
+                  : t("translate.action")}
+              </button>
+            ) : null}
+            {error ? (
+              <span className="w-full px-2 text-xs text-destructive" role="alert">
+                {error}
+              </span>
+            ) : null}
+          </CardFooter>
         </div>
       </Card>
     </article>

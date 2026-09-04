@@ -126,6 +126,17 @@
 6. Vietnamese content translation, multilingual embedding/recommendation — **완료**. `0025_multilingual_content.sql`의 translation target metadata, vi/ko/en/ru 감지·M2M100 번역, EmbeddingGemma 기반 768차원 추천, stale-vector guard, 운영 backfill을 적용했다.
 7. 광고/Pro/결제/ledger — **기반 구현 완료, 운영 결제 활성화 대기**. `0026_monetization_foundations.sql`의 동의·Pro 구독·청구 이벤트·transaction/reputation ledger, `/api/me/consent`, `/api/me/pro`, 서명된 provider-neutral `/api/billing/webhook`, 광고 기본 off·동의·active-window·dedupe·rate-limit 게이트를 적용했다. 실제 결제 provider checkout/credentials와 정책 승인 전에는 운영 결제를 켜지 않는다.
 
+## UI 방향 보정
+
+기존 구현은 원본 `red`의 Reddit-style 피드를 유지한 채 VTH 브랜드와 다국어·반응형만 적용했다. 베트남 사용자의 익숙한 사용 패턴을 우선해, 다음 UI 계약을 추가한다.
+
+- 게시물 카드는 Facebook-style의 작성자 헤더, 본문 중심 흰색 카드, 가로형 반응·댓글 action row를 사용한다. 내부 vote API와 reputation 계산은 변경하지 않는다.
+- 색상은 Facebook blue가 아니라 베트남 국기 컨셉의 `flag red`·`white`·`flag gold`를 사용한다. 배경은 중립 회색, 카드는 흰색, primary와 focus는 red, 선택 상태의 보조 강조는 gold다.
+- PC root는 기존 feed 데이터를 재사용하는 left navigation·center feed·right context의 3단 shell로 정리한다. 새 backend 기능은 추가하지 않는다.
+- 상단 header는 VTH 로고·검색·핵심 이동·알림·계정의 익숙한 social shell로 유지하고, 모바일 하단 navigation은 기존 항목과 동작을 유지한다.
+- 사용자 노출 Reddit 시각 잔재는 제거하되, `/r/*`, `/u/*`, `subreddits`, `upvote/downvote` 내부 호환 계약은 유지한다.
+- 광고·Pro·결제 등 직접적인 commercial surface는 제품 규모가 커질 때까지 보류하고 기본 비활성 상태를 유지한다.
+
 ## 외부 blocker
 
 - Cloudflare account ID와 실제 D1/R2/Vectorize/KV/rate-limit resource.

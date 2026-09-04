@@ -45,7 +45,8 @@ export function SiteHeader() {
   const { data: session, isPending } = useSession();
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    setHydrated(true);
+    const hydrationId = window.setTimeout(() => setHydrated(true), 0);
+    return () => window.clearTimeout(hydrationId);
   }, []);
   const visibleSession = hydrated ? session : null;
   const username =
@@ -59,8 +60,8 @@ export function SiteHeader() {
   const signedIn = authReady && Boolean(visibleSession?.user);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-[color-mix(in_oklch,var(--background)_88%,transparent)] backdrop-blur-md supports-[backdrop-filter]:bg-[color-mix(in_oklch,var(--background)_72%,transparent)] safe-pt-header">
-      <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 safe-px sm:gap-3">
+    <header className="sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header">
+      <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
         <Link
           href="/"
           className="group flex min-h-11 shrink-0 items-center gap-2"

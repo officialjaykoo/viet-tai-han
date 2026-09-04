@@ -742,9 +742,9 @@ export const ko: Messages = {
     events: "이벤트",
   },
   vote: {
-    upvote: "추천",
-    downvote: "비추천",
-    group: "투표",
+    upvote: "좋아요",
+    downvote: "싫어요",
+    group: "반응",
   },
   common: {
     loading: "불러오는 중…",

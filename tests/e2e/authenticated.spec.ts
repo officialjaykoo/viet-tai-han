@@ -65,7 +65,7 @@ test.describe("authenticated flows", () => {
       page.getByRole("listitem").filter({ hasText: commentBody })
     ).toBeVisible({ timeout: 30_000 });
 
-    const upvote = page.getByRole("button", { name: /^ủng hộ$/i }).first();
+    const upvote = page.getByRole("button", { name: /^thích$/i }).first();
     await upvote.click();
     await expect(upvote).toHaveAttribute("aria-pressed", "true", {
       timeout: 15_000,

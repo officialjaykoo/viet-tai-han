@@ -754,9 +754,9 @@ export const en = {
     events: "events",
   },
   vote: {
-    upvote: "Upvote",
-    downvote: "Downvote",
-    group: "Voting",
+    upvote: "Like",
+    downvote: "Dislike",
+    group: "Reactions",
   },
   common: {
     loading: "Loading…",

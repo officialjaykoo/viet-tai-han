@@ -35,7 +35,7 @@ export function FeedSortTabs({
 
   return (
     <div
-      className="mb-4 flex flex-wrap items-center gap-1"
+      className="mb-3 flex flex-wrap items-center gap-1 border-b border-border/70"
       role="tablist"
       aria-label={t("feed.sortLabel")}
     >
@@ -48,10 +48,10 @@ export function FeedSortTabs({
             role="tab"
             aria-selected={active}
             className={cn(
-              "inline-flex min-h-9 items-center rounded-4xl px-3 text-sm font-medium transition-colors",
+              "relative inline-flex min-h-10 items-center rounded-t-lg border-b-2 border-transparent px-3 text-sm font-semibold transition-colors hover:bg-muted/70",
               active
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "border-[var(--brand)] text-foreground"
+                : "text-muted-foreground"
             )}
             onClick={(e) => {
               e.preventDefault();
@@ -88,7 +88,11 @@ export function FeedModeTabs({
   }
 
   return (
-    <div className="mb-3 flex gap-1" role="tablist" aria-label={t("feed.modeLabel")}>
+    <div
+      className="mb-1 flex gap-1 border-b border-border/70"
+      role="tablist"
+      aria-label={t("feed.modeLabel")}
+    >
       {(
         [
           { id: "popular" as const, label: t("feed.popular") },
@@ -103,10 +107,10 @@ export function FeedModeTabs({
             role="tab"
             aria-selected={active}
             className={cn(
-              "inline-flex min-h-9 items-center rounded-4xl px-3 text-sm font-medium transition-colors",
+              "relative inline-flex min-h-10 items-center rounded-t-lg border-b-2 border-transparent px-3 text-sm font-semibold transition-colors hover:bg-muted/70",
               active
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                ? "border-[var(--brand)] text-[var(--brand)]"
+                : "text-muted-foreground"
             )}
             onClick={() => router.push(hrefFor(tab.id))}
           >

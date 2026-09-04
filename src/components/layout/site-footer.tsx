@@ -7,7 +7,7 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-auto safe-pb border-t border-transparent py-4">
-      <div className="mx-auto w-full max-w-3xl safe-px">
+      <div className="mx-auto w-full max-w-[1240px] safe-px">
         <p className="select-none text-center text-[10px] tracking-wide text-muted-foreground/50">
           {t("brand.homeAria")} · vth.kr
         </p>
