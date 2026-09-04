@@ -44,8 +44,9 @@ export async function dismissLanguagePrompt(page: Page) {
     name: /chỉ thiết yếu/i,
   });
   if (await essentialConsent.isVisible().catch(() => false)) {
+    await expect(essentialConsent).toBeEnabled({ timeout: 20_000 });
     await essentialConsent.click();
-    await expect(essentialConsent).toBeHidden({ timeout: 5_000 });
+    await expect(essentialConsent).toBeHidden({ timeout: 20_000 });
   }
 }
 
