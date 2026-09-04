@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
-import { listSavedListings } from "@/lib/marketplace";
+import { formatListingPrice, listSavedListings } from "@/lib/marketplace";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +71,8 @@ export default async function SavedMarketplaceListingsPage() {
                         </span>
                       </div>
                       <span className="shrink-0 text-sm font-semibold">
-                        {listing.price?.trim() || tLocale(locale, "marketplace.noPrice")}
+                        {formatListingPrice(listing.price) ??
+                          tLocale(locale, "marketplace.noPrice")}
                       </span>
                     </div>
                     <div className="mt-3">

@@ -29,7 +29,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <span aria-hidden="true" className="flex items-center gap-1.5">
             <span className="h-1 w-8 rounded-full bg-[var(--flag-red)]" />
             <span className="h-1 w-8 rounded-full bg-[var(--flag-gold)]" />
-            <span className="h-1 w-8 rounded-full bg-[var(--brand-ink)]" />
+            <span className="h-1 w-8 rounded-full bg-[var(--flag-red)]" />
           </span>
         </Link>
         {children}

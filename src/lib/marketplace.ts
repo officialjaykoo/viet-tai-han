@@ -83,6 +83,17 @@ export type ListingReportQueueItem = {
   createdAt: string;
 };
 
+/** Add thousands separators to numeric runs in a user-entered price. */
+export function formatListingPrice(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/\d{4,}/g, (digits) =>
+    digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  );
+}
+
 type ListingRow = {
   id: string;
   kind: ListingKind;

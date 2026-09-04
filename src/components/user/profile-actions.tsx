@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   MessageSquareIcon,
-  UserMinusIcon,
+  RssIcon,
   UserPlusIcon,
   UserRoundCheckIcon,
-  UserRoundPlusIcon,
+  UserRoundXIcon,
   UsersRoundIcon,
 } from "lucide-react";
 
@@ -224,11 +224,7 @@ export function ProfileActions({
           disabled={pending}
           onClick={() => run(following ? "unfollow" : "follow")}
         >
-          {following ? (
-            <UserRoundCheckIcon className="size-4" aria-hidden />
-          ) : (
-            <UserRoundPlusIcon className="size-4" aria-hidden />
-          )}
+          <RssIcon className="size-4" aria-hidden />
           {following ? t("profile.unfollow") : t("profile.follow")}
         </Button>
       ) : null}
@@ -240,7 +236,7 @@ export function ProfileActions({
         disabled={pending}
         onClick={() => run(blocked ? "unblock" : "block")}
       >
-        {blocked ? null : <UserMinusIcon className="size-4" aria-hidden />}
+        {blocked ? null : <UserRoundXIcon className="size-4" aria-hidden />}
         {blocked ? t("settings.unblock") : t("profile.block")}
       </Button>
       {error ? (

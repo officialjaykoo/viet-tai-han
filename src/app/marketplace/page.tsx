@@ -10,6 +10,7 @@ import { tLocale } from "@/lib/i18n/translate";
 import {
   LISTING_KINDS,
   LISTING_STATUSES,
+  formatListingPrice,
   listListings,
   type ListingKind,
   type ListingStatus,
@@ -272,7 +273,8 @@ export default async function MarketplacePage({
                           <span>{new Date(listing.createdAt).toLocaleDateString(locale)}</span>
                         </div>
                         <span className="shrink-0 text-sm font-semibold text-foreground">
-                          {listing.price?.trim() || tLocale(locale, "marketplace.noPrice")}
+                          {formatListingPrice(listing.price) ??
+                            tLocale(locale, "marketplace.noPrice")}
                         </span>
                       </div>
                       <div className="mt-3">

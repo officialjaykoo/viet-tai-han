@@ -7,7 +7,13 @@ import { AccountTags } from "@/components/user/account-tags";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
+import { formatListingPrice } from "@/lib/marketplace";
 import { normalizeSearchQuery, searchAll } from "@/lib/search";
+
+function listingPriceSuffix(value: string | null): string {
+  const formatted = formatListingPrice(value);
+  return formatted ? ` · ${formatted}` : "";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -209,7 +215,7 @@ export default async function SearchPage({
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           @{listing.authorUsername}
-                          {listing.price ? ` · ${listing.price}` : ""}
+                          {listingPriceSuffix(listing.price)}
                         </p>
                         <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
                           {listing.body}
