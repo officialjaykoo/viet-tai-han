@@ -2,15 +2,15 @@
 
 기준 저장소: `koval01/red` (`7363d6e`)  
 대상 프로젝트: `officialjaykoo/viet-tai-han` (`vth.kr`)  
-감사 기준: 2026-08-01 호환성 설정, 로컬 D1 `0024_messaging_delivery`까지 적용된 상태.
+감사 기준: 2026-08-01 호환성 설정, 로컬 D1 `0026_monetization_foundations`까지 적용된 상태.
 
 ## 결론
 
 - **KEEP**: Cloudflare/OpenNext 실행 경계, D1 migration 누적 이력, Better Auth 세션, posts/comments/votes, R2 이미지 정규화, `/i/api` 보안 터널, 테스트 골격.
 - **MODIFY**: 브랜드/도메인, UI locale, 커뮤니티 용어, 인증 origin/OAuth, 검색 도메인, 모바일 공통 layout, D1 도메인 확장, 배포 리소스 설정.
-- **DISABLE**: MVP 초기에는 광고 노출과 원격 AI/Vectorize 자동 호출을 기본 비활성화. 데이터/코드는 보존하고 명시적 feature flag 뒤에 둔다.
+- **KEEP WITH GATES**: 광고·분석과 결제 기반은 데이터/코드를 보존하되 동의·정책·anti-fraud·운영 secret이 확인될 때까지 기본 비활성화.
 - **REMOVE LATER**: `users` 레거시 테이블, `subreddits`/`/r/*` Reddit 명칭, 호환기간이 끝난 legacy translation columns, 사용되지 않는 PostObject 투표 경로. 마이그레이션·호환기간 후 제거한다.
-- **NEW**: Q&A, 마켓/구인, business profile, 북마크, 신고/정책 센터, WebAuthn/OAuth, push, 지도/예약, ledger/정산.
+- **NEW**: Q&A, 마켓/구인, business profile, 북마크, 신고/정책 센터, WebAuthn/OAuth, push, 지도/예약, consent/Pro/billing webhook, transaction·reputation ledger.
 
 ## KEEP
 
@@ -38,7 +38,7 @@
 | 인증 origin | `src/lib/auth.ts` trustedOrigins가 localhost 3000/3100뿐이다. | `https://vth.kr`, 운영 preview origin, OAuth callback origin을 환경별로 허용. | P0 운영 전 |
 | 검색 | `src/lib/search.ts`가 community/account/post LIKE 검색만 제공하고 limit/query escaping은 적용한다. | Q&A/answer/business/listing/report/booking 대상과 Vietnamese diacritic normalization, FTS 검토. | P1 |
 | content translation | `src/lib/translation.ts`, `migrations/0015_content_translation.sql`, `0025_multilingual_content.sql` | vi/ko/en/ru 감지, vi/ko target 기록, M2M100 번역, locale-aware toggle, background job, admin backfill을 적용했다. | P1 완료 |
-| 광고/분석 | `src/lib/ads.ts`, `src/lib/post-analytics.ts`가 feed inline 광고와 raw impression/click/view를 제공한다. | MVP 기본 off, 동의/anti-fraud/active-window/rate limit/owner stats를 추가한 후 재활성화. | P1 |
+| 광고/분석 | `src/lib/ads.ts`, `src/lib/post-analytics.ts`가 feed inline 광고와 raw impression/click/view를 제공한다. | `0026_monetization_foundations.sql`에서 ads 기본 off, 동의·active-window·dedupe·user/IP rate limit과 Pro ad-free 게이트를 적용했다. provider/정책 승인 전 운영 활성화는 금지. | P1 기반 완료·운영 승인 대기 |
 | AI 추천 | `src/lib/embeddings.ts`, `/api/recommendations` | EmbeddingGemma multilingual 768차원 모델, embedding version metadata filter, stale preference re-embedding과 일반 feed fallback을 적용했다. | P1 완료 |
 | 배포 resource | `wrangler.jsonc`가 `red-db`, `red-media`, `red-posts`와 zero D1 ID를 사용한다. | `vth` 명칭과 실제 계정 리소스 ID로 교체. placeholder 상태 deploy 금지. | P0 운영 전 |
 | 모바일 layout | 기존 390px preview는 horizontal overflow 없이 렌더링되고 touch target/header menu가 있다. bottom navigation과 safe-area 정책은 없다. | `src/components/layout/*`, `src/app/globals.css`에 mobile-first bottom nav, safe-area, keyboard/focus 규칙 추가. | P0 |
@@ -49,7 +49,7 @@
 
 | 기능 | 현재 경로 | 초기 정책 | 해제 조건 |
 |---|---|---|---|
-| feed 광고 노출 | `src/lib/ads.ts`의 `withFeedAds`/`injectAdsIntoFeed` | MVP에서는 사용자 feed에 기본 미삽입. campaign/analytics 코드는 보존. | 동의/정책/anti-fraud/targeting 범위와 광고주 운영 화면 확정 후 flag on. |
+| feed 광고 노출 | `src/lib/ads.ts`의 `withFeedAds`/`injectAdsIntoFeed` | `ads_enabled=0` 기본값, analytics consent 없이는 impression/click을 저장하지 않으며 Pro 활성 entitlement는 광고를 제거한다. | 정책·상품·anti-fraud 운영 승인 및 `ads_enabled=1` 전환 |
 | 원격 Workers AI/Vectorize | `src/lib/embeddings.ts`, `src/lib/translation.ts`, `wrangler.jsonc` | 로컬·preview에서 remote 호출을 자동 실행하지 않음. 추천은 hot/new/top fallback. | 실제 model cost budget, multilingual quality, Vectorize index와 장애 fallback 검증 후 on. |
 | production seed/demo | `seed.sql` | 운영 D1에 `alice/password123` 등 seed 금지. | 운영 초기화 절차에서 별도 관리자 bootstrap으로 대체. |
 
@@ -73,7 +73,7 @@
 | Reports/policy | report center, appeals, policy pages, moderation queues | 신고·이의제기·운영 투명성. |
 | Identity | Facebook/Zalo OAuth, WebAuthn passkey, account linking | 가입 장벽과 계정 보안 개선. |
 | Messaging delivery | push subscription, unread fanout, notification preference | DM/알림의 모바일 전달. |
-| Trust ledger | karma/reputation/transaction ledger | 기존 집계 karma를 감사 가능한 event/ledger로 확장. |
+| Trust ledger | karma/reputation/transaction ledger | `0026_monetization_foundations.sql`에 `reputation_ledger` opening balance와 `transaction_ledger`를 추가하고, 신규 reputation 조정은 idempotency key로 기록한다. P1 기반 완료, 회계·정산 운영은 대기. |
 | Vietnamese discovery | diacritic-aware search, location/category index, multilingual embeddings | 다국어 임베딩·추천은 P1에서 완료했고 검색 정규화와 location/category index는 후속 작업. |
 | Observability | Sentry/Workers logs/health checks/security events | 오류·rate-limit·abuse·비용 모니터링. |
 
@@ -87,8 +87,7 @@
 | P1 | challenge consume check-then-set 경쟁조건 | `src/lib/security/challenge.ts` `consumeChallenge()`가 load→used 검사→save | 동시 재생 요청이 같은 challenge를 통과할 가능성 | KV atomic write/DO serialization 또는 nonce consume transaction으로 교체. |
 | P1 | challenge/KV fallback이 isolate memory | `kv()`가 없으면 module Map 사용, `CACHE` binding 주석 처리 | 여러 Worker isolate에서 challenge/gate 불일치·재생 방어 약화 | production KV/DO를 필수화하고 fallback은 local-only로 제한. |
 | P1 | DM request 상태 전이 경쟁조건 | `src/lib/messages.ts` `startChatRequest`, `respondToChatRequest` | 동시 요청에서 500/중복 notification/잘못된 accept·decline | unique conflict를 409로 매핑하고 `WHERE status='pending'` 조건부 update + affected row 검사. |
-| P1 | 광고 update URL 검증 불일치 | `src/lib/ads.ts` create는 http/https 검증, update는 `new URL()`만 수행 | admin 입력이 javascript/custom scheme redirect로 이어질 수 있음 | create/update 공통 `http:`/`https:` validator와 host/policy 검증 사용. |
-| P1 | 광고 impression 무결성 부족 | `/api/ads/impression`과 `recordAdImpression`이 campaign active/placement/rate 검증 없이 insert | 봇이 지표를 부풀리고 존재하지 않는 campaign에서 500 유발 | active campaign·placement 일치 확인, visitor/session dedupe, IP/user rate limit. |
+| P1 | 광고 update URL 검증과 impression 무결성 | `src/lib/ads.ts`, `/api/ads/*` | create/update 공통 http/https 검증, active-window·placement 확인, 동의·dedupe·rate limit을 적용했다. | **해결** — 회귀 테스트 `tests/integration/monetization.test.ts` |
 | P1 | 직접 vote와 PostObject 경로 불일치 | `src/lib/votes.ts`는 D1 직접 write, DO는 후속 `getVotes()`만 호출 | DO aggregation이 실제 score source가 아니며 향후 이중 집계 위험 | 단일 source of truth를 선택하고 dead path를 제거. |
 | P2 | post view dedupe key가 caller 신뢰값 | `src/lib/post-analytics.ts` `sessionKey`를 slice해 unique index에 사용 | 임의 session key로 unique viewer/view 지표 왜곡 | 서명된 first-party cookie와 server-side rotation, abuse cap 적용. |
 | P2 | IP header fallback 신뢰 범위 | `clientIpFromHeaders()`가 `cf-connecting-ip`/`x-forwarded-for`를 직접 읽음 | 비-Cloudflare 환경에서 spoofing 시 rate limit 우회 | production은 Cloudflare edge only를 assert하고 local/test만 override. |
@@ -100,13 +99,14 @@
 | 명령/표면 | 결과 |
 |---|---|
 | `npm ci` | 성공, 881 packages 추가. deprecated warning만 관찰. |
-| `npm run db:reset:local` | migration `0001`~`0018` 적용, seed 48 commands 성공. |
-| `npm test` | unit 16 files / 62 tests, workers 2 files / 9 tests 통과. |
-| `npm run test:integration` | 1 file / 8 tests 통과. |
-| `npm run typecheck` | 최초 `LayoutProps` 오류. explicit `ReactNode` props 수정 후 통과. |
+| `npm run db:reset:local` | migration `0001`~`0026` 적용, seed 57 commands 성공. |
+| `npm test` | unit 19 files / 79 tests, workers 9 files / 23 tests 통과. |
+| `npm run test:integration` | 8 files / 22 tests 통과. |
+| `npm run typecheck` | 통과. |
 | `npm run build` | 성공. middleware convention, Windows OpenNext, AI/Vectorize local 지원, PostObject export 관련 warning 관찰. |
-| `npm run test:e2e:chromium` | Chromium 설치 후 E2E bypass 환경에서 10 tests 통과. |
-| OpenNext preview | `vth-cloudflare-preview`가 8787에서 기동. 실제 브라우저 390px surface가 horizontal overflow 없이 렌더링됨. baseline title/용어는 여전히 red/Reddit/r/u/English/Russian. |
+| `npx playwright test --project=chromium-desktop --workers=1` | 10 tests 실행, 9 passed / 1 flaky. consent prompt 차단은 E2E helper에서 essential 선택으로 해소했으며, 로컬 `/i/api` challenge·Vectorize binding warning이 남는다. |
+| `npx wrangler deploy --dry-run` | 성공. 57개 asset, 11,848.70 KiB upload 예정. OpenNext 번들 duplicate `options` warning과 Wrangler update 안내 관찰. |
+| 로컬 Chromium 390px UI | `/`에서 Vietnamese feed와 개인정보 선택 배너를 실제 렌더링. `scrollWidth=390`, horizontal overflow 없음. |
 
 ## 외부 작업 blocker
 
@@ -118,3 +118,4 @@
 - Facebook/Zalo OAuth client/secret 및 callback URL.
 - 이메일 발송 provider/도메인 인증.
 - WebAuthn RP ID/origin, Web Push `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, 지도/예약 provider keys. Native FCM/APNs are outside this web phase.
+- 결제 provider credentials/webhook endpoint, `BILLING_WEBHOOK_SECRET`, 상품·환불·세금 정책 승인과 provider customer→user 매핑.

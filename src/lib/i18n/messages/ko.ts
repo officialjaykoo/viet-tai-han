@@ -455,6 +455,19 @@ export const ko: Messages = {
     pushPermissionDenied: "브라우저 알림 권한을 허용하지 않았습니다.",
     pushFailed: "푸시 알림을 변경하지 못했습니다.",
   },
+  consent: {
+    bannerTitle: "개인정보 선택",
+    bannerDescription:
+      "필수 기능은 추적 없이 사용할 수 있습니다. 분석, 맞춤 광고, 마케팅 데이터 사용 여부를 선택하세요.",
+    acceptAll: "모두 허용",
+    essentialOnly: "필수만",
+    analytics: "분석",
+    analyticsDescription: "제품과 광고 성과의 익명 측정을 허용합니다.",
+    personalizedAds: "맞춤 광고",
+    personalizedAdsDescription: "더 관련성 높은 광고를 위해 광고 신호 사용을 허용합니다.",
+    marketing: "마케팅",
+    marketingDescription: "선택적 제품 업데이트와 홍보 메시지를 허용합니다.",
+  },
   profile: {
     overview: "개요",
     posts: "글",
@@ -572,6 +585,30 @@ export const ko: Messages = {
     notifyFollows: "새 팔로워",
     notifyChat: "대화 요청과 수락",
     notifyMentions: "멘션",
+    consentTitle: "개인정보 동의",
+    consentDescription:
+      "선택적 분석, 광고와 마케팅 권한을 변경합니다. 서비스에 필요한 데이터는 항상 처리됩니다.",
+    consentAnalytics: "분석",
+    consentAnalyticsDescription:
+      "제품과 광고 성과를 측정합니다. 광고 이벤트는 속도 제한과 중복 제거를 적용합니다.",
+    consentPersonalizedAds: "맞춤 광고",
+    consentPersonalizedAdsDescription:
+      "현재 광고는 문맥 기반입니다. 이 권한은 향후 승인된 타기팅 정책을 위해 저장됩니다.",
+    consentMarketing: "마케팅",
+    consentMarketingDescription:
+      "선택적 제품 업데이트와 홍보 메시지를 허용합니다.",
+    consentSaved: "개인정보 선택을 저장했습니다",
+    pro: "Việt tại Hàn Pro",
+    proDescription: "Pro 권한은 검증된 결제 제공자의 구독에서 부여됩니다.",
+    proActive: "Pro 활성",
+    proInactive: "Pro 비활성",
+    proAdFree: "이 권한이 유효한 동안 피드에 광고가 표시되지 않습니다.",
+    proBillingUnavailable:
+      "이 서버에는 아직 결제가 설정되지 않았습니다. 결제 제공자 설정이 필요합니다.",
+    proEndsAt: "현재 기간 종료: {date}",
+    proPlanMonthly: "월간",
+    proPlanAnnual: "연간",
+    proPlanLifetime: "평생",
     profileSaved: "프로필을 저장했습니다",
     emailUpdated: "이메일을 업데이트했습니다",
     passwordChanged: "비밀번호를 변경했습니다",

@@ -2,6 +2,7 @@ import { getDb, getEnv } from "@/lib/db";
 import { AuthError } from "@/lib/session";
 import { getSiteSetting } from "@/lib/settings";
 import { createPublicId } from "@/lib/id";
+import { appendReputationLedgerEntry } from "@/lib/monetization";
 
 type RateLimitBindingName =
   | "EDGE_IP_RATE_LIMITER"
@@ -351,18 +352,13 @@ export async function adjustAuthorKarma(
   delta: number
 ) {
   if (delta === 0) return;
-  const db = await getDb();
-  const column = kind === "post" ? "postKarma" : "commentKarma";
-  await db
-    .prepare(
-      `UPDATE "user"
-       SET ${column} = ${column} + ?,
-           karma = karma + ?,
-           updatedAt = datetime('now')
-       WHERE id = ?`
-    )
-    .bind(delta, delta, authorId)
-    .run();
+  await appendReputationLedgerEntry({
+    userId: authorId,
+    eventType: "vote_received",
+    amount: delta,
+    kind,
+    sourceType: "vote",
+  });
 
   void import("@/lib/achievements").then(({ syncAchievementsQuietly }) =>
     syncAchievementsQuietly(authorId)

@@ -9,6 +9,7 @@ import {
 /**
  * - Hidden internal paths (/i/*): non-POST → fake 404 (never 405).
  * - Public /api/* without Bearer: browsers get fake 404; machines get 401 JSON.
+ * - The billing webhook uses its own HMAC signature instead of a personal API key.
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -20,6 +21,10 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     return fakeNotFoundResponse();
+  }
+
+  if (pathname === "/api/billing/webhook") {
+    return NextResponse.next();
   }
 
   if (!pathname.startsWith("/api/")) {

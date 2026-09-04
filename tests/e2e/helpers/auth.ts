@@ -32,12 +32,20 @@ export async function disguiseAutomation(page: Page) {
   });
 }
 
-/** Dismiss the locale chooser if it still appears. */
+/** Dismiss locale and privacy prompts if they still appear. */
 export async function dismissLanguagePrompt(page: Page) {
   const preferVi = page.getByRole("button", { name: /chọn tiếng việt/i });
   if (await preferVi.isVisible().catch(() => false)) {
     await preferVi.click();
     await expect(preferVi).toBeHidden({ timeout: 5_000 });
+  }
+
+  const essentialConsent = page.getByRole("button", {
+    name: /chỉ thiết yếu/i,
+  });
+  if (await essentialConsent.isVisible().catch(() => false)) {
+    await essentialConsent.click();
+    await expect(essentialConsent).toBeHidden({ timeout: 5_000 });
   }
 }
 

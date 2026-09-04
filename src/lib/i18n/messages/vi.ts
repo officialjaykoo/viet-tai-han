@@ -459,6 +459,20 @@ export const vi: Messages = {
     pushPermissionDenied: "Chưa được cấp quyền thông báo trong trình duyệt.",
     pushFailed: "Không thể cập nhật thông báo đẩy.",
   },
+  consent: {
+    bannerTitle: "Lựa chọn quyền riêng tư",
+    bannerDescription:
+      "Các tính năng thiết yếu hoạt động mà không cần theo dõi. Chọn cho phép Việt tại Hàn dùng dữ liệu phân tích, quảng cáo cá nhân hóa hoặc tiếp thị.",
+    acceptAll: "Chấp nhận tất cả",
+    essentialOnly: "Chỉ thiết yếu",
+    analytics: "Phân tích",
+    analyticsDescription: "Cho phép đo lường ẩn danh hiệu suất sản phẩm và quảng cáo.",
+    personalizedAds: "Quảng cáo cá nhân hóa",
+    personalizedAdsDescription:
+      "Cho phép dùng tín hiệu quảng cáo để hiển thị quảng cáo phù hợp hơn.",
+    marketing: "Tiếp thị",
+    marketingDescription: "Cho phép nhận cập nhật sản phẩm và thông tin quảng bá tùy chọn.",
+  },
   profile: {
     overview: "Tổng quan",
     posts: "Bài đăng",
@@ -579,6 +593,31 @@ export const vi: Messages = {
     notifyFollows: "Người theo dõi mới",
     notifyChat: "Yêu cầu và chấp nhận trò chuyện",
     notifyMentions: "Lượt nhắc tên",
+    consentTitle: "Đồng ý về quyền riêng tư",
+    consentDescription:
+      "Thay đổi quyền tùy chọn cho phân tích, quảng cáo và tiếp thị. Dữ liệu cần thiết cho dịch vụ luôn được xử lý.",
+    consentAnalytics: "Phân tích",
+    consentAnalyticsDescription:
+      "Đo lường hiệu suất sản phẩm và quảng cáo. Sự kiện quảng cáo được giới hạn và loại trùng.",
+    consentPersonalizedAds: "Quảng cáo cá nhân hóa",
+    consentPersonalizedAdsDescription:
+      "Hiện quảng cáo chỉ dựa trên ngữ cảnh; quyền này được lưu cho chính sách nhắm mục tiêu được phê duyệt sau này.",
+    consentMarketing: "Tiếp thị",
+    consentMarketingDescription:
+      "Cho phép nhận cập nhật sản phẩm và thông tin quảng bá tùy chọn.",
+    consentSaved: "Đã lưu lựa chọn quyền riêng tư",
+    pro: "Việt tại Hàn Pro",
+    proDescription:
+      "Quyền Pro đến từ gói đăng ký của nhà cung cấp thanh toán đã xác minh.",
+    proActive: "Pro đang hoạt động",
+    proInactive: "Pro chưa hoạt động",
+    proAdFree: "Bảng tin của bạn không có quảng cáo khi quyền này còn hiệu lực.",
+    proBillingUnavailable:
+      "Máy chủ chưa cấu hình thanh toán. Cần thiết lập nhà cung cấp thanh toán.",
+    proEndsAt: "Kỳ hiện tại kết thúc {date}",
+    proPlanMonthly: "Hàng tháng",
+    proPlanAnnual: "Hàng năm",
+    proPlanLifetime: "Trọn đời",
     profileSaved: "Đã lưu hồ sơ",
     emailUpdated: "Đã cập nhật email",
     passwordChanged: "Đã đổi mật khẩu",

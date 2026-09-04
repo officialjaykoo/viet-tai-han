@@ -54,8 +54,8 @@ flowchart LR
 - Search and AI-backed recommendations
 - Direct messages and notifications
 - Media uploads (R2)
-- Ads + post analytics
-- Admin / moderation tools
+- Ads + post analytics (default off until consent and policy approval)
+- Consent controls, Pro entitlements, signed billing webhook, transaction/reputation ledgers
 - Achievements, reputation, badges, tags
 - Content translation via Workers AI
 - Sealed Protobuf API tunnel (`/i/api`) with bot / PoW challenges
@@ -101,6 +101,15 @@ npx wrangler vectorize create-metadata-index vth-posts --property-name=embedding
 
 Content translation uses [`@cf/meta/m2m100-1.2b`](https://developers.cloudflare.com/workers-ai/models/m2m100-1.2b/). Vietnamese and Korean posts are translated for the other supported locale; English and Russian posts use Vietnamese as the default target. Translation and embedding jobs are backgrounded and fall back to the regular feed when Workers AI or Vectorize is unavailable.
 
+### Monetization safety
+
+The monetization foundation is implemented without pretending that a payment provider is configured:
+
+- `ads_enabled` is seeded as `0`. An administrator may set it to `1` only after policy, consent, targeting scope, and anti-fraud review.
+- Analytics and ad-event storage are opt-in. Impression events require signed-in analytics consent, active campaign/window checks, per-user/day dedupe, and rate limits. Pro entitlements remove feed ads.
+- `POST /api/billing/webhook` accepts only a provider-neutral normalized event signed with HMAC-SHA256 in `X-VTH-Billing-Signature` (raw hex, or `sha256=<hex>`). It stores the payload hash and idempotently updates `pro_subscriptions`, `billing_events`, and `transaction_ledger`; raw provider payloads are not stored.
+- The webhook contract expects `BILLING_WEBHOOK_SECRET` and an adapter that maps the provider payload to an internal `userId`. Checkout, prices, refunds, tax handling, and provider credentials remain an operator task; no payment flow is enabled by default.
+
 
 ## Deploy your own
 
@@ -136,10 +145,12 @@ Content translation uses [`@cf/meta/m2m100-1.2b`](https://developers.cloudflare.
    wrangler secret put ZALO_APP_SECRET          # when Zalo is enabled
    wrangler secret put VAPID_PRIVATE_KEY       # when browser push is enabled
    wrangler secret put VAPID_SUBJECT           # mailto: or https: contact URI
+   wrangler secret put BILLING_WEBHOOK_SECRET  # required only when a provider webhook is enabled
    ```
 
    All three VAPID values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`) are required to enable push. The site must run on HTTPS (localhost is allowed by browsers); subscriptions can be managed under Settings → Notifications.
    Facebook and Zalo remain disabled unless both the provider ID and secret are present. Passkeys use the hostname and origin from `BETTER_AUTH_URL`.
+   The billing webhook is not a checkout implementation. Configure a provider adapter, user mapping, prices, refunds, and tax policy before setting `ads_enabled=1` or accepting real payments.
 
 6. Apply remote migrations, then deploy:
 

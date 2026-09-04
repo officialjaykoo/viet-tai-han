@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { getMonetizationContext } from "@/lib/monetization";
 import { AuthError } from "@/lib/session";
 import {
   CacheKeys,
@@ -6,6 +7,8 @@ import {
   cacheGetJson,
   cacheSetJson,
 } from "@/lib/cache";
+import { getSiteSetting } from "@/lib/settings";
+import { sha256Hex } from "@/lib/security/crypto";
 import type { FeedAdItem, FeedItem, FeedPost } from "@/lib/types";
 
 export type AdPlacement = "feed_inline" | "sidebar" | "post_footer";
@@ -46,7 +49,36 @@ function mapCampaign(row: Record<string, unknown>): AdCampaign {
     clicks: row.clicks != null ? Number(row.clicks) : undefined,
   };
 }
+const AD_PLACEMENTS = ["feed_inline", "sidebar", "post_footer"] as const;
+const AD_STATUSES = ["draft", "active", "paused", "ended"] as const;
 
+export function isAdPlacement(value: unknown): value is AdPlacement {
+  return (
+    typeof value === "string" &&
+    (AD_PLACEMENTS as readonly string[]).includes(value)
+  );
+}
+
+export function isAdStatus(value: unknown): value is AdStatus {
+  return (
+    typeof value === "string" &&
+    (AD_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+function normalizeTargetUrl(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new AuthError("Invalid target URL", 400);
+  }
+  try {
+    const url = new URL(value.trim());
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("scheme");
+    return url.toString();
+  } catch {
+    throw new AuthError("Invalid target URL", 400);
+  }
+
+}
 export async function listAdCampaigns(): Promise<AdCampaign[]> {
   const db = await getDb();
   const { results } = await db
@@ -75,18 +107,31 @@ export async function createAdCampaign(input: {
   status?: AdStatus;
   createdBy: string;
 }) {
-  const name = input.name.trim();
-  if (name.length < 2) throw new AuthError("Name required", 400);
-  let targetUrl: string;
-  try {
-    const u = new URL(input.targetUrl.trim());
-    if (!["http:", "https:"].includes(u.protocol)) {
-      throw new Error("bad");
-    }
-    targetUrl = u.toString();
-  } catch {
-    throw new AuthError("Invalid target URL", 400);
+  if (typeof input.name !== "string") {
+    throw new AuthError("Name required", 400);
   }
+  const name = input.name.trim();
+  if (name.length < 2 || name.length > 120) {
+    throw new AuthError("Name required", 400);
+  }
+  if (!isAdPlacement(input.placement)) {
+    throw new AuthError("Invalid ad placement", 400);
+  }
+  const status = input.status ?? "draft";
+  if (!isAdStatus(status)) {
+    throw new AuthError("Invalid ad status", 400);
+  }
+  const weight = input.weight ?? 1;
+  if (!Number.isSafeInteger(weight) || weight < 1 || weight > 1000) {
+    throw new AuthError("Invalid ad weight", 400);
+  }
+  if (input.body != null && typeof input.body !== "string") {
+    throw new AuthError("Ad copy is invalid", 400);
+  }
+  if (input.body != null && input.body.length > 2000) {
+    throw new AuthError("Ad copy is too long", 400);
+  }
+  const targetUrl = normalizeTargetUrl(input.targetUrl);
 
   const id = crypto.randomUUID();
   const db = await getDb();
@@ -99,12 +144,12 @@ export async function createAdCampaign(input: {
     .bind(
       id,
       name,
-      input.status ?? "draft",
+      status,
       input.placement,
       input.body?.trim() || null,
       input.imageKey ?? null,
       targetUrl,
-      Math.max(1, input.weight ?? 1),
+      weight,
       input.createdBy
     )
     .run();
@@ -127,7 +172,10 @@ export async function updateAdCampaign(input: {
     .first();
   if (!existing) throw new AuthError("Campaign not found", 404);
 
-  if (input.status) {
+  if (input.status !== undefined) {
+    if (!isAdStatus(input.status)) {
+      throw new AuthError("Invalid ad status", 400);
+    }
     await db
       .prepare(
         `UPDATE ad_campaigns SET status = ?, updated_at = datetime('now') WHERE id = ?`
@@ -135,23 +183,43 @@ export async function updateAdCampaign(input: {
       .bind(input.status, input.id)
       .run();
   }
-  if (input.name != null) {
+  if (input.name !== undefined) {
+    if (typeof input.name !== "string") {
+      throw new AuthError("Name required", 400);
+    }
+    const name = input.name.trim();
+    if (name.length < 2 || name.length > 120) {
+      throw new AuthError("Name required", 400);
+    }
     await db
       .prepare(
         `UPDATE ad_campaigns SET name = ?, updated_at = datetime('now') WHERE id = ?`
       )
-      .bind(input.name.trim(), input.id)
+      .bind(name, input.id)
       .run();
   }
-  if (input.weight != null) {
+  if (input.weight !== undefined) {
+    if (
+      !Number.isSafeInteger(input.weight) ||
+      input.weight < 1 ||
+      input.weight > 1000
+    ) {
+      throw new AuthError("Invalid ad weight", 400);
+    }
     await db
       .prepare(
         `UPDATE ad_campaigns SET weight = ?, updated_at = datetime('now') WHERE id = ?`
       )
-      .bind(Math.max(1, input.weight), input.id)
+      .bind(input.weight, input.id)
       .run();
   }
   if (input.body !== undefined) {
+    if (input.body != null && typeof input.body !== "string") {
+      throw new AuthError("Ad copy is invalid", 400);
+    }
+    if (input.body != null && input.body.length > 2000) {
+      throw new AuthError("Ad copy is too long", 400);
+    }
     await db
       .prepare(
         `UPDATE ad_campaigns SET body = ?, updated_at = datetime('now') WHERE id = ?`
@@ -159,13 +227,12 @@ export async function updateAdCampaign(input: {
       .bind(input.body?.trim() || null, input.id)
       .run();
   }
-  if (input.targetUrl) {
-    const u = new URL(input.targetUrl.trim());
+  if (input.targetUrl !== undefined) {
     await db
       .prepare(
         `UPDATE ad_campaigns SET target_url = ?, updated_at = datetime('now') WHERE id = ?`
       )
-      .bind(u.toString(), input.id)
+      .bind(normalizeTargetUrl(input.targetUrl), input.id)
       .run();
   }
   await cacheDeletePrefix("ads:");
@@ -175,6 +242,7 @@ export async function updateAdCampaign(input: {
 export async function pickAdForPlacement(
   placement: AdPlacement
 ): Promise<AdCampaign | null> {
+  if ((await getSiteSetting("ads_enabled", "0")) !== "1") return null;
   const cacheKey = CacheKeys.adPlacement(placement);
   let campaigns = await cacheGetJson<AdCampaign[]>(cacheKey);
 
@@ -199,11 +267,11 @@ export async function pickAdForPlacement(
 
   if (campaigns.length === 0) return null;
 
-  const total = campaigns.reduce((s, c) => s + c.weight, 0);
-  let r = Math.random() * total;
-  for (const c of campaigns) {
-    r -= c.weight;
-    if (r <= 0) return c;
+  const total = campaigns.reduce((sum, campaign) => sum + campaign.weight, 0);
+  let random = Math.random() * total;
+  for (const campaign of campaigns) {
+    random -= campaign.weight;
+    if (random <= 0) return campaign;
   }
   return campaigns[campaigns.length - 1] ?? null;
 }
@@ -244,7 +312,8 @@ export async function injectAdsIntoFeed(
 ): Promise<FeedItem[]> {
   const every = options?.every ?? FEED_AD_EVERY_N;
   const placement = options?.placement ?? "feed_inline";
-  const recordImpressions = options?.recordImpressions !== false;
+  const recordImpressions =
+    options?.recordImpressions === true && Boolean(options?.viewerId);
 
   if (posts.length === 0) return [];
 
@@ -289,50 +358,104 @@ export async function withFeedAds(
   nextCursor: string | null;
   hasMore: boolean;
 }> {
-  return {
-    posts: await injectAdsIntoFeed(feed.posts, { viewerId }),
-    nextCursor: feed.nextCursor,
-    hasMore: feed.hasMore,
-  };
+  try {
+    const monetization = await getMonetizationContext(viewerId ?? null);
+    if (monetization.isPro) {
+      return {
+        posts: feed.posts.map((post) => ({ kind: "post", ...post })),
+        nextCursor: feed.nextCursor,
+        hasMore: feed.hasMore,
+      };
+    }
+    return {
+      posts: await injectAdsIntoFeed(feed.posts, {
+        viewerId,
+        recordImpressions: monetization.analyticsAllowed,
+      }),
+      nextCursor: feed.nextCursor,
+      hasMore: feed.hasMore,
+    };
+  } catch {
+    // Monetization failures must never break the organic feed.
+    return {
+      posts: feed.posts.map((post) => ({ kind: "post", ...post })),
+      nextCursor: feed.nextCursor,
+      hasMore: feed.hasMore,
+    };
+  }
 }
 
 export async function recordAdImpression(input: {
   campaignId: string;
   viewerId?: string | null;
   placement: string;
-}) {
+}): Promise<boolean> {
+  if (!input.viewerId || !isAdPlacement(input.placement)) return false;
+  if ((await getSiteSetting("ads_enabled", "0")) !== "1") return false;
+  const monetization = await getMonetizationContext(input.viewerId);
+  if (!monetization.analyticsAllowed || monetization.isPro) return false;
+
   const db = await getDb();
-  await db
+  const campaign = await db
     .prepare(
-      `INSERT INTO ad_impressions (id, campaign_id, viewer_id, placement)
-       VALUES (?, ?, ?, ?)`
+      `SELECT id FROM ad_campaigns
+       WHERE id = ? AND placement = ? AND status = 'active'
+         AND (starts_at IS NULL OR starts_at <= datetime('now'))
+         AND (ends_at IS NULL OR ends_at >= datetime('now'))`
+    )
+    .bind(input.campaignId, input.placement)
+    .first<{ id: string }>();
+  if (!campaign) return false;
+
+  const day = new Date().toISOString().slice(0, 10);
+  const dedupeKey = await sha256Hex(
+    `ad-impression:${input.campaignId}:${input.viewerId}:${input.placement}:${day}`
+  );
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO ad_impressions (
+         id, campaign_id, viewer_id, placement, dedupe_key
+       ) VALUES (?, ?, ?, ?, ?)`
     )
     .bind(
       crypto.randomUUID(),
       input.campaignId,
-      input.viewerId ?? null,
-      input.placement
+      input.viewerId,
+      input.placement,
+      dedupeKey
     )
     .run();
+  return Number(result.meta?.changes ?? 0) > 0;
 }
 
 export async function recordAdClick(input: {
   campaignId: string;
   viewerId?: string | null;
 }): Promise<string | null> {
+  if ((await getSiteSetting("ads_enabled", "0")) !== "1") return null;
   const db = await getDb();
   const campaign = await db
-    .prepare(`SELECT target_url FROM ad_campaigns WHERE id = ?`)
+    .prepare(
+      `SELECT target_url FROM ad_campaigns
+       WHERE id = ? AND status = 'active'
+         AND (starts_at IS NULL OR starts_at <= datetime('now'))
+         AND (ends_at IS NULL OR ends_at >= datetime('now'))`
+    )
     .bind(input.campaignId)
     .first<{ target_url: string }>();
   if (!campaign) return null;
 
-  await db
-    .prepare(
-      `INSERT INTO ad_clicks (id, campaign_id, viewer_id) VALUES (?, ?, ?)`
-    )
-    .bind(crypto.randomUUID(), input.campaignId, input.viewerId ?? null)
-    .run();
+  if (input.viewerId) {
+    const monetization = await getMonetizationContext(input.viewerId);
+    if (monetization.analyticsAllowed && !monetization.isPro) {
+      await db
+        .prepare(
+          `INSERT INTO ad_clicks (id, campaign_id, viewer_id) VALUES (?, ?, ?)`
+        )
+        .bind(crypto.randomUUID(), input.campaignId, input.viewerId)
+        .run();
+    }
+  }
 
   return campaign.target_url;
 }

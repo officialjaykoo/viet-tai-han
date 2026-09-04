@@ -11,7 +11,7 @@ import {
 import { reviewBusinessVerification } from "@/lib/businesses";
 import { reviewChatMessageReport } from "@/lib/dm-moderation";
 import { reviewListingReport } from "@/lib/marketplace";
-import { listSiteSettings } from "@/lib/settings";
+import { listSiteSettings, setSiteSetting } from "@/lib/settings";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
@@ -191,6 +191,22 @@ export async function POST(request: NextRequest) {
           typeof body.limit === "number" ? body.limit : 100
         );
         return NextResponse.json(result);
+      }
+      case "set_setting": {
+        if (
+          typeof body.key !== "string" ||
+          !/^[a-z0-9_]{2,80}$/.test(body.key) ||
+          typeof body.value !== "string" ||
+          body.value.length > 500
+        ) {
+          return await jsonLocalizedError("Invalid setting", 400);
+        }
+        const value = body.value.trim();
+        if (body.key === "ads_enabled" && !["0", "1"].includes(value)) {
+          return await jsonLocalizedError("ads_enabled must be 0 or 1", 400);
+        }
+        await setSiteSetting(body.key, value, actor.id);
+        return NextResponse.json({ ok: true });
       }
       case "list_ads": {
         const { listAdCampaigns } = await import("@/lib/ads");

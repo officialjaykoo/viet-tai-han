@@ -19,6 +19,7 @@ import {
   LockIcon,
   PaletteIcon,
   ShieldIcon,
+  SparklesIcon,
   Trash2Icon,
   UserIcon,
 } from "lucide-react";
@@ -40,10 +41,21 @@ import type {
   ThemePreference,
   UserSettings,
 } from "@/lib/user-settings";
+import type { ConsentRecord, ProPlan, ProStatus } from "@/lib/monetization";
+import {
+  CONSENT_STORAGE_KEY,
+  CONSENT_VERSION,
+  type ConsentChoice,
+} from "@/lib/consent";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
 
 type Section = "profile" | "account" | "appearance" | "privacy" | "notifications";
+const PRO_PLAN_LABELS: Record<ProPlan, MessageKey> = {
+  monthly: "settings.proPlanMonthly",
+  annual: "settings.proPlanAnnual",
+  lifetime: "settings.proPlanLifetime",
+};
 
 type BlockedUser = {
   id: string;
@@ -101,6 +113,8 @@ export function SettingsClient({
   initialSection = "profile",
   initialPush,
   initialIdentityError,
+  initialConsent,
+  initialPro,
 }: {
   initialSettings: UserSettings;
   initialBlocked: BlockedUser[];
@@ -111,12 +125,19 @@ export function SettingsClient({
     subscribed: boolean;
   };
   initialIdentityError?: string;
+  initialConsent: ConsentRecord | null;
+  initialPro: ProStatus;
 }) {
   const router = useRouter();
   const { t, setLanguage, locale } = useI18n();
   const localizeError = useLocalizedError();
   const { theme, setTheme } = useTheme();
   const [section, setSection] = useState<Section>(initialSection);
+  const [consent, setConsent] = useState<ConsentChoice>({
+    analytics: initialConsent?.analytics ?? false,
+    personalizedAds: initialConsent?.personalizedAds ?? false,
+    marketing: initialConsent?.marketing ?? false,
+  });
   const [settings, setSettings] = useState(initialSettings);
   const [blocked, setBlocked] = useState(initialBlocked);
   const [pending, startTransition] = useTransition();
@@ -392,6 +413,51 @@ export function SettingsClient({
     });
   }
 
+  function saveConsent(patch: Partial<ConsentChoice>) {
+    const previous = consent;
+    const next = { ...consent, ...patch };
+    setConsent(next);
+    flash(null, null);
+    startTransition(async () => {
+      try {
+        const res = await apiFetch("/api/me/consent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            consentVersion: CONSENT_VERSION,
+            ...next,
+          }),
+        });
+        const data = (await res.json()) as {
+          consent?: ConsentRecord;
+          error?: string;
+        };
+        if (!res.ok || !data.consent) {
+          setConsent(previous);
+          flash(null, localizeError(data.error, "Could not save privacy choices"));
+          return;
+        }
+        setConsent({
+          analytics: data.consent.analytics,
+          personalizedAds: data.consent.personalizedAds,
+          marketing: data.consent.marketing,
+        });
+        try {
+          window.localStorage.setItem(
+            CONSENT_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch {
+          // The server record is authoritative when browser storage is blocked.
+        }
+        flash(t("settings.consentSaved"), null);
+      } catch {
+        setConsent(previous);
+        flash(null, t("common.error"));
+      }
+    });
+
+  }
   function unblock(usernameToUnblock: string) {
     startTransition(async () => {
       await apiFetch(`/api/users/${encodeURIComponent(usernameToUnblock)}`, {
@@ -634,6 +700,42 @@ export function SettingsClient({
 
         {section === "account" ? (
           <>
+            <SettingsCard
+              title={t("settings.pro")}
+              description={t("settings.proDescription")}
+            >
+              <div className="rounded-xl border border-border/50 px-3 py-3">
+                <div className="flex items-start gap-3">
+                  <SparklesIcon className="mt-0.5 size-5 text-[var(--brand)]" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {initialPro.active
+                        ? t("settings.proActive")
+                        : t("settings.proInactive")}
+                    </p>
+                    {initialPro.plan ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t(PRO_PLAN_LABELS[initialPro.plan])}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {initialPro.active
+                    ? t("settings.proAdFree")
+                    : t("settings.proBillingUnavailable")}
+                </p>
+                {initialPro.active && initialPro.currentPeriodEnd ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("settings.proEndsAt", {
+                      date: new Date(
+                        initialPro.currentPeriodEnd
+                      ).toLocaleDateString(locale),
+                    })}
+                  </p>
+                ) : null}
+              </div>
+            </SettingsCard>
             <SettingsCard
               title={t("settings.emailAddress")}
               description={t("settings.emailAddressDesc")}
@@ -938,6 +1040,32 @@ export function SettingsClient({
                   ))}
                 </div>
               </Field>
+            </SettingsCard>
+            <SettingsCard
+              title={t("settings.consentTitle")}
+              description={t("settings.consentDescription")}
+            >
+              <ToggleRow
+                label={t("settings.consentAnalytics")}
+                description={t("settings.consentAnalyticsDescription")}
+                checked={consent.analytics}
+                disabled={pending}
+                onChange={(next) => saveConsent({ analytics: next })}
+              />
+              <ToggleRow
+                label={t("settings.consentPersonalizedAds")}
+                description={t("settings.consentPersonalizedAdsDescription")}
+                checked={consent.personalizedAds}
+                disabled={pending}
+                onChange={(next) => saveConsent({ personalizedAds: next })}
+              />
+              <ToggleRow
+                label={t("settings.consentMarketing")}
+                description={t("settings.consentMarketingDescription")}
+                checked={consent.marketing}
+                disabled={pending}
+                onChange={(next) => saveConsent({ marketing: next })}
+              />
             </SettingsCard>
 
             <SettingsCard

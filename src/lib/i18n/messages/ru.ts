@@ -460,6 +460,20 @@ export const ru: Messages = {
     pushPermissionDenied: "Разрешение на уведомления в браузере не выдано.",
     pushFailed: "Не удалось изменить push-уведомления.",
   },
+  consent: {
+    bannerTitle: "Ваш выбор конфиденциальности",
+    bannerDescription:
+      "Основные функции работают без отслеживания. Разрешите аналитику, персонализированную рекламу или маркетинговые данные по своему выбору.",
+    acceptAll: "Разрешить всё",
+    essentialOnly: "Только необходимое",
+    analytics: "Аналитика",
+    analyticsDescription: "Разрешить анонимное измерение продукта и рекламы.",
+    personalizedAds: "Персонализированная реклама",
+    personalizedAdsDescription:
+      "Разрешить использовать рекламные сигналы для более подходящей рекламы.",
+    marketing: "Маркетинг",
+    marketingDescription: "Разрешить необязательные обновления продукта и рекламные сообщения.",
+  },
   profile: {
     overview: "Обзор",
     posts: "Посты",
@@ -583,6 +597,31 @@ export const ru: Messages = {
     notifyFollows: "Новые подписчики",
     notifyChat: "Запросы и принятие чатов",
     notifyMentions: "Упоминания",
+    consentTitle: "Согласие на обработку данных",
+    consentDescription:
+      "Изменяйте необязательные разрешения для аналитики, рекламы и маркетинга. Данные, необходимые для работы сервиса, обрабатываются всегда.",
+    consentAnalytics: "Аналитика",
+    consentAnalyticsDescription:
+      "Измеряет продукт и рекламу. Рекламные события ограничиваются и устраняются дубликаты.",
+    consentPersonalizedAds: "Персонализированная реклама",
+    consentPersonalizedAdsDescription:
+      "Сейчас реклама основана на контексте; разрешение сохранено для будущей утверждённой политики таргетинга.",
+    consentMarketing: "Маркетинг",
+    consentMarketingDescription:
+      "Разрешить необязательные обновления продукта и рекламные сообщения.",
+    consentSaved: "Настройки конфиденциальности сохранены",
+    pro: "Việt tại Hàn Pro",
+    proDescription:
+      "Права Pro предоставляются подпиской проверенного платёжного провайдера.",
+    proActive: "Pro активен",
+    proInactive: "Pro не активен",
+    proAdFree: "Пока это право действительно, в вашей ленте нет рекламы.",
+    proBillingUnavailable:
+      "Оплата ещё не настроена на этом сервере. Требуется платёжный провайдер.",
+    proEndsAt: "Текущий период заканчивается {date}",
+    proPlanMonthly: "Ежемесячно",
+    proPlanAnnual: "Ежегодно",
+    proPlanLifetime: "Навсегда",
     profileSaved: "Профиль сохранён",
     emailUpdated: "Email обновлён",
     passwordChanged: "Пароль изменён",

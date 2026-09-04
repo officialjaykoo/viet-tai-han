@@ -459,6 +459,20 @@ export const en = {
     pushPermissionDenied: "Browser notification permission was not granted.",
     pushFailed: "Could not update push notifications.",
   },
+  consent: {
+    bannerTitle: "Your privacy choices",
+    bannerDescription:
+      "Essential features work without tracking. Choose whether Việt tại Hàn may use analytics, personalized advertising, or marketing data.",
+    acceptAll: "Accept all",
+    essentialOnly: "Essential only",
+    analytics: "Analytics",
+    analyticsDescription: "Allow anonymous product and ad performance measurement.",
+    personalizedAds: "Personalized advertising",
+    personalizedAdsDescription:
+      "Allow advertising signals to be used for more relevant ads.",
+    marketing: "Marketing",
+    marketingDescription: "Allow optional product updates and promotional messages.",
+  },
   profile: {
     overview: "Overview",
     posts: "Posts",
@@ -581,6 +595,31 @@ export const en = {
     notifyFollows: "New followers",
     notifyChat: "Chat requests and accepts",
     notifyMentions: "Mentions",
+    consentTitle: "Privacy consent",
+    consentDescription:
+      "Change optional analytics, advertising, and marketing permissions. Essential service data is always processed.",
+    consentAnalytics: "Analytics",
+    consentAnalyticsDescription:
+      "Measure product and ad performance. Ad events are rate-limited and deduplicated.",
+    consentPersonalizedAds: "Personalized advertising",
+    consentPersonalizedAdsDescription:
+      "Ads are contextual today; this permission is stored for a future approved targeting policy.",
+    consentMarketing: "Marketing",
+    consentMarketingDescription:
+      "Allow optional product updates and promotional messages.",
+    consentSaved: "Privacy choices saved",
+    pro: "Việt tại Hàn Pro",
+    proDescription:
+      "Pro entitlements come from a verified payment provider subscription.",
+    proActive: "Pro is active",
+    proInactive: "Pro is not active",
+    proAdFree: "Your feed is ad-free while this entitlement is active.",
+    proBillingUnavailable:
+      "Checkout is not configured on this server yet. Payment provider setup is required.",
+    proEndsAt: "Current period ends {date}",
+    proPlanMonthly: "Monthly",
+    proPlanAnnual: "Annual",
+    proPlanLifetime: "Lifetime",
     profileSaved: "Profile saved",
     emailUpdated: "Email updated",
     passwordChanged: "Password changed",

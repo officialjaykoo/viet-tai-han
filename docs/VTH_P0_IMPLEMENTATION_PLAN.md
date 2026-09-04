@@ -124,7 +124,7 @@
 4. Facebook/Zalo OAuth, WebAuthn/passkey, account linking — **완료**. `0023_identity_providers.sql`, Better Auth provider/PKCE 구성, 로그인·가입 선택지, 설정의 명시적 계정 연결과 패스키 관리를 적용했다.
 5. push notification, DM moderation, unread fanout — **완료**. `0024_messaging_delivery.sql`, pure Web Push/VAPID subscription API, unread badges, DM 신고·운영 큐와 race-safe request transitions를 적용했다.
 6. Vietnamese content translation, multilingual embedding/recommendation — **완료**. `0025_multilingual_content.sql`의 translation target metadata, vi/ko/en/ru 감지·M2M100 번역, EmbeddingGemma 기반 768차원 추천, stale-vector guard, 운영 backfill을 적용했다.
-7. 광고/Pro/결제/ledger는 policy·consent·anti-fraud 이후 활성화.
+7. 광고/Pro/결제/ledger — **기반 구현 완료, 운영 결제 활성화 대기**. `0026_monetization_foundations.sql`의 동의·Pro 구독·청구 이벤트·transaction/reputation ledger, `/api/me/consent`, `/api/me/pro`, 서명된 provider-neutral `/api/billing/webhook`, 광고 기본 off·동의·active-window·dedupe·rate-limit 게이트를 적용했다. 실제 결제 provider checkout/credentials와 정책 승인 전에는 운영 결제를 켜지 않는다.
 
 ## 외부 blocker
 
@@ -136,5 +136,6 @@
 - 운영 WebAuthn RP domain과 HTTPS origin.
 - Web Push VAPID credentials; native FCM/APNs remains outside the web phase.
 - 지도·예약 provider 및 결제 provider credentials.
+- 결제 상품·환불·세금 정책 승인, `BILLING_WEBHOOK_SECRET`, provider webhook 서명/사용자 매핑 값.
 
 이 값이 없는 동안에는 로컬 D1, OpenNext local preview, 코드·schema·보안 검증까지만 수행하고 원격 production deploy는 실행하지 않는다.

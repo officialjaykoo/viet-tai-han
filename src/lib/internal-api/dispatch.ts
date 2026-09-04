@@ -143,6 +143,16 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/me/settings/route"),
   },
   {
+    methods: ["GET", "POST"],
+    pattern: "/api/me/consent",
+    load: () => import("@/app/api/me/consent/route"),
+  },
+  {
+    methods: ["GET"],
+    pattern: "/api/me/pro",
+    load: () => import("@/app/api/me/pro/route"),
+  },
+  {
     methods: ["GET", "POST", "DELETE"],
     pattern: "/api/me/api-keys",
     load: () => import("@/app/api/me/api-keys/route"),

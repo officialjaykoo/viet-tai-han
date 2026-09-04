@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Geist_Mono, Manrope } from "next/font/google";
 
+import { ConsentBanner } from "@/components/consent/consent-banner";
 import { I18nProvider } from "@/components/i18n/i18n-provider";
 import { LanguagePrompt } from "@/components/i18n/language-prompt";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -96,6 +97,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <MobileNav />
             <SiteFooter />
             <LanguagePrompt />
+            <ConsentBanner signedIn={signedIn} />
           </I18nProvider>
         </ThemeProvider>
       </body>
