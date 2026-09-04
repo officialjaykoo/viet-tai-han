@@ -698,6 +698,10 @@ export const vi: Messages = {
     failedPosts: "{count} lỗi",
     embeddingHint:
       "Lập chỉ mục bài đăng gần đây bằng Cloudflare Vectorize và Workers AI để mục Dành cho bạn xếp hạng theo độ tương đồng.",
+    backfillTranslations: "Bổ sung bản dịch nội dung",
+    translationBackfillResult:
+      "Đã xử lý {posts} bài đăng và {comments} bình luận",
+    translationBackfillFailed: "{count} tác vụ dịch bị lỗi",
     activate: "Bật",
     pause: "Tạm dừng",
     end: "Kết thúc",

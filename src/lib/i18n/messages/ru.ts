@@ -702,6 +702,10 @@ export const ru: Messages = {
     failedPosts: "Ошибок: {count}",
     embeddingHint:
       "Индексируйте свежие посты в Cloudflare Vectorize и Workers AI, чтобы «Для вас» использовал семантическое сходство.",
+    backfillTranslations: "Обновить переводы контента",
+    translationBackfillResult:
+      "Обработано постов: {posts}, комментариев: {comments}",
+    translationBackfillFailed: "Ошибок перевода: {count}",
     activate: "Включить",
     pause: "Поставить на паузу",
     end: "Завершить",

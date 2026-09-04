@@ -185,6 +185,13 @@ export async function POST(request: NextRequest) {
         );
         return NextResponse.json(result);
       }
+      case "backfill_translations": {
+        const { backfillContentTranslations } = await import("@/lib/translation");
+        const result = await backfillContentTranslations(
+          typeof body.limit === "number" ? body.limit : 100
+        );
+        return NextResponse.json(result);
+      }
       case "list_ads": {
         const { listAdCampaigns } = await import("@/lib/ads");
         return NextResponse.json({ campaigns: await listAdCampaigns() });

@@ -69,6 +69,7 @@ export interface PublicProfile {
 
 function mapTranslation(row: {
   source_lang?: string | null;
+  translation_target_lang?: string | null;
   translation_status?: string | null;
   title_translated?: string | null;
   body_translated?: string | null;
@@ -78,6 +79,7 @@ function mapTranslation(row: {
   if (status !== "ready") {
     return {
       sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
+      targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
       status,
       titleTranslated: null,
       bodyTranslated: null,
@@ -85,6 +87,7 @@ function mapTranslation(row: {
   }
   return {
     sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
+    targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
     status,
     titleTranslated: row.title_translated ?? null,
     bodyTranslated: row.body_translated ?? null,
@@ -104,6 +107,7 @@ function mapFeedRow(
     comment_count: number;
     created_at: string;
     source_lang?: string | null;
+    translation_target_lang?: string | null;
     title_translated?: string | null;
     body_translated?: string | null;
     translation_status?: string | null;
@@ -252,6 +256,7 @@ export async function getPostDetail(
              p.id, p.title, p.body, p.url, p.media_key,
              p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at, p.is_locked,
              p.source_lang, p.title_translated, p.body_translated, p.translation_status,
+             p.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
              COALESCE(u.displayUsername, u.name) AS author_display_name,
              u.image AS author_image,
@@ -275,6 +280,7 @@ export async function getPostDetail(
              p.id, p.title, p.body, p.url, p.media_key,
              p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at, p.is_locked,
              p.source_lang, p.title_translated, p.body_translated, p.translation_status,
+             p.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
              COALESCE(u.displayUsername, u.name) AS author_display_name,
              u.image AS author_image,
@@ -300,6 +306,7 @@ export async function getPostDetail(
              c.id, c.post_id, c.parent_id, c.body, c.score, c.upvotes, c.downvotes,
              c.depth, c.created_at, c.is_deleted, c.is_shadow_hidden,
              c.source_lang, c.body_translated, c.translation_status,
+             c.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
              COALESCE(u.displayUsername, u.name) AS author_display_name,
              u.image AS author_image,
@@ -322,6 +329,7 @@ export async function getPostDetail(
              c.id, c.post_id, c.parent_id, c.body, c.score, c.upvotes, c.downvotes,
              c.depth, c.created_at, c.is_deleted, c.is_shadow_hidden,
              c.source_lang, c.body_translated, c.translation_status,
+             c.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
              COALESCE(u.displayUsername, u.name) AS author_display_name,
              u.image AS author_image,
@@ -354,6 +362,7 @@ export async function getPostDetail(
       is_deleted: number;
       is_shadow_hidden: number;
       source_lang: string | null;
+      translation_target_lang: string | null;
       body_translated: string | null;
       translation_status: string | null;
       author_id: string;
@@ -392,6 +401,7 @@ export async function getPostDetail(
         ? null
         : mapTranslation({
             source_lang: row.source_lang,
+            translation_target_lang: row.translation_target_lang,
             translation_status: row.translation_status,
             body_translated: row.body_translated,
           }),
@@ -512,6 +522,7 @@ export async function getRecommendations(userId: string, limit = 10) {
            p.id, p.title, p.body, p.url, p.media_key,
            p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at,
            p.source_lang, p.title_translated, p.body_translated, p.translation_status,
+           p.translation_target_lang,
            u.id AS author_id, u.username AS author_username,
            COALESCE(u.displayUsername, u.name) AS author_display_name,
            u.image AS author_image,
@@ -558,6 +569,7 @@ export async function getRecommendations(userId: string, limit = 10) {
          p.id, p.title, p.body, p.url, p.media_key,
          p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at,
          p.source_lang, p.title_translated, p.body_translated, p.translation_status,
+         p.translation_target_lang,
          u.id AS author_id, u.username AS author_username,
          COALESCE(u.displayUsername, u.name) AS author_display_name,
          u.image AS author_image,
@@ -593,6 +605,7 @@ export async function getRecommendations(userId: string, limit = 10) {
          p.id, p.title, p.body, p.url, p.media_key,
          p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at,
          p.source_lang, p.title_translated, p.body_translated, p.translation_status,
+         p.translation_target_lang,
          u.id AS author_id, u.username AS author_username,
          COALESCE(u.displayUsername, u.name) AS author_display_name,
          u.image AS author_image,

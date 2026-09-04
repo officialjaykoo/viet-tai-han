@@ -197,6 +197,41 @@ export function AdminPanel({
       router.refresh();
     });
   }
+  function backfillTranslations() {
+    setError(null);
+    setMessage(null);
+    startTransition(async () => {
+      const res = await apiFetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          op: "backfill_translations",
+          limit: 100,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+        postsProcessed?: number;
+        commentsProcessed?: number;
+        failed?: number;
+      } | null;
+      if (!res.ok) {
+        setError(localizeError(data?.error, t("common.error")));
+        return;
+      }
+      setMessage(
+        t("admin.translationBackfillResult", {
+          posts: data?.postsProcessed ?? 0,
+          comments: data?.commentsProcessed ?? 0,
+        }) +
+          (data?.failed
+            ? ` (${t("admin.translationBackfillFailed", { count: data.failed })})`
+            : "")
+      );
+      router.refresh();
+    });
+  }
+
 
   return (
     <div className="space-y-10">
@@ -792,6 +827,14 @@ export function AdminPanel({
           }}
         >
           {t("admin.backfillEmbeddings")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={backfillTranslations}
+        >
+          {t("admin.backfillTranslations")}
         </Button>
       </section>
 

@@ -91,6 +91,17 @@ Turnstile test keys in `.dev.vars.example` always pass locally. Replace them wit
 | `npm run db:migrate:local` | Apply D1 migrations locally |
 | `npm run vectors:create` | Create the Vectorize index (remote) |
 
+### Multilingual AI
+
+Post recommendations use Cloudflare Workers AI [`@cf/google/embeddinggemma-300m`](https://developers.cloudflare.com/workers-ai/models/embeddinggemma-300m/), a multilingual embedding model that keeps the existing 768-dimensional cosine Vectorize index. New vectors carry an `embeddingVersion` metadata value; create its metadata index before backfilling:
+
+```bash
+npx wrangler vectorize create-metadata-index vth-posts --property-name=embeddingVersion --type=string
+```
+
+Content translation uses [`@cf/meta/m2m100-1.2b`](https://developers.cloudflare.com/workers-ai/models/m2m100-1.2b/). Vietnamese and Korean posts are translated for the other supported locale; English and Russian posts use Vietnamese as the default target. Translation and embedding jobs are backgrounded and fall back to the regular feed when Workers AI or Vectorize is unavailable.
+
+
 ## Deploy your own
 
 1. Create Cloudflare resources:
@@ -100,6 +111,8 @@ Turnstile test keys in `.dev.vars.example` always pass locally. Replace them wit
    npx wrangler d1 create vth-db
    npx wrangler r2 bucket create vth-media
    npm run vectors:create   # Vectorize index vth-posts (768 dims, cosine)
+   npx wrangler vectorize create-metadata-index vth-posts --property-name=embeddingVersion --type=string
+   npx wrangler vectorize create-metadata-index vth-posts --property-name=authorId --type=string
    # optional:
    npx wrangler kv namespace create CACHE
    npx wrangler kv namespace create CACHE --preview

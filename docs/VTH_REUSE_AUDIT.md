@@ -9,7 +9,7 @@
 - **KEEP**: Cloudflare/OpenNext 실행 경계, D1 migration 누적 이력, Better Auth 세션, posts/comments/votes, R2 이미지 정규화, `/i/api` 보안 터널, 테스트 골격.
 - **MODIFY**: 브랜드/도메인, UI locale, 커뮤니티 용어, 인증 origin/OAuth, 검색 도메인, 모바일 공통 layout, D1 도메인 확장, 배포 리소스 설정.
 - **DISABLE**: MVP 초기에는 광고 노출과 원격 AI/Vectorize 자동 호출을 기본 비활성화. 데이터/코드는 보존하고 명시적 feature flag 뒤에 둔다.
-- **REMOVE LATER**: `users` 레거시 테이블, `subreddits`/`/r/*` Reddit 명칭, en/ru 전용 content translation, 사용되지 않는 PostObject 투표 경로. 마이그레이션·호환기간 후 제거한다.
+- **REMOVE LATER**: `users` 레거시 테이블, `subreddits`/`/r/*` Reddit 명칭, 호환기간이 끝난 legacy translation columns, 사용되지 않는 PostObject 투표 경로. 마이그레이션·호환기간 후 제거한다.
 - **NEW**: Q&A, 마켓/구인, business profile, 북마크, 신고/정책 센터, WebAuthn/OAuth, push, 지도/예약, ledger/정산.
 
 ## KEEP
@@ -17,7 +17,7 @@
 | 영역 | 현재 코드 경로 | 판단 근거 | 조치 |
 |---|---|---|---|
 | Cloudflare 실행 | `src/worker.ts`, `next.config.ts`, `open-next.config.ts` | OpenNext handler 앞에서 edge IP 제한을 적용하고 HTML에 speculation rule을 설정한다. | Worker 진입점은 유지. `vth` 리소스명과 custom worker 빌드 검증만 수행. |
-| D1 access | `src/lib/db.ts`, `migrations/0001_init.sql`~`0018_api_keys.sql` | Kysely-D1/쿼리 builder와 keyset cursor, visibility filter, 인덱스가 이미 있다. 로컬 18개 migration이 적용된다. | 기존 migration은 수정하지 않고 후속 migration만 추가. |
+| D1 access | `src/lib/db.ts`, `migrations/0001_init.sql`~`0025_multilingual_content.sql` | Kysely-D1/쿼리 builder와 keyset cursor, visibility filter, 인덱스가 이미 있다. 로컬 migration 누적 이력이 적용된다. | 기존 migration은 수정하지 않고 후속 migration만 추가. |
 | 인증/세션 | `src/lib/auth.ts`, `src/lib/session.ts`, `src/lib/permissions.ts` | Better Auth email/password, 세션 캐시, banned 차단, role/status 입력 차단, admin/moderator 경계가 있다. | `vth.kr` trusted origin, OAuth, WebAuthn을 추가하고 secret을 운영값으로 교체. |
 | 게시물/댓글/투표 | `src/lib/actions.ts`, `src/lib/content.ts`, `src/lib/votes.ts`, `src/app/api/posts/**`, `src/app/api/comments/**` | 생성/수정/삭제/댓글/투표/신고/숨김 및 karma/rate limit/visibility filter가 연결되어 있다. | 핵심 피드 흐름은 유지. Vietnamese 커뮤니티·Q&A 도메인만 확장. |
 | 커뮤니티 | `src/lib/communities.ts`, `src/app/communities/page.tsx`, `src/app/r/[name]/page.tsx` | 커뮤니티 생성·구독·피드·moderator 경계가 구현되어 있다. | 내부 데이터는 호환 유지하고 사용자 노출 명칭을 `community`/`cộng đồng`로 변경. `/r/*`는 호환 redirect로 전환. |
@@ -37,9 +37,9 @@
 | route naming | 페이지는 `/r/[name]`, `/u/[username]`; logical API는 `/api/subreddits/**`다. | 신규 canonical `/c/[name]`, `/@/[username]` 여부를 확정하고 기존 경로는 308/서버 redirect. API는 versioned public schema로 분리. | P1 |
 | 인증 origin | `src/lib/auth.ts` trustedOrigins가 localhost 3000/3100뿐이다. | `https://vth.kr`, 운영 preview origin, OAuth callback origin을 환경별로 허용. | P0 운영 전 |
 | 검색 | `src/lib/search.ts`가 community/account/post LIKE 검색만 제공하고 limit/query escaping은 적용한다. | Q&A/answer/business/listing/report/booking 대상과 Vietnamese diacritic normalization, FTS 검토. | P1 |
-| content translation | `src/lib/translation.ts`가 `en/ru` 감지 및 양방향 번역만 제공한다. | `vi/ko/en` 모델·원문 언어·번역 cache/version/quality fallback 설계. UI locale 변경과 별도 배포. | P1 |
+| content translation | `src/lib/translation.ts`, `migrations/0015_content_translation.sql`, `0025_multilingual_content.sql` | vi/ko/en/ru 감지, vi/ko target 기록, M2M100 번역, locale-aware toggle, background job, admin backfill을 적용했다. | P1 완료 |
 | 광고/분석 | `src/lib/ads.ts`, `src/lib/post-analytics.ts`가 feed inline 광고와 raw impression/click/view를 제공한다. | MVP 기본 off, 동의/anti-fraud/active-window/rate limit/owner stats를 추가한 후 재활성화. | P1 |
-| AI 추천 | `src/lib/embeddings.ts`, `/api/recommendations`가 Workers AI BGE 영어 embedding + Vectorize에 의존한다. | Vietnamese 다국어 embedding, 비용 flag, 실패 fallback, metadata visibility filter를 검증. | P1 |
+| AI 추천 | `src/lib/embeddings.ts`, `/api/recommendations` | EmbeddingGemma multilingual 768차원 모델, embedding version metadata filter, stale preference re-embedding과 일반 feed fallback을 적용했다. | P1 완료 |
 | 배포 resource | `wrangler.jsonc`가 `red-db`, `red-media`, `red-posts`와 zero D1 ID를 사용한다. | `vth` 명칭과 실제 계정 리소스 ID로 교체. placeholder 상태 deploy 금지. | P0 운영 전 |
 | 모바일 layout | 기존 390px preview는 horizontal overflow 없이 렌더링되고 touch target/header menu가 있다. bottom navigation과 safe-area 정책은 없다. | `src/components/layout/*`, `src/app/globals.css`에 mobile-first bottom nav, safe-area, keyboard/focus 규칙 추가. | P0 |
 | CI/e2e 명령 | Playwright config가 존재하지 않는 `npm run dev:next`를 호출했다. | `playwright.config.ts`를 실제 `npm run dev`로 수정했다. | P0 완료 |
@@ -59,7 +59,7 @@
 |---|---|---|
 | 레거시 identity tables | `migrations/0001_init.sql`의 `users`, `subreddits`와 Better Auth `"user"` 공존 | 모든 사용자/community FK와 데이터가 canonical model로 이동하고 backup/rollback 검증 완료. |
 | Reddit URL/표기 | `/r/[name]`, `/u/[username]`, `/api/subreddits/**` 및 노출 문자열 | canonical route/API가 안정되고 외부 링크 redirect 기간 종료. |
-| en/ru content translation | `src/lib/translation.ts`의 `ContentLang`, `posts/comments` 번역 필드 | vi/ko/en translation schema와 backfill/quality policy가 운영됨. |
+| legacy translation storage | `src/lib/translation.ts`의 `posts/comments` 번역 필드 | 다국어 target metadata와 backfill이 안정화되고 translation table로 확장할 필요가 확인될 때 정리. |
 | 미사용 PostObject 투표 경로 | `src/workers/PostObject.ts`, `src/lib/votes.ts` | 현재 실제 vote write path가 D1 직접 갱신인지 확인하고, DO로 일원화하거나 binding/code를 제거. |
 | 원본 demo copy | `README.md`, `seed.sql`, fixture의 red/Reddit/Cloudflare 샘플 | Việt tại Hàn용 seed/문서/fixture로 교체 후 baseline fixture가 새 계약을 검증. |
 
@@ -74,7 +74,7 @@
 | Identity | Facebook/Zalo OAuth, WebAuthn passkey, account linking | 가입 장벽과 계정 보안 개선. |
 | Messaging delivery | push subscription, unread fanout, notification preference | DM/알림의 모바일 전달. |
 | Trust ledger | karma/reputation/transaction ledger | 기존 집계 karma를 감사 가능한 event/ledger로 확장. |
-| Vietnamese discovery | diacritic-aware search, location/category index, multilingual embeddings | 베트남어 콘텐츠 발견성과 추천. |
+| Vietnamese discovery | diacritic-aware search, location/category index, multilingual embeddings | 다국어 임베딩·추천은 P1에서 완료했고 검색 정규화와 location/category index는 후속 작업. |
 | Observability | Sentry/Workers logs/health checks/security events | 오류·rate-limit·abuse·비용 모니터링. |
 
 ## 보안 이슈 우선순위

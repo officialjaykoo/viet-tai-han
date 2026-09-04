@@ -57,7 +57,8 @@ export interface CommentRow {
   updated_at: string;
 }
 
-export type ContentSourceLang = "en" | "ru" | "other";
+export type ContentTargetLang = "vi" | "ko";
+export type ContentSourceLang = ContentTargetLang | "en" | "ru" | "other";
 export type ContentTranslationStatus =
   | "pending"
   | "ready"
@@ -66,6 +67,7 @@ export type ContentTranslationStatus =
 
 export interface ContentTranslation {
   sourceLang: ContentSourceLang | null;
+  targetLang: ContentTargetLang | null;
   status: ContentTranslationStatus;
   titleTranslated: string | null;
   bodyTranslated: string | null;

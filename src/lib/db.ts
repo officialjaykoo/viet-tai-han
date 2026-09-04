@@ -40,6 +40,7 @@ function voteValueToAction(value: number | null | undefined): ViewerVote {
 
 function mapTranslation(row: {
   source_lang?: string | null;
+  translation_target_lang?: string | null;
   translation_status?: string | null;
   title_translated?: string | null;
   body_translated?: string | null;
@@ -48,6 +49,7 @@ function mapTranslation(row: {
   if (status !== "ready") {
     return {
       sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
+      targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
       status,
       titleTranslated: null,
       bodyTranslated: null,
@@ -55,6 +57,7 @@ function mapTranslation(row: {
   }
   return {
     sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
+    targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
     status,
     titleTranslated: row.title_translated ?? null,
     bodyTranslated: row.body_translated ?? null,
@@ -73,6 +76,7 @@ interface FeedQueryRow {
   comment_count: number;
   created_at: string;
   source_lang: string | null;
+  translation_target_lang: string | null;
   title_translated: string | null;
   body_translated: string | null;
   translation_status: string | null;
@@ -251,6 +255,7 @@ export async function getFeedPosts(options: {
          p.comment_count,
          p.created_at,
          p.source_lang,
+         p.translation_target_lang,
          p.title_translated,
          p.body_translated,
          p.translation_status,

@@ -21,7 +21,7 @@
 - auth: Better Auth + username plugin
 - browser API: POST `/i/api` Protobuf tunnel
 - direct API: `/api/*` + `Authorization: Bearer <personal_api_key>`
-- local DB: migrations `0001`~`0022`, `seed.sql`
+- local DB: migrations `0001`~`0025`, `seed.sql`
 
 ## P0-1 identity와 환경
 
@@ -123,7 +123,7 @@
 3. business profile, verification, 지도/예약 — **완료**. `0022_business_profiles.sql`, `/businesses`, 인증 심사 큐, 지도 링크, 예약 요청/상태 변경 API와 통합 테스트를 적용했다.
 4. Facebook/Zalo OAuth, WebAuthn/passkey, account linking — **완료**. `0023_identity_providers.sql`, Better Auth provider/PKCE 구성, 로그인·가입 선택지, 설정의 명시적 계정 연결과 패스키 관리를 적용했다.
 5. push notification, DM moderation, unread fanout — **완료**. `0024_messaging_delivery.sql`, pure Web Push/VAPID subscription API, unread badges, DM 신고·운영 큐와 race-safe request transitions를 적용했다.
-6. Vietnamese content translation, multilingual embedding/recommendation.
+6. Vietnamese content translation, multilingual embedding/recommendation — **완료**. `0025_multilingual_content.sql`의 translation target metadata, vi/ko/en/ru 감지·M2M100 번역, EmbeddingGemma 기반 768차원 추천, stale-vector guard, 운영 backfill을 적용했다.
 7. 광고/Pro/결제/ledger는 policy·consent·anti-fraud 이후 활성화.
 
 ## 외부 blocker
@@ -134,7 +134,7 @@
 - Facebook/Zalo OAuth credentials와 callback allowlist(외부 OAuth 활성화·운영 smoke에 필요).
 - SMTP/email provider.
 - 운영 WebAuthn RP domain과 HTTPS origin.
-- push VAPID/FCM/APNs credentials.
+- Web Push VAPID credentials; native FCM/APNs remains outside the web phase.
 - 지도·예약 provider 및 결제 provider credentials.
 
 이 값이 없는 동안에는 로컬 D1, OpenNext local preview, 코드·schema·보안 검증까지만 수행하고 원격 production deploy는 실행하지 않는다.

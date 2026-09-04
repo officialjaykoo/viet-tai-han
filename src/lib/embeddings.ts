@@ -1,7 +1,8 @@
 import { getDb, getEnv } from "@/lib/db";
 
-export const EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5";
+export const EMBEDDING_MODEL = "@cf/google/embeddinggemma-300m";
 export const EMBEDDING_DIMENSIONS = 768;
+export const EMBEDDING_VERSION = "embeddinggemma-300m-v1";
 
 type EmbeddingResponse = {
   shape: number[];
@@ -20,7 +21,7 @@ export function postEmbeddingText(input: {
   body?: string | null;
 }): string {
   const parts = [
-    input.subredditName ? `r/${input.subredditName}` : null,
+    input.subredditName ? `Community: ${input.subredditName}` : null,
     input.title.trim(),
     input.body?.trim() || null,
   ].filter(Boolean);
@@ -29,11 +30,21 @@ export function postEmbeddingText(input: {
 
 function averageVectors(vectors: number[][]): number[] {
   const dim = vectors[0]?.length ?? 0;
-  if (!dim || vectors.length === 0) return [];
+  if (
+    !dim ||
+    vectors.length === 0 ||
+    vectors.some(
+      (vector) =>
+        vector.length !== dim || vector.some((value) => !Number.isFinite(value))
+    )
+  ) {
+    return [];
+  }
+
   const out = new Array<number>(dim).fill(0);
   for (const vector of vectors) {
     for (let i = 0; i < dim; i++) {
-      out[i]! += vector[i] ?? 0;
+      out[i]! += vector[i]!;
     }
   }
   const n = vectors.length;
@@ -67,10 +78,19 @@ export async function embedTexts(texts: string[]): Promise<number[][] | null> {
   try {
     const response = (await bindings.ai.run(EMBEDDING_MODEL, {
       text: texts,
-      pooling: "cls",
     })) as EmbeddingResponse;
 
-    if (!response?.data?.length) return null;
+    if (
+      !response?.data?.length ||
+      response.data.length !== texts.length ||
+      response.data.some(
+        (vector) =>
+          vector.length !== EMBEDDING_DIMENSIONS ||
+          vector.some((value) => !Number.isFinite(value))
+      )
+    ) {
+      return null;
+    }
     return response.data;
   } catch (error) {
     console.warn("Workers AI embedding failed", error);
@@ -104,6 +124,8 @@ export async function indexPostEmbedding(input: {
           subredditId: input.subredditId,
           subredditName: input.subredditName,
           createdAt: input.createdAt ?? new Date().toISOString(),
+          embeddingModel: EMBEDDING_MODEL,
+          embeddingVersion: EMBEDDING_VERSION,
         },
       },
     ]);
@@ -149,26 +171,11 @@ async function buildUserPreferenceVector(userId: string): Promise<number[] | nul
       body: string | null;
       subreddit_name: string;
     }>();
-
   const likedRows = liked ?? [];
-  if (likedRows.length > 0) {
-    const bindings = await getAiBindings();
-    if (bindings) {
-      try {
-        const stored = await bindings.vectorize.getByIds(
-          likedRows.map((row) => row.id)
-        );
-        const values = stored
-          .map((item) => item.values)
-          .filter((v): v is number[] => Array.isArray(v) && v.length > 0);
-        if (values.length > 0) {
-          return averageVectors(values);
-        }
-      } catch {
-        // Fall through to re-embed text.
-      }
-    }
 
+  if (likedRows.length > 0) {
+    // Re-embed the preference text instead of reading stored vectors. This
+    // keeps old BGE vectors out of the new multilingual embedding space.
     const vectors = await embedTexts(
       likedRows.map((row) =>
         postEmbeddingText({
@@ -199,7 +206,7 @@ async function buildUserPreferenceVector(userId: string): Promise<number[] | nul
   const preferenceText = communityRows
     .map(
       (row) =>
-        `Interested in r/${row.name}: ${row.title}. ${row.description ?? ""}`
+        `Community ${row.name}: ${row.title}. ${row.description ?? ""}`
     )
     .join("\n");
 
@@ -218,14 +225,16 @@ export async function queryRecommendedPostIds(
   const bindings = await getAiBindings();
   if (!bindings) return null;
 
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
   const preference = await buildUserPreferenceVector(userId);
   if (!preference?.length) return null;
 
   try {
     const matches = await bindings.vectorize.query(preference, {
-      topK: Math.min(Math.max(limit * 3, 24), 50),
+      topK: Math.min(safeLimit * 3, 50),
       returnMetadata: "indexed",
       filter: {
+        embeddingVersion: EMBEDDING_VERSION,
         authorId: { $ne: userId },
       },
     });
@@ -235,7 +244,7 @@ export async function queryRecommendedPostIds(
       .map((match) => match.id)
       .filter(Boolean);
 
-    return ids.length > 0 ? ids : null;
+    return ids.length > 0 ? ids.slice(0, safeLimit) : null;
   } catch (error) {
     console.warn("Vectorize query failed", error);
     return null;
@@ -248,6 +257,7 @@ export async function backfillPostEmbeddings(limit = 100): Promise<{
   failed: number;
 }> {
   const db = await getDb();
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
   const { results } = await db
     .prepare(
       `SELECT p.id, p.author_id, p.subreddit_id, p.title, p.body, p.created_at,
@@ -258,7 +268,7 @@ export async function backfillPostEmbeddings(limit = 100): Promise<{
        ORDER BY p.created_at DESC
        LIMIT ?`
     )
-    .bind(limit)
+    .bind(safeLimit)
     .all<{
       id: string;
       author_id: string;

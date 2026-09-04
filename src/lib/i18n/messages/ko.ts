@@ -690,6 +690,10 @@ export const ko: Messages = {
     failedPosts: "{count}개 실패",
     embeddingHint:
       "Cloudflare Vectorize와 Workers AI로 최근 글을 색인해 맞춤 추천을 의미 유사도로 정렬합니다.",
+    backfillTranslations: "콘텐츠 번역 보충",
+    translationBackfillResult:
+      "게시물 {posts}개와 댓글 {comments}개를 처리했습니다",
+    translationBackfillFailed: "번역 작업 {count}개가 실패했습니다",
     activate: "활성화",
     pause: "일시중지",
     end: "종료",

@@ -700,6 +700,10 @@ export const en = {
     failedPosts: "{count} failed",
     embeddingHint:
       "Index recent posts into Cloudflare Vectorize and Workers AI so For you can rank by semantic similarity.",
+    backfillTranslations: "Backfill content translations",
+    translationBackfillResult:
+      "Processed {posts} posts and {comments} comments",
+    translationBackfillFailed: "{count} translation jobs failed",
     activate: "Activate",
     pause: "Pause",
     end: "End",

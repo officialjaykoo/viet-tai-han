@@ -572,6 +572,7 @@ export async function editPost(input: {
       `UPDATE posts
        SET title = ?, body = ?, url = ?,
            source_lang = NULL,
+           translation_target_lang = NULL,
            title_translated = NULL,
            body_translated = NULL,
            translation_status = 'pending',
@@ -651,6 +652,7 @@ export async function editComment(input: {
       `UPDATE comments
        SET body = ?,
            source_lang = NULL,
+           translation_target_lang = NULL,
            body_translated = NULL,
            translation_status = 'pending',
            is_shadow_hidden = CASE WHEN ? THEN 1 ELSE is_shadow_hidden END,
