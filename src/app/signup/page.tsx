@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 
+import { IdentityAuthButtons } from "@/components/auth/identity-auth-buttons";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import {
@@ -22,8 +23,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { signUp } from "@/lib/auth-client";
+import { authClient, signUp } from "@/lib/auth-client";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
+const subscribeToLocation = () => () => {};
+
 
 export default function SignupPage() {
   const { t } = useI18n();
@@ -37,10 +40,21 @@ export default function SignupPage() {
   const [pending, startTransition] = useTransition();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const bot = useBotGuard();
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useSyncExternalStore(
+    subscribeToLocation,
+    () => true,
+    () => false
+  );
+  const callbackError = useSyncExternalStore(
+    subscribeToLocation,
+    () => new URLSearchParams(window.location.search).get("error"),
+    () => null
+  );
+  const displayError =
+    error ??
+    (callbackError
+      ? localizeError(callbackError, t("auth.couldNotSignUp"))
+      : null);
 
   function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -72,6 +86,44 @@ export default function SignupPage() {
       router.refresh();
     });
   }
+  function startSocial(
+    event: React.MouseEvent<HTMLButtonElement>,
+    provider: "facebook" | "zalo"
+  ) {
+    event.preventDefault();
+    setError(null);
+    bot.markTrusted(event);
+
+    startTransition(async () => {
+      const check = await passBotCheck(bot, turnstileToken);
+      if (!check.ok) {
+        setError(localizeError(check.error, t("common.error")));
+        return;
+      }
+
+      const result =
+        provider === "facebook"
+          ? await authClient.signIn.social({
+              provider: "facebook",
+              callbackURL: "/",
+              errorCallbackURL: "/signup",
+              requestSignUp: true,
+            })
+          : await authClient.signIn.oauth2({
+              providerId: "zalo",
+              callbackURL: "/",
+              errorCallbackURL: "/signup",
+              requestSignUp: true,
+            });
+
+      if (result.error) {
+        setError(
+          localizeError(result.error.message, t("auth.couldNotSignUp"))
+        );
+      }
+    });
+  }
+
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 items-center safe-px safe-pb py-10 sm:py-16">
@@ -138,9 +190,9 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </label>
-            {error ? (
+            {displayError ? (
               <p className="text-sm text-destructive" role="alert">
-                {error}
+                {displayError}
               </p>
             ) : null}
             <TurnstileWidget onToken={setTurnstileToken} />
@@ -155,6 +207,11 @@ export default function SignupPage() {
             >
               {pending ? t("auth.creating") : t("auth.createAccount")}
             </Button>
+            <IdentityAuthButtons
+              pending={pending}
+              onFacebook={(event) => startSocial(event, "facebook")}
+              onZalo={(event) => startSocial(event, "zalo")}
+            />
             <p className="text-center text-sm text-muted-foreground">
               {t("auth.hasAccount")}{" "}
               <Link href="/login" className="text-foreground underline">

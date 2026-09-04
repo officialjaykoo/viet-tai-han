@@ -77,7 +77,7 @@ export async function loginAsAlice(page: Page, next = "/") {
   await password.fill(SEED_USER.password);
   await page.keyboard.press("Tab");
 
-  await page.getByRole("button", { name: /đăng nhập/i }).click();
+  await page.getByRole("button", { name: /^đăng nhập$/i }).click();
   await expect(page.getByRole("button", { name: /đang đăng nhập/i })).toBeVisible({
     timeout: 5_000,
   }).catch(() => undefined);

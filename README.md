@@ -107,16 +107,23 @@ Turnstile test keys in `.dev.vars.example` always pass locally. Replace them wit
 
 2. Paste the returned IDs into `wrangler.jsonc` (`database_id`, and KV ids if used).
 
-3. Set `vars.BETTER_AUTH_URL` to your public origin and put your Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and add `FACEBOOK_CLIENT_ID` / `ZALO_APP_ID` when those providers are enabled. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins.
 
-4. Add that same origin to `trustedOrigins` in `src/lib/auth.ts`.
+4. Register the OAuth callbacks with each provider:
+
+   - Facebook: `https://YOUR_ORIGIN/api/auth/callback/facebook`
+   - Zalo: `https://YOUR_ORIGIN/api/auth/oauth2/callback/zalo`
 
 5. Set secrets:
 
    ```bash
    wrangler secret put BETTER_AUTH_SECRET
    wrangler secret put TURNSTILE_SECRET_KEY
+   wrangler secret put FACEBOOK_CLIENT_SECRET  # when Facebook is enabled
+   wrangler secret put ZALO_APP_SECRET          # when Zalo is enabled
    ```
+
+   Facebook and Zalo remain disabled unless both the provider ID and secret are present. Passkeys use the hostname and origin from `BETTER_AUTH_URL`.
 
 6. Apply remote migrations, then deploy:
 

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, useTransition } from "react";
+import { Suspense, useState, useSyncExternalStore, useTransition } from "react";
 
+import { IdentityAuthButtons } from "@/components/auth/identity-auth-buttons";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import {
@@ -22,8 +23,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { signIn } from "@/lib/auth-client";
+import { authClient, signIn } from "@/lib/auth-client";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
+const subscribeToHydration = () => () => {};
+
 
 function LoginForm() {
   const { t } = useI18n();
@@ -37,10 +40,17 @@ function LoginForm() {
   const [pending, startTransition] = useTransition();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const bot = useBotGuard();
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false
+  );
+  const callbackError = searchParams.get("error");
+  const displayError =
+    error ??
+    (callbackError
+      ? localizeError(callbackError, t("auth.couldNotSignIn"))
+      : null);
 
   function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -70,6 +80,51 @@ function LoginForm() {
       router.refresh();
     });
   }
+  function startIdentity(
+    event: React.MouseEvent<HTMLButtonElement>,
+    method: "facebook" | "zalo" | "passkey"
+  ) {
+    event.preventDefault();
+    setError(null);
+    bot.markTrusted(event);
+
+    startTransition(async () => {
+      const check = await passBotCheck(bot, turnstileToken);
+      if (!check.ok) {
+        setError(localizeError(check.error, t("common.error")));
+        return;
+      }
+
+      const callbackURL = next.startsWith("/") ? next : "/";
+      const result =
+        method === "facebook"
+          ? await authClient.signIn.social({
+              provider: "facebook",
+              callbackURL,
+              errorCallbackURL: "/login",
+            })
+          : method === "zalo"
+            ? await authClient.signIn.oauth2({
+                providerId: "zalo",
+                callbackURL,
+                errorCallbackURL: "/login",
+              })
+            : await signIn.passkey();
+
+      if (result.error) {
+        setError(
+          localizeError(result.error.message, t("auth.couldNotSignIn"))
+        );
+        return;
+      }
+
+      if (method === "passkey") {
+        router.push(callbackURL);
+        router.refresh();
+      }
+    });
+  }
+
 
   return (
     <Card className="w-full rounded-2xl">
@@ -108,9 +163,9 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
-          {error ? (
+          {displayError ? (
             <p className="text-sm text-destructive" role="alert">
-              {error}
+              {displayError}
             </p>
           ) : null}
           <TurnstileWidget onToken={setTurnstileToken} />
@@ -125,6 +180,12 @@ function LoginForm() {
           >
             {pending ? t("auth.signingIn") : t("auth.signIn")}
           </Button>
+          <IdentityAuthButtons
+            pending={pending}
+            onFacebook={(event) => startIdentity(event, "facebook")}
+            onZalo={(event) => startIdentity(event, "zalo")}
+            onPasskey={(event) => startIdentity(event, "passkey")}
+          />
           <p className="text-center text-sm text-muted-foreground">
             {t("auth.noAccount")}{" "}
             <Link href="/signup" className="text-foreground underline">

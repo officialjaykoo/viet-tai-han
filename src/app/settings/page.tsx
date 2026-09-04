@@ -32,7 +32,7 @@ function parseSection(value: string | undefined): Section {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ section?: string }>;
+  searchParams: Promise<{ section?: string; error?: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) {
@@ -66,6 +66,7 @@ export default async function SettingsPage({
           initialSettings={settings}
           initialBlocked={blocked}
           initialSection={parseSection(params.section)}
+          initialIdentityError={params.error}
         />
       </main>
     </>

@@ -21,6 +21,11 @@ interface CloudflareEnv {
 	EXPENSIVE_IP_RATE_LIMITER: RateLimit;
 	BETTER_AUTH_SECRET: string;
 	BETTER_AUTH_URL: string;
+	VTH_AUTH_ORIGINS?: string;
+	FACEBOOK_CLIENT_ID?: string;
+	FACEBOOK_CLIENT_SECRET?: string;
+	ZALO_APP_ID?: string;
+	ZALO_APP_SECRET?: string;
 	TURNSTILE_SECRET_KEY: string;
 	NEXT_PUBLIC_TURNSTILE_SITE_KEY: string;
 	NEXTJS_ENV?: string;
@@ -30,6 +35,11 @@ declare namespace NodeJS {
 	interface ProcessEnv {
 		BETTER_AUTH_SECRET?: string;
 		BETTER_AUTH_URL?: string;
+		VTH_AUTH_ORIGINS?: string;
+		FACEBOOK_CLIENT_ID?: string;
+		FACEBOOK_CLIENT_SECRET?: string;
+		ZALO_APP_ID?: string;
+		ZALO_APP_SECRET?: string;
 		TURNSTILE_SECRET_KEY?: string;
 		NEXT_PUBLIC_TURNSTILE_SITE_KEY?: string;
 		NEXTJS_ENV?: string;
