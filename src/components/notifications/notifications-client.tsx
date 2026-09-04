@@ -5,12 +5,13 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
+import { announceUnreadChanged } from "@/components/notifications/use-unread-count";
 import { RelativeTime } from "@/components/time/relative-time";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { Button } from "@/components/ui/button";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import { cn } from "@/lib/utils";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 type NotificationItem = {
   id: string;
@@ -60,9 +61,10 @@ export function NotificationsClient() {
   }, [router, t]);
 
   useEffect(() => {
+    // Initial notification loading is an intentional external data sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
-
   function markAll() {
     startTransition(async () => {
       await apiFetch("/api/notifications", {
@@ -70,6 +72,7 @@ export function NotificationsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_all_read" }),
       });
+      announceUnreadChanged();
       await load();
     });
   }
@@ -82,6 +85,7 @@ export function NotificationsClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "mark_read", ids: [item.id] }),
         });
+        announceUnreadChanged();
       }
       if (item.href) router.push(item.href);
       else await load();

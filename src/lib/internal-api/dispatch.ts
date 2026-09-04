@@ -174,6 +174,11 @@ const ROUTES: RouteEntry[] = [
   },
   {
     methods: ["POST"],
+    pattern: "/api/messages/:roomId/report",
+    load: () => import("@/app/api/messages/[roomId]/report/route"),
+  },
+  {
+    methods: ["POST"],
     pattern: "/api/messages/requests/:id",
     load: () => import("@/app/api/messages/requests/[id]/route"),
   },
@@ -181,6 +186,16 @@ const ROUTES: RouteEntry[] = [
     methods: ["GET", "POST"],
     pattern: "/api/notifications",
     load: () => import("@/app/api/notifications/route"),
+  },
+  {
+    methods: ["GET", "POST", "DELETE"],
+    pattern: "/api/push",
+    load: () => import("@/app/api/push/route"),
+  },
+  {
+    methods: ["GET"],
+    pattern: "/api/unread",
+    load: () => import("@/app/api/unread/route"),
   },
   {
     methods: ["GET"],

@@ -5,12 +5,13 @@ import { useEffect, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
+import { announceUnreadChanged } from "@/components/notifications/use-unread-count";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user/user-avatar";
+import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { apiFetch, apiJson } from "@/lib/api-client";
 
 type Room = {
   id: string;
@@ -22,6 +23,7 @@ type Room = {
     displayName: string;
   };
   lastBody: string | null;
+  unreadCount: number;
 };
 
 type RequestItem = {
@@ -43,6 +45,22 @@ type ChatMessage = {
   isMine: boolean;
   senderUsername: string | null;
 };
+type ChatReportReason =
+  | "spam"
+  | "harassment"
+  | "hate"
+  | "misinformation"
+  | "nsfw"
+  | "other";
+
+const CHAT_REPORT_REASONS: ChatReportReason[] = [
+  "spam",
+  "harassment",
+  "hate",
+  "misinformation",
+  "nsfw",
+  "other",
+];
 
 export function MessagesClient() {
   const router = useRouter();
@@ -60,8 +78,16 @@ export function MessagesClient() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [loaded, setLoaded] = useState(false);
+  const [reportingMessageId, setReportingMessageId] = useState<string | null>(
+    null
+  );
+  const [reportReason, setReportReason] =
+    useState<ChatReportReason>("harassment");
+  const [reportDetails, setReportDetails] = useState("");
 
   useEffect(() => {
+    // URL query changes intentionally seed the compose field.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (toParam) setComposeUser(toParam);
   }, [toParam]);
 
@@ -90,10 +116,12 @@ export function MessagesClient() {
     loadInbox();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   useEffect(() => {
     if (!selectedRoom) {
+      // Reading a different room clears the previous room's local state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMessages([]);
+      setReportingMessageId(null);
       return;
     }
     startTransition(async () => {
@@ -104,6 +132,7 @@ export function MessagesClient() {
       }
       const data = (await res.json()) as { messages: ChatMessage[] };
       setMessages(data.messages);
+      announceUnreadChanged();
     });
   }, [selectedRoom, localizeError]);
 
@@ -180,7 +209,42 @@ export function MessagesClient() {
     });
   }
 
+  function submitReport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedRoom || !reportingMessageId) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await apiFetch(`/api/messages/${selectedRoom}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: reportingMessageId,
+          reason: reportReason,
+          details: reportDetails,
+        }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(localizeError(payload?.error, "Couldn't report message"));
+        return;
+      }
+      setReportingMessageId(null);
+      setReportDetails("");
+      setError(null);
+    });
+  }
+
   const activeRoom = rooms.find((room) => room.id === selectedRoom);
+  const reportReasonLabels: Record<ChatReportReason, string> = {
+    spam: t("messages.reasonSpam"),
+    harassment: t("messages.reasonHarassment"),
+    hate: t("messages.reasonHate"),
+    misinformation: t("messages.reasonMisinformation"),
+    nsfw: t("messages.reasonNsfw"),
+    other: t("messages.reasonOther"),
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
@@ -298,6 +362,16 @@ export function MessagesClient() {
                         {room.lastBody ?? t("messages.noMessagesYet")}
                       </span>
                     </span>
+                    {room.unreadCount > 0 ? (
+                      <span
+                        className="grid min-w-5 place-items-center rounded-full bg-[var(--brand)] px-1 text-[10px] font-bold leading-5 text-[var(--brand-foreground)] tabular-nums"
+                        aria-label={t("messages.unreadCount", {
+                          count: room.unreadCount,
+                        })}
+                      >
+                        {room.unreadCount > 99 ? "99+" : room.unreadCount}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -317,13 +391,74 @@ export function MessagesClient() {
                 <div
                   key={message.id}
                   className={cn(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
-                    message.isMine
-                      ? "ml-auto bg-[color-mix(in_oklch,var(--brand)_18%,transparent)]"
-                      : "bg-muted"
+                    "space-y-1",
+                    message.isMine ? "ml-auto max-w-[85%]" : "max-w-[85%]"
                   )}
                 >
-                  {message.body}
+                  <div
+                    className={cn(
+                      "rounded-2xl px-3 py-2 text-sm",
+                      message.isMine
+                        ? "bg-[color-mix(in_oklch,var(--brand)_18%,transparent)]"
+                        : "bg-muted"
+                    )}
+                  >
+                    {message.body}
+                  </div>
+                  {!message.isMine && reportingMessageId !== message.id ? (
+                    <button
+                      type="button"
+                      className="px-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                      onClick={() => setReportingMessageId(message.id)}
+                    >
+                      {t("messages.report")}
+                    </button>
+                  ) : null}
+                  {reportingMessageId === message.id ? (
+                    <form
+                      onSubmit={submitReport}
+                      className="space-y-2 rounded-xl border border-border/60 bg-card p-2"
+                    >
+                      <select
+                        className="h-9 w-full rounded-lg border border-input bg-background px-2 text-xs"
+                        value={reportReason}
+                        onChange={(e) =>
+                          setReportReason(e.target.value as ChatReportReason)
+                        }
+                        aria-label={t("messages.reportReason")}
+                      >
+                        {CHAT_REPORT_REASONS.map((reason) => (
+                          <option key={reason} value={reason}>
+                            {reportReasonLabels[reason]}
+                          </option>
+                        ))}
+                      </select>
+                      <Textarea
+                        value={reportDetails}
+                        onChange={(e) => setReportDetails(e.target.value)}
+                        placeholder={t("messages.reportDetails")}
+                        rows={2}
+                        className="rounded-lg text-xs"
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit" size="xs" disabled={pending}>
+                          {t("messages.submitReport")}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          disabled={pending}
+                          onClick={() => {
+                            setReportingMessageId(null);
+                            setReportDetails("");
+                          }}
+                        >
+                          {t("common.cancel")}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : null}
                 </div>
               ))}
             </div>

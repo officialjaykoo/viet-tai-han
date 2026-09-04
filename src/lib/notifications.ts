@@ -1,4 +1,10 @@
 import { getDb } from "@/lib/db";
+import { queuePushDelivery } from "@/lib/push";
+import {
+  decrementUnread,
+  getUnreadCounts,
+  incrementUnread,
+} from "@/lib/unread";
 import { AuthError } from "@/lib/session";
 
 export type NotificationKind =
@@ -9,6 +15,14 @@ export type NotificationKind =
   | "chat_accepted"
   | "warning"
   | "mention";
+export async function canNotifyChat(userId: string): Promise<boolean> {
+  const db = await getDb();
+  const row = await db
+    .prepare(`SELECT notifyChat FROM "user" WHERE id = ?`)
+    .bind(userId)
+    .first<{ notifyChat: number }>();
+  return row ? Boolean(row.notifyChat) : true;
+}
 
 export type NotificationItem = {
   id: string;
@@ -88,6 +102,16 @@ export async function createNotification(input: {
       input.commentId ?? null
     )
     .run();
+  await incrementUnread(input.userId, "notifications");
+  queuePushDelivery({
+    userId: input.userId,
+    payload: {
+      title: input.title,
+      body: input.body,
+      href: input.href,
+      tag: `notification-${input.kind}`,
+    },
+  });
   return id;
 }
 
@@ -151,14 +175,8 @@ export async function listNotifications(
 }
 
 export async function countUnreadNotifications(userId: string): Promise<number> {
-  const db = await getDb();
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0`
-    )
-    .bind(userId)
-    .first<{ c: number }>();
-  return Number(row?.c ?? 0);
+  const counts = await getUnreadCounts(userId);
+  return counts.notificationCount;
 }
 
 export async function markNotificationsRead(input: {
@@ -168,26 +186,40 @@ export async function markNotificationsRead(input: {
 }) {
   const db = await getDb();
   if (input.all) {
-    await db
+    const result = await db
       .prepare(
         `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`
       )
       .bind(input.userId)
       .run();
+    if (result.meta.changes) {
+      await decrementUnread(
+        input.userId,
+        "notifications",
+        result.meta.changes
+      );
+    }
     return { ok: true };
   }
   if (!input.ids?.length) {
     throw new AuthError("Nothing to mark read", 400);
   }
   const placeholders = input.ids.map(() => "?").join(", ");
-  await db
+  const result = await db
     .prepare(
       `UPDATE notifications
        SET is_read = 1
-       WHERE user_id = ? AND id IN (${placeholders})`
+       WHERE user_id = ? AND id IN (${placeholders}) AND is_read = 0`
     )
     .bind(input.userId, ...input.ids)
     .run();
+  if (result.meta.changes) {
+    await decrementUnread(
+      input.userId,
+      "notifications",
+      result.meta.changes
+    );
+  }
   return { ok: true };
 }
 

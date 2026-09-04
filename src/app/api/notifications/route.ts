@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  countUnreadNotifications,
   listNotifications,
   markNotificationsRead,
 } from "@/lib/notifications";
+import { getUnreadCounts } from "@/lib/unread";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { readApiJson } from "@/lib/security/guard";
@@ -12,20 +12,28 @@ import { readApiJson } from "@/lib/security/guard";
 export async function GET(request: NextRequest) {
   try {
     const session = await requireSession();
+    const counts = await getUnreadCounts(session.user.id);
     const countOnly =
       request.nextUrl.searchParams.get("count") === "1";
     if (countOnly) {
-      const unreadCount = await countUnreadNotifications(session.user.id);
-      return NextResponse.json({ unreadCount });
+      return NextResponse.json({
+        unreadCount: counts.notificationCount,
+        unreadMessages: counts.messageCount,
+        totalUnread: counts.totalCount,
+      });
     }
 
     const unreadOnly =
       request.nextUrl.searchParams.get("unread") === "1";
-    const [notifications, unreadCount] = await Promise.all([
-      listNotifications(session.user.id, { unreadOnly }),
-      countUnreadNotifications(session.user.id),
-    ]);
-    return NextResponse.json({ notifications, unreadCount });
+    const notifications = await listNotifications(session.user.id, {
+      unreadOnly,
+    });
+    return NextResponse.json({
+      notifications,
+      unreadCount: counts.notificationCount,
+      unreadMessages: counts.messageCount,
+      totalUnread: counts.totalCount,
+    });
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);
     console.error("GET /api/notifications failed", error);
@@ -43,7 +51,13 @@ export async function POST(request: NextRequest) {
 
     if (body.action === "mark_all_read") {
       await markNotificationsRead({ userId: session.user.id, all: true });
-      return NextResponse.json({ ok: true, unreadCount: 0 });
+      const counts = await getUnreadCounts(session.user.id);
+      return NextResponse.json({
+        ok: true,
+        unreadCount: counts.notificationCount,
+        unreadMessages: counts.messageCount,
+        totalUnread: counts.totalCount,
+      });
     }
 
     if (body.action === "mark_read") {
@@ -51,8 +65,13 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         ids: body.ids ?? [],
       });
-      const unreadCount = await countUnreadNotifications(session.user.id);
-      return NextResponse.json({ ok: true, unreadCount });
+      const counts = await getUnreadCounts(session.user.id);
+      return NextResponse.json({
+        ok: true,
+        unreadCount: counts.notificationCount,
+        unreadMessages: counts.messageCount,
+        totalUnread: counts.totalCount,
+      });
     }
 
     return await jsonLocalizedError("Unknown action", 400);

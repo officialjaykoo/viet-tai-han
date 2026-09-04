@@ -135,6 +135,7 @@ type CreateKind =
   | "vote"
   | "dm_request"
   | "dm_message"
+  | "dm_report"
   | "question"
   | "answer"
   | "listing"
@@ -175,6 +176,12 @@ const CREATE_DEFAULTS: Record<
     hour: 30,
     burstKey: "max_dm_messages_burst_per_min",
     burst: 8,
+  },
+  dm_report: {
+    hourKey: "max_dm_reports_per_hour",
+    hour: 20,
+    burstKey: "max_dm_reports_burst_per_min",
+    burst: 5,
   },
   question: {
     hourKey: "max_questions_per_hour",

@@ -26,6 +26,9 @@ interface CloudflareEnv {
 	FACEBOOK_CLIENT_SECRET?: string;
 	ZALO_APP_ID?: string;
 	ZALO_APP_SECRET?: string;
+	VAPID_PUBLIC_KEY?: string;
+	VAPID_PRIVATE_KEY?: string;
+	VAPID_SUBJECT?: string;
 	TURNSTILE_SECRET_KEY: string;
 	NEXT_PUBLIC_TURNSTILE_SITE_KEY: string;
 	NEXTJS_ENV?: string;
@@ -40,6 +43,9 @@ declare namespace NodeJS {
 		FACEBOOK_CLIENT_SECRET?: string;
 		ZALO_APP_ID?: string;
 		ZALO_APP_SECRET?: string;
+		VAPID_PUBLIC_KEY?: string;
+		VAPID_PRIVATE_KEY?: string;
+		VAPID_SUBJECT?: string;
 		TURNSTILE_SECRET_KEY?: string;
 		NEXT_PUBLIC_TURNSTILE_SITE_KEY?: string;
 		NEXTJS_ENV?: string;

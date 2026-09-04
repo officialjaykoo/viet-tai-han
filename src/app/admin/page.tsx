@@ -59,6 +59,7 @@ export default async function AdminPage() {
             burstPosts: overview.burstPosts,
             listingReports: overview.listingReports,
             businessVerifications: overview.businessVerifications,
+            chatReports: overview.chatReports,
           }}
         />
       </main>

@@ -2,7 +2,7 @@
 
 기준 저장소: `koval01/red` (`7363d6e`)  
 대상 프로젝트: `officialjaykoo/viet-tai-han` (`vth.kr`)  
-감사 기준: 2026-08-01 호환성 설정, 로컬 D1 `0018_api_keys`까지 적용된 상태.
+감사 기준: 2026-08-01 호환성 설정, 로컬 D1 `0024_messaging_delivery`까지 적용된 상태.
 
 ## 결론
 
@@ -23,7 +23,7 @@
 | 커뮤니티 | `src/lib/communities.ts`, `src/app/communities/page.tsx`, `src/app/r/[name]/page.tsx` | 커뮤니티 생성·구독·피드·moderator 경계가 구현되어 있다. | 내부 데이터는 호환 유지하고 사용자 노출 명칭을 `community`/`cộng đồng`로 변경. `/r/*`는 호환 redirect로 전환. |
 | 미디어 | `src/lib/media.ts`, `src/lib/image-process.ts`, `src/app/api/media/**`, `src/components/media/tunneled-media.tsx` | 1 MiB 제한, JPEG/PNG/WebP signature 검사, 메타데이터 제거, trailing payload 검사, R2 metadata, `/i/api` blob 로딩이 있다. | MIME/픽셀·quota·ownership 정책을 보강하되 터널 로딩 구조는 유지. |
 | 보안 터널 | `src/lib/security/**`, `src/lib/internal-api/dispatch.ts`, `src/app/i/api/route.ts` | Protobuf route sealing, HMAC, timestamp/nonce, PoW, IP 제한, public API Bearer 경계를 분리한다. | 기본 모델 유지. challenge atomicity와 KV/Durable Object 저장소를 보강. |
-| DM/알림 | `src/lib/messages.ts`, `src/lib/notifications.ts`, `src/app/api/messages/**`, `src/app/api/notifications/route.ts` | 요청→수락→활성 멤버십, 차단, DM preference, unread/read timestamp가 있다. | Vietnamese UX와 push를 추가. 현재 경쟁조건은 수정 필수. |
+| **DM/알림** | `src/lib/messages.ts`, `src/lib/notifications.ts`, `src/app/api/messages/**`, `src/app/api/notifications/route.ts` | 요청→수락→활성 멤버십, 차단, DM preference, unread/read timestamp가 있다. | Vietnamese UX, VAPID Web Push, D1 unread fanout, DM 신고·운영 검토 큐와 race-safe transition을 `0024_messaging_delivery.sql` 및 관련 API/UI에 추가했다. |
 | 테스트/CI | `tests/unit/**`, `tests/workers/**`, `tests/integration/**`, `tests/e2e/**`, `.github/workflows/ci.yml` | unit 62개, worker 9개, integration 8개, Chromium smoke 10개가 baseline에서 통과했다. | Phase1 계약에 맞는 i18n/mobile/branding 회귀 테스트만 추가. |
 
 ## MODIFY
@@ -117,4 +117,4 @@
 - production `BETTER_AUTH_SECRET`, Turnstile site/secret.
 - Facebook/Zalo OAuth client/secret 및 callback URL.
 - 이메일 발송 provider/도메인 인증.
-- WebAuthn RP ID/origin, push VAPID/FCM/APNs, 지도/예약 provider keys.
+- WebAuthn RP ID/origin, Web Push `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, 지도/예약 provider keys. Native FCM/APNs are outside this web phase.

@@ -23,6 +23,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import { TunneledBanner } from "@/components/media/tunneled-banner";
+import { PushSettings } from "@/components/notifications/push-settings";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { useTheme } from "@/components/theme/theme-provider";
@@ -98,11 +99,17 @@ export function SettingsClient({
   initialSettings,
   initialBlocked,
   initialSection = "profile",
+  initialPush,
   initialIdentityError,
 }: {
   initialSettings: UserSettings;
   initialBlocked: BlockedUser[];
   initialSection?: Section;
+  initialPush: {
+    available: boolean;
+    publicKey: string | null;
+    subscribed: boolean;
+  };
   initialIdentityError?: string;
 }) {
   const router = useRouter();
@@ -981,35 +988,42 @@ export function SettingsClient({
         ) : null}
 
         {section === "notifications" ? (
-          <SettingsCard
-            title={t("settings.notifyPrefs")}
-            description={t("settings.notifyPrefsDesc")}
-          >
-            <ToggleRow
-              label={t("settings.notifyComments")}
-              checked={settings.notifyComments}
-              disabled={pending}
-              onChange={(next) => savePreferences({ notifyComments: next })}
+          <>
+            <SettingsCard
+              title={t("settings.notifyPrefs")}
+              description={t("settings.notifyPrefsDesc")}
+            >
+              <ToggleRow
+                label={t("settings.notifyComments")}
+                checked={settings.notifyComments}
+                disabled={pending}
+                onChange={(next) => savePreferences({ notifyComments: next })}
+              />
+              <ToggleRow
+                label={t("settings.notifyFollows")}
+                checked={settings.notifyFollows}
+                disabled={pending}
+                onChange={(next) => savePreferences({ notifyFollows: next })}
+              />
+              <ToggleRow
+                label={t("settings.notifyChat")}
+                checked={settings.notifyChat}
+                disabled={pending}
+                onChange={(next) => savePreferences({ notifyChat: next })}
+              />
+              <ToggleRow
+                label={t("settings.notifyMentions")}
+                checked={settings.notifyMentions}
+                disabled={pending}
+                onChange={(next) => savePreferences({ notifyMentions: next })}
+              />
+            </SettingsCard>
+            <PushSettings
+              available={initialPush.available}
+              publicKey={initialPush.publicKey}
+              initialSubscribed={initialPush.subscribed}
             />
-            <ToggleRow
-              label={t("settings.notifyFollows")}
-              checked={settings.notifyFollows}
-              disabled={pending}
-              onChange={(next) => savePreferences({ notifyFollows: next })}
-            />
-            <ToggleRow
-              label={t("settings.notifyChat")}
-              checked={settings.notifyChat}
-              disabled={pending}
-              onChange={(next) => savePreferences({ notifyChat: next })}
-            />
-            <ToggleRow
-              label={t("settings.notifyMentions")}
-              checked={settings.notifyMentions}
-              disabled={pending}
-              onChange={(next) => savePreferences({ notifyMentions: next })}
-            />
-          </SettingsCard>
+          </>
         ) : null}
       </div>
     </div>

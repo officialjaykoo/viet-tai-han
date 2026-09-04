@@ -2,35 +2,14 @@
 
 import Link from "next/link";
 import { BellIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
-import { apiFetch } from "@/lib/api-client";
+import { useUnreadCount } from "@/components/notifications/use-unread-count";
 import { cn } from "@/lib/utils";
 
 export function NotificationsBell({ className }: { className?: string }) {
   const { t } = useI18n();
-  const [unread, setUnread] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      try {
-        const res = await apiFetch("/api/notifications?count=1");
-        if (!res.ok) return;
-        const data = (await res.json()) as { unreadCount?: number };
-        if (!cancelled) setUnread(Number(data.unreadCount ?? 0));
-      } catch {
-        // ignore
-      }
-    }
-    void poll();
-    const id = window.setInterval(poll, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
+  const unread = useUnreadCount("notifications");
 
   return (
     <Link

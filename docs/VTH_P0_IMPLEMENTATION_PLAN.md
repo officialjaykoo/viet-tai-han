@@ -122,7 +122,7 @@
 2. 중고거래·구인·서비스 listing과 scam/report workflow — **완료**. `0021_marketplace.sql`, `/marketplace`, listing/save/alert/report API, 운영 리포트 큐와 통합 회귀 테스트를 적용했다.
 3. business profile, verification, 지도/예약 — **완료**. `0022_business_profiles.sql`, `/businesses`, 인증 심사 큐, 지도 링크, 예약 요청/상태 변경 API와 통합 테스트를 적용했다.
 4. Facebook/Zalo OAuth, WebAuthn/passkey, account linking — **완료**. `0023_identity_providers.sql`, Better Auth provider/PKCE 구성, 로그인·가입 선택지, 설정의 명시적 계정 연결과 패스키 관리를 적용했다.
-5. push notification, DM moderation, unread fanout.
+5. push notification, DM moderation, unread fanout — **완료**. `0024_messaging_delivery.sql`, pure Web Push/VAPID subscription API, unread badges, DM 신고·운영 큐와 race-safe request transitions를 적용했다.
 6. Vietnamese content translation, multilingual embedding/recommendation.
 7. 광고/Pro/결제/ledger는 policy·consent·anti-fraud 이후 활성화.
 

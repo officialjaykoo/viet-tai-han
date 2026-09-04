@@ -107,7 +107,7 @@ Turnstile test keys in `.dev.vars.example` always pass locally. Replace them wit
 
 2. Paste the returned IDs into `wrangler.jsonc` (`database_id`, and KV ids if used).
 
-3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and add `FACEBOOK_CLIENT_ID` / `ZALO_APP_ID` when those providers are enabled. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins.
+3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and add `FACEBOOK_CLIENT_ID` / `ZALO_APP_ID` when those providers are enabled. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins. For browser push, set the VAPID public key in `vars.VAPID_PUBLIC_KEY`.
 
 4. Register the OAuth callbacks with each provider:
 
@@ -121,8 +121,11 @@ Turnstile test keys in `.dev.vars.example` always pass locally. Replace them wit
    wrangler secret put TURNSTILE_SECRET_KEY
    wrangler secret put FACEBOOK_CLIENT_SECRET  # when Facebook is enabled
    wrangler secret put ZALO_APP_SECRET          # when Zalo is enabled
+   wrangler secret put VAPID_PRIVATE_KEY       # when browser push is enabled
+   wrangler secret put VAPID_SUBJECT           # mailto: or https: contact URI
    ```
 
+   All three VAPID values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`) are required to enable push. The site must run on HTTPS (localhost is allowed by browsers); subscriptions can be managed under Settings → Notifications.
    Facebook and Zalo remain disabled unless both the provider ID and secret are present. Passkeys use the hostname and origin from `BETTER_AUTH_URL`.
 
 6. Apply remote migrations, then deploy:

@@ -8,7 +8,7 @@ import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 type AdminUser = {
   id: string;
@@ -61,6 +61,21 @@ type ListingReport = {
   status: string;
   createdAt: string;
 };
+type ChatMessageReport = {
+  id: string;
+  messageId: string;
+  roomId: string;
+  messageBody: string;
+  messageCreatedAt: string;
+  messageIsModerationHidden: boolean;
+  senderUsername: string | null;
+  reporterUsername: string | null;
+  peerUsername: string | null;
+  reason: string;
+  details: string | null;
+  status: string;
+  createdAt: string;
+};
 
 type BusinessVerification = {
   id: string;
@@ -84,6 +99,7 @@ export function AdminPanel({
     settings: Setting[];
     recentActions: Array<Record<string, unknown>>;
     adCampaigns?: AdCampaign[];
+    chatReports?: ChatMessageReport[];
     burstPosts?: BurstPost[];
     businessVerifications?: BusinessVerification[];
     listingReports?: ListingReport[];
@@ -107,6 +123,7 @@ export function AdminPanel({
   const [message, setMessage] = useState<string | null>(null);
   const campaigns = initial.adCampaigns ?? [];
   const burstPosts = initial.burstPosts ?? [];
+  const chatReports = initial.chatReports ?? [];
   const listingReports = initial.listingReports ?? [];
   const businessVerifications = initial.businessVerifications ?? [];
   const countLabels: Record<string, string> = {
@@ -119,6 +136,7 @@ export function AdminPanel({
     listings: t("search.listings"),
     open_listing_reports: t("admin.listingReports"),
     banned: t("admin.bans"),
+    open_chat_reports: t("admin.chatReports"),
     shadowbanned: t("admin.bans"),
     banned_words: t("admin.bannedWords"),
   };
@@ -149,6 +167,14 @@ export function AdminPanel({
     misleading: t("marketplace.reasonMisleading"),
     unsafe: t("marketplace.reasonUnsafe"),
     other: t("marketplace.reasonOther"),
+  };
+  const chatReportReasonLabels: Record<string, string> = {
+    spam: t("messages.reasonSpam"),
+    harassment: t("messages.reasonHarassment"),
+    hate: t("messages.reasonHate"),
+    misinformation: t("messages.reasonMisinformation"),
+    nsfw: t("messages.reasonNsfw"),
+    other: t("messages.reasonOther"),
   };
 
   function run(op: string, payload: Record<string, unknown> = {}) {
@@ -390,6 +416,90 @@ export function AdminPanel({
                     }
                   >
                     {t("admin.removeListing")}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-heading text-xl font-semibold">
+          {t("admin.chatReports")}
+        </h2>
+        {chatReports.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t("admin.noChatReports")}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {chatReports.map((report) => (
+              <li
+                key={report.id}
+                className="space-y-3 rounded-xl border border-border/60 p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium">
+                    @{report.senderUsername ?? "unknown"} → @
+                    {report.peerUsername ?? "unknown"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(report.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  @{report.reporterUsername ?? "unknown"} ·{" "}
+                  {t("admin.reportReason")}:{" "}
+                  {chatReportReasonLabels[report.reason] ?? report.reason} ·{" "}
+                  {t("admin.reportDetails")}: {report.details || "—"}
+                </p>
+                <blockquote className="whitespace-pre-wrap rounded-lg bg-muted/40 p-2">
+                  {report.messageBody}
+                </blockquote>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_chat_message_report", {
+                        reportId: report.id,
+                        reportStatus: "reviewed",
+                      })
+                    }
+                  >
+                    {t("admin.reviewReport")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_chat_message_report", {
+                        reportId: report.id,
+                        reportStatus: "dismissed",
+                      })
+                    }
+                  >
+                    {t("admin.dismissReport")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={pending}
+                    onClick={() =>
+                      run("review_chat_message_report", {
+                        reportId: report.id,
+                        reportStatus: "reviewed",
+                        removeMessage: true,
+                      })
+                    }
+                  >
+                    {t("admin.removeMessage")}
                   </Button>
                 </div>
               </li>

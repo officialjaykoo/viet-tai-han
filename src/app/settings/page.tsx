@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { SiteHeader } from "@/components/layout/site-header";
 import { SettingsClient } from "@/components/settings/settings-client";
+import { getPushStatus } from "@/lib/push";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
@@ -45,7 +46,10 @@ export default async function SettingsPage({
   if (!settings) {
     redirect("/login?next=/settings");
   }
-  const blocked = await listBlockedUsers(session.user.id);
+  const [blocked, push] = await Promise.all([
+    listBlockedUsers(session.user.id),
+    getPushStatus(session.user.id),
+  ]);
 
   return (
     <>
@@ -66,6 +70,11 @@ export default async function SettingsPage({
           initialSettings={settings}
           initialBlocked={blocked}
           initialSection={parseSection(params.section)}
+          initialPush={{
+            available: push.available,
+            publicKey: push.publicKey,
+            subscribed: push.subscribed,
+          }}
           initialIdentityError={params.error}
         />
       </main>

@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { listAdCampaigns } from "@/lib/ads";
+import { listChatMessageReports } from "@/lib/dm-moderation";
 import { listBurstPosts } from "@/lib/score-integrity";
 import { listBusinessVerificationQueue } from "@/lib/businesses";
 import { listListingReportQueue } from "@/lib/marketplace";
@@ -247,6 +248,7 @@ export async function getAdminOverview() {
          (SELECT COUNT(*) FROM businesses WHERE status != 'removed') AS businesses,
          (SELECT COUNT(*) FROM business_verification_requests WHERE status = 'pending') AS pending_business_verifications,
          (SELECT COUNT(*) FROM listing_reports WHERE status = 'open') AS open_listing_reports,
+         (SELECT COUNT(*) FROM chat_message_reports WHERE status = 'open') AS open_chat_reports,
          (SELECT COUNT(*) FROM "user" WHERE status = 'banned') AS banned,
          (SELECT COUNT(*) FROM "user" WHERE status = 'shadowbanned') AS shadowbanned,
          (SELECT COUNT(*) FROM banned_words) AS banned_words`
@@ -260,6 +262,7 @@ export async function getAdminOverview() {
       subreddits: number;
       listings: number;
       open_listing_reports: number;
+      open_chat_reports: number;
       banned: number;
       shadowbanned: number;
       banned_words: number;
@@ -297,14 +300,19 @@ export async function getAdminOverview() {
        LIMIT 50`
     )
     .all();
-
-  const [burstPosts, adCampaigns, listingReports, businessVerifications] =
-    await Promise.all([
-      listBurstPosts(15),
-      listAdCampaigns(),
-      listListingReportQueue("open"),
-      listBusinessVerificationQueue("pending"),
-    ]);
+  const [
+    burstPosts,
+    adCampaigns,
+    listingReports,
+    businessVerifications,
+    chatReports,
+  ] = await Promise.all([
+    listBurstPosts(15),
+    listAdCampaigns(),
+    listListingReportQueue("open"),
+    listBusinessVerificationQueue("pending"),
+    listChatMessageReports("open"),
+  ]);
 
   return {
     counts: counts ?? {
@@ -316,6 +324,7 @@ export async function getAdminOverview() {
       businesses: 0,
       pending_business_verifications: 0,
       open_listing_reports: 0,
+      open_chat_reports: 0,
       banned: 0,
       shadowbanned: 0,
       banned_words: 0,
@@ -327,6 +336,7 @@ export async function getAdminOverview() {
     burstPosts,
     businessVerifications,
     adCampaigns,
+    chatReports,
     listingReports,
   };
 }
