@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getDb } from "@/lib/db";
 import {
+  cancelFriendRequestByUsers,
+  removeFriend,
+  sendFriendRequest,
+} from "@/lib/friends";
+import {
   blockUser,
   followUser,
   reportTarget,
@@ -33,7 +38,15 @@ export async function POST(
     }
 
     const body = (await readApiJson(request).catch(() => ({}))) as {
-      action?: "follow" | "unfollow" | "block" | "unblock" | "report";
+      action?:
+        | "follow"
+        | "unfollow"
+        | "block"
+        | "unblock"
+        | "report"
+        | "friend_request"
+        | "friend_remove"
+        | "friend_cancel";
       reason?: string;
       details?: string;
     };
@@ -44,6 +57,19 @@ export async function POST(
       case "unfollow":
         return NextResponse.json(
           await unfollowUser(session.user.id, user.id)
+        );
+      case "friend_request":
+        return NextResponse.json(
+          await sendFriendRequest(session.user.id, user.id),
+          { status: 201 }
+        );
+      case "friend_remove":
+        return NextResponse.json(
+          await removeFriend(session.user.id, user.id)
+        );
+      case "friend_cancel":
+        return NextResponse.json(
+          await cancelFriendRequestByUsers(session.user.id, user.id)
         );
       case "block":
         return NextResponse.json(await blockUser(session.user.id, user.id));

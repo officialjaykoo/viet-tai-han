@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { getFriendRelation } from "@/lib/friends";
 import { createPublicId } from "@/lib/id";
 import { AuthError } from "@/lib/session";
 
@@ -70,6 +71,14 @@ export async function blockUser(blockerId: string, blockedId: string) {
       `DELETE FROM user_follows
        WHERE (follower_id = ? AND following_id = ?)
           OR (follower_id = ? AND following_id = ?)`
+    )
+    .bind(blockerId, blockedId, blockedId, blockerId)
+    .run();
+  await db
+    .prepare(
+      `DELETE FROM user_friendships
+       WHERE (requester_id = ? AND addressee_id = ?)
+          OR (requester_id = ? AND addressee_id = ?)`
     )
     .bind(blockerId, blockedId, blockedId, blockerId)
     .run();
@@ -225,10 +234,16 @@ export async function getProfileRelation(
   profileUserId: string
 ) {
   if (!viewerId || viewerId === profileUserId) {
-    return { following: false, blocked: false, isSelf: viewerId === profileUserId };
+    return {
+      following: false,
+      blocked: false,
+      friendStatus: "none" as const,
+      friendRequestId: null,
+      isSelf: viewerId === profileUserId,
+    };
   }
   const db = await getDb();
-  const [follow, block] = await Promise.all([
+  const [follow, block, friend] = await Promise.all([
     db
       .prepare(
         `SELECT 1 AS ok FROM user_follows
@@ -243,10 +258,13 @@ export async function getProfileRelation(
       )
       .bind(viewerId, profileUserId)
       .first(),
+    getFriendRelation(viewerId, profileUserId),
   ]);
   return {
     following: Boolean(follow),
     blocked: Boolean(block),
+    friendStatus: friend.status,
+    friendRequestId: friend.requestId,
     isSelf: false,
   };
 }

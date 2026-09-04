@@ -128,6 +128,11 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/users/[username]/route"),
   },
   {
+    methods: ["GET", "POST"],
+    pattern: "/api/friends",
+    load: () => import("@/app/api/friends/route"),
+  },
+  {
     methods: ["POST"],
     pattern: "/api/me/language",
     load: () => import("@/app/api/me/language/route"),

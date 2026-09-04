@@ -154,12 +154,28 @@ function CommentItem({
     >
       <div className="space-y-2 rounded-xl bg-card/40 px-3 py-2.5">
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-          <UserAvatar
-            username={comment.author.username}
-            image={comment.author.image}
-            size="xs"
-            className="ring-0"
-          />
+          {comment.author.username ? (
+            <Link
+              href={`/u/${encodeURIComponent(comment.author.username)}`}
+              prefetch={false}
+              aria-label={`@${comment.author.username}`}
+              className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+            >
+              <UserAvatar
+                username={comment.author.username}
+                image={comment.author.image}
+                size="xs"
+                className="ring-0"
+              />
+            </Link>
+          ) : (
+            <UserAvatar
+              username={comment.author.username}
+              image={comment.author.image}
+              size="xs"
+              className="ring-0"
+            />
+          )}
           {comment.author.username ? (
             <Link
               href={`/u/${comment.author.username}`}

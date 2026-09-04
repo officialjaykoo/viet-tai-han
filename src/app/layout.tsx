@@ -38,7 +38,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: messages.meta.title,
     description: messages.meta.description,
-    applicationName: "Việt tại Hàn",
+    icons: {
+      icon: "/icon.svg",
+      shortcut: "/icon.svg",
+      apple: "/icon.svg",
+    },
     formatDetection: {
       telephone: false,
       email: false,

@@ -11,6 +11,8 @@ export type NotificationKind =
   | "comment_on_post"
   | "reply_to_comment"
   | "follow"
+  | "friend_request"
+  | "friend_accepted"
   | "chat_request"
   | "chat_accepted"
   | "warning"
@@ -73,7 +75,14 @@ export async function createNotification(input: {
     ) {
       return null;
     }
-    if (input.kind === "follow" && !prefs.notifyFollows) return null;
+    if (
+      (input.kind === "follow" ||
+        input.kind === "friend_request" ||
+        input.kind === "friend_accepted") &&
+      !prefs.notifyFollows
+    ) {
+      return null;
+    }
     if (
       (input.kind === "chat_request" || input.kind === "chat_accepted") &&
       !prefs.notifyChat

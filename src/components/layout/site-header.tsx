@@ -261,6 +261,13 @@ export function SiteHeader() {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="min-h-11"
+                      render={<Link href="/friends" />}
+                    >
+                      <UsersRoundIcon />
+                      {t("nav.friends")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="min-h-11"
                       render={<Link href="/settings" />}
                     >
                       <SettingsIcon />

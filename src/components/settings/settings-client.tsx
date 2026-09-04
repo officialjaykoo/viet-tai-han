@@ -12,18 +12,19 @@ import {
 } from "react";
 import {
   BellIcon,
+  CameraIcon,
   EyeIcon,
   ImageIcon,
   KeyRoundIcon,
   LinkIcon,
   LockIcon,
   PaletteIcon,
+  RotateCcwIcon,
   ShieldIcon,
   SparklesIcon,
   Trash2Icon,
   UserIcon,
 } from "lucide-react";
-import { TunneledBanner } from "@/components/media/tunneled-banner";
 import { PushSettings } from "@/components/notifications/push-settings";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -35,7 +36,6 @@ import { UserAvatar } from "@/components/user/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
 import type { MessageKey } from "@/lib/i18n/messages/en";
-import { profileBannerGradient } from "@/lib/profile-banner";
 import type {
   AllowDms,
   ThemePreference,
@@ -152,9 +152,8 @@ export function SettingsClient({
   const [name, setName] = useState(initialSettings.name);
   const [bio, setBio] = useState(initialSettings.bio ?? "");
   const [image, setImage] = useState(initialSettings.image);
-  const [bannerKey, setBannerKey] = useState(initialSettings.bannerKey);
   const avatarInput = useRef<HTMLInputElement>(null);
-  const bannerInput = useRef<HTMLInputElement>(null);
+  const cameraAvatarInput = useRef<HTMLInputElement>(null);
 
   // Account form
   const [email, setEmail] = useState(initialSettings.email);
@@ -167,7 +166,6 @@ export function SettingsClient({
   const [identityLoading, setIdentityLoading] = useState(true);
 
   const username = settings.username ?? "user";
-  const bannerGradient = profileBannerGradient(username);
 
   const flash = useCallback((ok: string | null, err: string | null) => {
     setMessage(ok);
@@ -184,6 +182,24 @@ export function SettingsClient({
     }
     return data.mediaKey;
   }
+  function chooseAvatarFile(file: File | undefined) {
+    if (!file) return;
+    startTransition(async () => {
+      try {
+        const key = await uploadFile(file);
+        setImage(`/api/media/${key}`);
+        flash(null, null);
+      } catch (err) {
+        flash(
+          null,
+          localizeError(
+            err instanceof Error ? err.message : null,
+            "Upload failed"
+          )
+        );
+      }
+    });
+  }
 
   function saveProfile() {
     flash(null, null);
@@ -196,7 +212,6 @@ export function SettingsClient({
           name,
           bio,
           image,
-          bannerKey,
         }),
       });
       const data = (await res.json()) as {
@@ -542,122 +557,92 @@ export function SettingsClient({
             title={t("settings.customizeProfile")}
             description={t("settings.customizeProfileDesc")}
           >
-            <div className="overflow-hidden rounded-2xl border border-border/60">
-              <div
-                className="relative h-28 bg-muted sm:h-32"
-                style={
-                  bannerKey
-                    ? undefined
-                    : {
-                        background: `linear-gradient(135deg, ${bannerGradient.from}, ${bannerGradient.to})`,
-                      }
-                }
-              >
-                {bannerKey ? <TunneledBanner mediaKey={bannerKey} /> : null}
-                <div className="absolute inset-x-0 bottom-2 flex justify-end gap-2 px-3">
-                  <input
-                    ref={bannerInput}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      startTransition(async () => {
-                        try {
-                          const key = await uploadFile(file);
-                          setBannerKey(key);
-                          flash(null, null);
-                        } catch (err) {
-                          flash(
-                            null,
-                            localizeError(
-                              err instanceof Error ? err.message : null,
-                              "Upload failed"
-                            )
-                          );
-                        }
-                      });
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5"
-                    disabled={pending}
-                    onClick={() => bannerInput.current?.click()}
-                  >
-                    <ImageIcon className="size-3.5" />
-                    {t("settings.banner")}
-                  </Button>
-                  {bannerKey ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={pending}
-                      onClick={() => setBannerKey(null)}
-                    >
-                      {t("settings.remove")}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-              <div className="relative px-4 pb-4 pt-2">
-                <div className="-mt-10 inline-block rounded-full bg-background p-1 ring-1 ring-border/60">
+            <div className="rounded-2xl border border-border/60 p-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="rounded-full bg-background p-1 ring-1 ring-border/60">
                   <UserAvatar
                     username={username}
                     image={image}
                     size="2xl"
                   />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <input
-                    ref={avatarInput}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      startTransition(async () => {
-                        try {
-                          const key = await uploadFile(file);
-                          setImage(`/api/media/${key}`);
-                        } catch (err) {
-                          flash(
-                            null,
-                            localizeError(
-                              err instanceof Error ? err.message : null,
-                              "Upload failed"
-                            )
-                          );
-                        }
-                      });
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() => avatarInput.current?.click()}
-                  >
-                    {t("settings.uploadAvatar")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() =>
-                      setImage(encodeGeneratedAvatar(createAvatarSeed()))
-                    }
-                  >
-                    {t("settings.shuffleAvatar")}
-                  </Button>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{t("settings.changeAvatar")}</p>
+                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                    {t("settings.avatarHelp")}
+                  </p>
                 </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <input
+                  ref={cameraAvatarInput}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="user"
+                  aria-label={t("settings.takePhoto")}
+                  className="sr-only"
+                  onChange={(e) => {
+                    chooseAvatarFile(e.currentTarget.files?.[0]);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <input
+                  ref={avatarInput}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  aria-label={t("settings.chooseFromGallery")}
+                  className="sr-only"
+                  onChange={(e) => {
+                    chooseAvatarFile(e.currentTarget.files?.[0]);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 gap-1.5 sm:min-h-8"
+                  disabled={pending}
+                  onClick={() => cameraAvatarInput.current?.click()}
+                >
+                  <CameraIcon className="size-4" />
+                  {t("settings.takePhoto")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 gap-1.5 sm:min-h-8"
+                  disabled={pending}
+                  onClick={() => avatarInput.current?.click()}
+                >
+                  <ImageIcon className="size-4" />
+                  {t("settings.chooseFromGallery")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 gap-1.5 sm:min-h-8"
+                  disabled={pending}
+                  onClick={() => setImage(null)}
+                >
+                  <RotateCcwIcon className="size-4" />
+                  {t("settings.defaultAvatar")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 gap-1.5 sm:min-h-8"
+                  disabled={pending}
+                  onClick={() =>
+                    setImage(encodeGeneratedAvatar(createAvatarSeed()))
+                  }
+                >
+                  <SparklesIcon className="size-4" />
+                  {t("settings.shuffleAvatar")}
+                </Button>
               </div>
             </div>
 

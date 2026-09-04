@@ -32,6 +32,8 @@ const KIND_KEYS: Record<string, MessageKey> = {
   comment_on_post: "notify.commentOnPost",
   reply_to_comment: "notify.replyToComment",
   follow: "notify.follow",
+  friend_request: "notify.friendRequest",
+  friend_accepted: "notify.friendAccepted",
   chat_request: "notify.chatRequest",
   chat_accepted: "notify.chatAccepted",
   warning: "notify.warning",

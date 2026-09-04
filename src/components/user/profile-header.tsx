@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { Cake } from "lucide-react";
+import { Cake, UsersRound } from "lucide-react";
 
 import { AccountBadges } from "@/components/user/account-badges";
 import { AccountTags } from "@/components/user/account-tags";
-import { TunneledBanner } from "@/components/media/tunneled-banner";
 import { resolveAccountBadges } from "@/lib/achievement-levels";
 import { ProfileActions } from "@/components/user/profile-actions";
 import { ProfileAvatarEditor } from "@/components/user/profile-avatar-editor";
@@ -16,7 +15,6 @@ import {
 import type { PublicProfile } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
-import { profileBannerGradient } from "@/lib/profile-banner";
 
 function formatKarma(n: number, locale: string): string {
   if (Math.abs(n) >= 10_000) {
@@ -32,14 +30,17 @@ export async function ProfileHeader({
 }: {
   profile: PublicProfile;
   isOwner: boolean;
-  relation: { following: boolean; blocked: boolean };
+  relation: {
+    following: boolean;
+    blocked: boolean;
+    friendStatus: "none" | "outgoing" | "incoming" | "friends";
+    friendRequestId: string | null;
+  };
 }) {
   const { locale } = await getRequestLocale();
   const username = profile.username ?? "unknown";
-  const banner = profileBannerGradient(username);
-  const bannerKey = profile.bannerKey;
   const displayName = profile.name?.trim() || username;
-  const ageLabel = formatAccountAge(profile.createdAt, Date.now(), locale);
+  const ageLabel = formatAccountAge(profile.createdAt, undefined, locale);
   const cakeDay = isCakeDay(profile.createdAt);
   const badges = resolveAccountBadges({
     karma: profile.karma,
@@ -50,25 +51,11 @@ export async function ProfileHeader({
   return (
     <header className="overflow-hidden rounded-2xl border border-border/60 bg-card/90 shadow-sm">
       <div
-        className="relative h-28 sm:h-36"
-        style={
-          bannerKey
-            ? undefined
-            : {
-                background: `linear-gradient(135deg, ${banner.from}, ${banner.to})`,
-              }
-        }
+        className="h-1 bg-[linear-gradient(90deg,var(--flag-red)_0%,var(--flag-red)_38%,var(--flag-gold)_38%,var(--flag-gold)_68%,var(--brand-ink)_68%)]"
         aria-hidden
-      >
-        {bannerKey ? (
-          <TunneledBanner mediaKey={bannerKey} />
-        ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,255,255,0.22),transparent_55%)]" />
-        )}
-      </div>
-
-      <div className="relative px-4 pb-4 sm:px-5 sm:pb-5">
-        <div className="-mt-10 flex flex-wrap items-end justify-between gap-3 sm:-mt-12">
+      />
+      <div className="relative px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           {isOwner ? (
             <div className="rounded-full bg-background p-1 ring-1 ring-border/60">
               <ProfileAvatarEditor
@@ -79,33 +66,51 @@ export async function ProfileHeader({
             </div>
           ) : (
             <div className="rounded-full bg-background p-1 ring-1 ring-border/60">
-              <UserAvatar
-                username={username}
-                image={profile.image}
-                size="2xl"
-              />
+              <Link
+                href={`/u/${encodeURIComponent(username)}`}
+                aria-label={`@${username}`}
+                className="block rounded-full"
+              >
+                <UserAvatar
+                  username={username}
+                  image={profile.image}
+                  size="2xl"
+                />
+              </Link>
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-2 pb-1">
             {isOwner ? (
-              <Link
-                href="/settings"
-                className="inline-flex min-h-9 items-center justify-center rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
-              >
-                {tLocale(locale, "profile.editProfile")}
-              </Link>
+              <>
+                <Link
+                  href="/friends"
+                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  <UsersRound className="size-4" aria-hidden />
+                  {tLocale(locale, "profile.manageFriends")}
+                </Link>
+                <Link
+                  href="/settings"
+                  className="inline-flex min-h-9 items-center justify-center rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  {tLocale(locale, "profile.editProfile")}
+                </Link>
+              </>
             ) : (
               <ProfileActions
                 username={username}
                 initiallyFollowing={relation.following}
                 initiallyBlocked={relation.blocked}
+                initiallyFriendStatus={relation.friendStatus}
+                initiallyFriendRequestId={relation.friendRequestId}
               />
             )}
           </div>
         </div>
 
         <div className="mt-3 space-y-1">
+
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
               {displayName}

@@ -189,12 +189,19 @@ export function PostCard({
         >
           <CardHeader className="gap-3 px-4 pt-4 pb-0">
             <div className="flex items-center gap-2.5">
-              <UserAvatar
-                username={post.author.username}
-                image={post.author.image}
-                size="sm"
-                className="ring-0"
-              />
+              <Link
+                href={`/u/${encodeURIComponent(post.author.username)}`}
+                prefetch={false}
+                aria-label={`@${post.author.username}`}
+                className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+              >
+                <UserAvatar
+                  username={post.author.username}
+                  image={post.author.image}
+                  size="sm"
+                  className="ring-0"
+                />
+              </Link>
               <div className="min-w-0 flex-1">
                 <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 break-anywhere text-sm">
                   <Link
