@@ -8,8 +8,12 @@
 
 - Account: `viet-tai-han`
 - Account ID: `8cbaf5bd93f2cfcf2a01bcae16cdf2d8`
-- Worker: `vth` — Secret 등록 완료, 애플리케이션 코드 배포 대기
+- Worker: `vth`
+- Worker URL: <https://vth.viet-tai-han.workers.dev>
+- Custom Domain: <https://vth.kr>
+- Current Version ID: `051f6467-fba1-4379-8395-99e2be4a6b3c`
 - D1: `vth-db` — 생성 및 원격 migration 적용 완료
+- R2: `vth-media` — 생성 및 Worker binding 완료
 - Vectorize: `vth-posts` — 768 dimensions, cosine
 - Vectorize metadata index:
   - `embeddingVersion`
@@ -27,11 +31,9 @@
 
 운영 D1에는 로컬 데모 데이터와 `seed.sql`을 넣지 않았습니다. 첫 운영 계정은 실제 가입으로 생성해야 합니다.
 
-### 현재 차단 사항
+### 배포 완료 상태
 
-목표 계정 `viet-tai-han`에서 R2가 아직 활성화되지 않았습니다. `npx wrangler r2 bucket create vth-media`가 Cloudflare API 오류 `10042`로 거부되었습니다. R2를 Dashboard에서 활성화한 뒤 버킷을 만들고 다시 배포해야 합니다.
-
-`wrangler.jsonc`에는 `vth.kr` Custom Domain 자동 연결 설정이 이미 들어 있습니다.
+`wrangler.jsonc`에 `vth.kr` Custom Domain 자동 연결 설정이 들어 있으며, 목표 계정에서 최종 배포가 성공했습니다.
 
 ```jsonc
 "routes": [
@@ -43,25 +45,23 @@
 ]
 ```
 
-R2가 활성화되면 다음 배포가 Worker 코드, R2 binding, Custom Domain을 함께 반영합니다.
+`https://vth.kr/`, `/login`, `/signup`은 Cloudflare edge에 대한 HTTPS 요청으로 `200`을 확인했습니다. 이 검증은 Cloudflare edge IP를 `vth.kr`에 지정한 HTTPS 요청으로 수행했습니다. 현재 작업 환경의 ISP DNS resolver가 A 응답을 아직 반환하지 않아 일반 `curl https://vth.kr`은 일시적으로 `ENOTFOUND`가 될 수 있습니다. 공용 DNS 조회에서는 `vth.kr` 레코드가 확인됩니다.
 
 ---
 
-## 0. 목표 계정에서 R2 활성화
+## 0. 목표 계정에서 R2 활성화 (완료)
 
-이 단계만 Cloudflare Dashboard에서 한 번 눌러야 합니다. Worker를 수동 생성하는 작업이 아닙니다.
-
-1. Cloudflare Dashboard에서 계정 `viet-tai-han`을 선택합니다.
-2. **R2** 메뉴를 엽니다.
-3. `Get started`, `Enable R2` 또는 표시되는 R2 활성화 버튼을 선택합니다.
-4. 결제/약관 확인이 요구되면 Cloudflare 안내에 따라 완료합니다.
-5. 활성화 후 저장소 루트에서 다음 명령을 실행합니다.
+Cloudflare Dashboard에서 R2 subscription을 활성화한 뒤 아래 명령으로 버킷을 생성했습니다. Worker를 Dashboard에서 수동 생성하지 않았습니다.
 
 ```bash
 npx wrangler r2 bucket create vth-media
 ```
 
-버킷 생성이 완료되면 아래 배포 명령을 실행합니다. 현재 `wrangler.jsonc`가 목표 계정 `viet-tai-han`을 지정하므로 다른 계정에 생성하지 않습니다.
+생성 결과:
+
+- R2 bucket: `vth-media`
+- Worker binding: `MEDIA_BUCKET`
+- 최종 Worker 배포에서 R2 binding 연결 확인
 
 ## 1. vth.kr을 Cloudflare Zone으로 추가
 이미 `vth.kr` Zone이 `Active`이면 이 단계는 건너뛰고 2단계로 진행합니다.
@@ -218,6 +218,7 @@ npx wrangler secret put VAPID_SUBJECT
 ```bash
 npm ci
 npx wrangler login
+export CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
 npx wrangler d1 migrations apply DB --remote
 ```
 
@@ -228,6 +229,7 @@ npx wrangler d1 migrations apply DB --remote
 `NEXT_PUBLIC_*` 값은 Next.js 빌드 시점에 번들에 포함됩니다. `wrangler.jsonc`의 Worker 변수만으로는 Next.js 클라이언트 번들에 값이 들어가지 않을 수 있으므로, 배포할 때 빌드 프로세스에도 공개 Turnstile site key를 전달합니다.
 
 ```powershell
+$env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
 $env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
 $env:BETTER_AUTH_URL="https://vth.kr"
 $env:NEXTJS_ENV="production"
@@ -235,8 +237,8 @@ npm run deploy
 ```
 
 ### macOS/Linux에서 배포
-
 ```bash
+CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8" \
 NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>" \
 BETTER_AUTH_URL="https://vth.kr" \
 NEXTJS_ENV=production \
@@ -250,6 +252,7 @@ npm run deploy
 코드 변경 후에도 동일한 빌드 환경을 전달합니다.
 
 ```powershell
+$env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
 $env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
 $env:BETTER_AUTH_URL="https://vth.kr"
 $env:NEXTJS_ENV="production"
@@ -266,6 +269,12 @@ Windows에서 OpenNext 빌드가 `.open-next` 파일 잠금으로 실패하면 �
 ## 6. 첫 운영 관리자 계정
 
 운영 DB에 데모 관리자 계정은 없습니다.
+여러 Cloudflare 계정이 로그인되어 있으면 D1 명령 전에 목표 계정을 명시합니다.
+
+```powershell
+$env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
+```
+
 
 1. `https://vth.kr/signup`에서 첫 계정을 생성합니다.
 2. 계정 정보를 확인합니다.

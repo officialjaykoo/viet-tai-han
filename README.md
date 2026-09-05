@@ -112,7 +112,7 @@ The monetization foundation is implemented without pretending that a payment pro
 
 
 ## Deploy your own
-For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md). The target account and production D1/Vectorize/Turnstile configuration are prepared; R2 must be enabled in the target account before creating `vth-media`. Do not recreate resources unless you are provisioning a separate environment.
+For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md). The target account, R2 subscription, `vth-media` bucket, D1, Vectorize, Turnstile, and Worker deployment are complete. Do not recreate resources unless you are provisioning a separate environment.
 
 
 1. Create Cloudflare resources:
