@@ -4,7 +4,8 @@ BETTER_AUTH_URL=http://localhost:3000
 # Optional comma-separated browser origins for preview/custom domains:
 # VTH_AUTH_ORIGINS=https://preview.example.com
 #
-# OAuth providers stay disabled until both values for that provider are set:
+# Social OAuth — configure at least one provider for local sign-up/sign-in.
+# Each provider stays disabled until both values are set:
 # FACEBOOK_CLIENT_ID=
 # FACEBOOK_CLIENT_SECRET=
 # ZALO_APP_ID=

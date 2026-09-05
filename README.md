@@ -50,7 +50,7 @@ flowchart LR
 ## Features
 
 - Communities, posts, comments, votes, profiles
-- Auth ([Better Auth](https://www.better-auth.com)) with email/password + username
+- Auth ([Better Auth](https://www.better-auth.com) with Facebook/Zalo OAuth and explicit account linking)
 - Search and AI-backed recommendations
 - Direct messages and notifications
 - Media uploads (R2)
@@ -75,7 +75,7 @@ npm run db:reset:local   # migrate + seed demo data
 npm run dev              # http://localhost:3000
 ```
 
-Seeded demo login (local only): `alice` / `password123`
+Local auth is social-only. Set at least one provider's ID and secret in `.dev.vars` before signing up; seeded demo credentials are not accepted.
 
 Turnstile test keys in `.dev.vars.example` always pass locally. Replace them with your own widget keys for production.
 
@@ -131,7 +131,7 @@ For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFL
 
 2. Paste the returned IDs into `wrangler.jsonc` (`database_id`, and KV ids if used).
 
-3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and add `FACEBOOK_CLIENT_ID` / `ZALO_APP_ID` when those providers are enabled. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins. For browser push, set the VAPID public key in `vars.VAPID_PUBLIC_KEY`.
+3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and configure at least one of `FACEBOOK_CLIENT_ID` / `ZALO_APP_ID`. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins. For browser push, set the VAPID public key in `vars.VAPID_PUBLIC_KEY`.
 
 4. Register the OAuth callbacks with each provider:
 
@@ -151,7 +151,7 @@ For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFL
    ```
 
    All three VAPID values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`) are required to enable push. The site must run on HTTPS (localhost is allowed by browsers); subscriptions can be managed under Settings → Notifications.
-   Facebook and Zalo remain disabled unless both the provider ID and secret are present. Passkeys use the hostname and origin from `BETTER_AUTH_URL`.
+   Facebook and Zalo remain disabled unless both the provider ID and secret are present. After signing in with either provider, link the other under Settings → Account → Connected accounts. Email/password and passkey authentication are disabled.
    The billing webhook is not a checkout implementation. Configure a provider adapter, user mapping, prices, refunds, and tax policy before setting `ads_enabled=1` or accepting real payments.
 
 6. Apply remote migrations, then deploy:

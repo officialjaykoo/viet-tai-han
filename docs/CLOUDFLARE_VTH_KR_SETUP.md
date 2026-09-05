@@ -171,8 +171,9 @@ npx wrangler secret put TURNSTILE_SECRET_KEY
 
 ### 추가 OAuth를 사용할 경우
 
-기본 인증은 이메일/사용자명 + 비밀번호로 동작합니다. Facebook과 Zalo는 ID와 secret을 모두 설정한 경우에만 활성화됩니다.
-현재 운영 Worker에는 두 provider 설정이 없습니다. 따라서 회원가입 화면의 Facebook/Zalo 버튼은 보이지만 클릭하면 provider 설정 오류가 납니다. 이메일/사용자명 + 비밀번호 가입은 별도로 동작합니다.
+운영 인증은 Facebook 또는 Zalo OAuth만 사용합니다. 이메일/사용자명 + 비밀번호 가입·로그인 엔드포인트와 패스키 인증은 비활성화되어 있습니다. 두 provider는 ID와 secret을 모두 설정한 경우에만 활성화됩니다.
+
+회원은 Facebook 또는 Zalo 중 하나로 가입한 뒤, 로그인 후 **설정 → 계정 → 연결된 계정**에서 다른 provider를 명시적으로 연결할 수 있습니다. 연결이 완료되면 두 provider 중 어느 쪽으로도 같은 계정에 로그인됩니다.
 
 비밀값은 채팅이나 GitHub에 보내지 말고, 아래 `wrangler secret put` 프롬프트에 직접 입력합니다.
 
@@ -238,8 +239,7 @@ Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가
 
 두 값(ID와 secret)이 모두 있어야 해당 provider가 Better Auth에 등록됩니다. 설정 후 새 로그인 시도 전에 Worker 배포와 provider 콘솔 저장이 완료되었는지 확인합니다.
 
-
-OAuth를 사용하지 않으면 아무것도 설정하지 않아도 됩니다.
+Facebook 또는 Zalo를 최소 하나 구성해야 회원가입과 로그인이 가능합니다.
 
 ### Web Push를 사용할 경우
 

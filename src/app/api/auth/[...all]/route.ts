@@ -8,11 +8,7 @@ function readCookie(header: string | null, name: string): string | null {
 }
 
 function needsHumanGate(pathname: string): boolean {
-  return (
-    pathname.includes("/sign-in") ||
-    pathname.includes("/sign-up") ||
-    pathname.includes("/passkey/generate-authenticate-options")
-  );
+  return pathname.includes("/sign-in") || pathname.includes("/sign-up");
 }
 async function rejectNonHuman(request: Request): Promise<Response | null> {
   const url = new URL(request.url);

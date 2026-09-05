@@ -1,8 +1,5 @@
 "use client";
 
-import { KeyRoundIcon } from "lucide-react";
-
-import { useI18n } from "@/components/i18n/i18n-provider";
 import { Button } from "@/components/ui/button";
 
 function FacebookBrandIcon() {
@@ -44,56 +41,33 @@ export function IdentityAuthButtons({
   pending,
   onFacebook,
   onZalo,
-  onPasskey,
 }: {
   pending: boolean;
   onFacebook: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onZalo: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  onPasskey?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
-  const { t } = useI18n();
-
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3 text-[0.68rem] font-semibold tracking-[0.12em] text-muted-foreground">
-        <span className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-border" />
-        <span>{t("auth.orContinueWith")}</span>
-        <span className="h-px flex-1 bg-gradient-to-l from-transparent via-border to-border" />
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={pending}
-          onClick={onFacebook}
-          className="h-11 gap-2 border-blue-500/30 bg-blue-500/[0.04] hover:border-blue-500/50 hover:bg-blue-500/[0.08]"
-        >
-          <FacebookBrandIcon />
-          <span>Facebook</span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={pending}
-          onClick={onZalo}
-          className="h-11 gap-2 border-sky-500/30 bg-sky-500/[0.04] hover:border-sky-500/50 hover:bg-sky-500/[0.08]"
-        >
-          <ZaloBrandIcon />
-          <span>Zalo</span>
-        </Button>
-      </div>
-      {onPasskey ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={pending}
-          onClick={onPasskey}
-          className="w-full"
-        >
-          <KeyRoundIcon className="size-4" />
-          {t("auth.signInWithPasskey")}
-        </Button>
-      ) : null}
+    <div className="grid gap-2 sm:grid-cols-2">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={pending}
+        onClick={onFacebook}
+        className="h-11 gap-2 border-blue-500/30 bg-blue-500/[0.04] hover:border-blue-500/50 hover:bg-blue-500/[0.08]"
+      >
+        <FacebookBrandIcon />
+        <span>Facebook</span>
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={pending}
+        onClick={onZalo}
+        className="h-11 gap-2 border-sky-500/30 bg-sky-500/[0.04] hover:border-sky-500/50 hover:bg-sky-500/[0.08]"
+      >
+        <ZaloBrandIcon />
+        <span>Zalo</span>
+      </Button>
     </div>
   );
 }

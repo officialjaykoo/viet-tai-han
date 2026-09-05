@@ -1,9 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import {
-  genericOAuthClient,
-  usernameClient,
-} from "better-auth/client/plugins";
-import { passkeyClient } from "@better-auth/passkey/client";
+import { genericOAuthClient } from "better-auth/client/plugins";
 
 import { apiFetch } from "@/lib/api-client";
 
@@ -24,7 +20,7 @@ export const authClient = createAuthClient({
       return apiFetch(url, init);
     },
   },
-  plugins: [usernameClient(), genericOAuthClient(), passkeyClient()],
+  plugins: [genericOAuthClient()],
 });
 
-export const { signIn, signUp, signOut, useSession } = authClient;
+export const { signIn, signOut, useSession } = authClient;

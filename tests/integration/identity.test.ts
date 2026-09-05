@@ -21,24 +21,22 @@ async function startOAuth(
 }
 
 describe("identity providers", () => {
-  it("installs the Better Auth passkey schema", async () => {
-    const result = await env.DB.prepare("PRAGMA table_info(passkey)").all<{
-      name: string;
-    }>();
+  it("blocks credential authentication endpoints", async () => {
+    const auth = createAuth(env.DB);
 
-    expect(result.results.map((column) => column.name)).toEqual([
-      "id",
-      "name",
-      "publicKey",
-      "userId",
-      "credentialID",
-      "counter",
-      "deviceType",
-      "backedUp",
-      "transports",
-      "createdAt",
-      "aaguid",
-    ]);
+    for (const path of [
+      "sign-up/email",
+      "sign-in/email",
+      "sign-in/username",
+      "change-password",
+      "set-password",
+      "request-password-reset",
+      "reset-password",
+      "verify-password",
+    ]) {
+      const response = await startOAuth(auth, path, {});
+      expect(response.status).toBe(404);
+    }
   });
 
   it("starts Facebook OAuth with the configured callback", async () => {

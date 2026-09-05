@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState, useSyncExternalStore, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useTransition } from "react";
 
 import { IdentityAuthButtons } from "@/components/auth/identity-auth-buttons";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -14,7 +14,6 @@ import {
   useBotGuard,
 } from "@/components/security/bot-check";
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -23,29 +22,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { authClient, signIn } from "@/lib/auth-client";
-import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
-const subscribeToHydration = () => () => {};
-
+import { authClient } from "@/lib/auth-client";
 
 function LoginForm() {
   const { t } = useI18n();
   const localizeError = useLocalizedError();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const bot = useBotGuard();
-  const hydrated = useSyncExternalStore(
-    subscribeToHydration,
-    () => true,
-    () => false
-  );
   const callbackError = searchParams.get("error");
   const displayError =
     error ??
@@ -53,37 +40,9 @@ function LoginForm() {
       ? localizeError(callbackError, t("auth.couldNotSignIn"))
       : null);
 
-  function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    bot.markTrusted(event);
-
-    startTransition(async () => {
-      const check = await passBotCheck(bot, turnstileToken);
-      if (!check.ok) {
-        setError(localizeError(check.error, t("common.error")));
-        return;
-      }
-
-      const { error: signInError } = await signIn.username({
-        username,
-        password,
-      });
-
-      if (signInError) {
-        setError(
-          localizeError(signInError.message, t("auth.couldNotSignIn"))
-        );
-        return;
-      }
-
-      router.push(next.startsWith("/") ? next : "/");
-      router.refresh();
-    });
-  }
   function startIdentity(
     event: React.MouseEvent<HTMLButtonElement>,
-    method: "facebook" | "zalo" | "passkey"
+    method: "facebook" | "zalo"
   ) {
     event.preventDefault();
     setError(null);
@@ -104,24 +63,16 @@ function LoginForm() {
               callbackURL,
               errorCallbackURL: "/login",
             })
-          : method === "zalo"
-            ? await authClient.signIn.oauth2({
-                providerId: "zalo",
-                callbackURL,
-                errorCallbackURL: "/login",
-              })
-            : await signIn.passkey();
+          : await authClient.signIn.oauth2({
+              providerId: "zalo",
+              callbackURL,
+              errorCallbackURL: "/login",
+            });
 
       if (result.error) {
         setError(
           localizeError(result.error.message, t("auth.couldNotSignIn"))
         );
-        return;
-      }
-
-      if (method === "passkey") {
-        router.push(callbackURL);
-        router.refresh();
       }
     });
   }
@@ -137,66 +88,24 @@ function LoginForm() {
           {t("auth.signInDescription")}
         </CardDescription>
       </CardHeader>
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        className="relative"
-        data-hydrated={hydrated}
-      >
+      <div className="relative">
         <ParserTraps setTrapRef={bot.setTrapRef} />
         <CardContent className="flex flex-col gap-4 px-6 sm:px-8">
-          <label className="grid gap-2 text-sm">
-            <span className="font-semibold text-foreground/80">
-              {t("auth.username")}
-            </span>
-            <Input
-              required
-              name="username"
-              autoComplete="username"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              enterKeyHint="next"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </label>
-          <label className="grid gap-2 text-sm">
-            <span className="font-semibold text-foreground/80">
-              {t("auth.password")}
-            </span>
-            <Input
-              required
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              enterKeyHint="go"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
           {displayError ? (
-            <p className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-sm text-destructive" role="alert">
+            <p
+              className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-sm text-destructive"
+              role="alert"
+            >
               {displayError}
             </p>
           ) : null}
           <TurnstileWidget onToken={setTurnstileToken} />
         </CardContent>
         <CardFooter className="flex flex-col items-stretch gap-4 px-6 pb-7 sm:px-8">
-          <Button
-            type="submit"
-            disabled={
-              !hydrated || pending || requiresTurnstileToken(turnstileToken)
-            }
-            className="h-12 rounded-xl bg-[var(--flag-red)] font-semibold shadow-[0_12px_24px_-14px_var(--flag-red)] hover:bg-[color-mix(in_oklch,var(--flag-red)_88%,black)]"
-          >
-            {pending ? t("auth.signingIn") : t("auth.signIn")}
-          </Button>
           <IdentityAuthButtons
             pending={pending}
             onFacebook={(event) => startIdentity(event, "facebook")}
             onZalo={(event) => startIdentity(event, "zalo")}
-            onPasskey={(event) => startIdentity(event, "passkey")}
           />
           <p className="border-t border-border/70 pt-4 text-center text-sm text-muted-foreground">
             {t("auth.noAccount")}{" "}
@@ -208,7 +117,7 @@ function LoginForm() {
             </Link>
           </p>
         </CardFooter>
-      </form>
+      </div>
     </Card>
   );
 }

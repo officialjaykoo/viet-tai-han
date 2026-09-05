@@ -1,6 +1,5 @@
 import { betterAuth } from "better-auth";
 import { genericOAuth, username } from "better-auth/plugins";
-import { passkey } from "@better-auth/passkey";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Kysely } from "kysely";
 import { D1Dialect } from "kysely-d1";
@@ -170,9 +169,18 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       },
     },
     emailAndPassword: {
-      enabled: true,
-      minPasswordLength: 8,
+      enabled: false,
     },
+    disabledPaths: [
+      "/sign-in/username",
+      "/sign-in/email",
+      "/sign-up/email",
+      "/change-password",
+      "/set-password",
+      "/request-password-reset",
+      "/reset-password",
+      "/verify-password",
+    ],
     session: {
       expiresIn: 60 * 60 * 24 * 14,
       updateAge: 60 * 60 * 24,
@@ -261,11 +269,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
         usernameValidator: (value) => /^[a-zA-Z0-9_]+$/.test(value),
       }),
       genericOAuth({ config: zaloOAuthConfig(env) }),
-      passkey({
-        rpID: new URL(baseURL).hostname,
-        rpName: "Việt tại Hàn",
-        origin: configuredOrigins(baseURL, env.VTH_AUTH_ORIGINS),
-      }),
     ],
     rateLimit: {
       enabled: true,

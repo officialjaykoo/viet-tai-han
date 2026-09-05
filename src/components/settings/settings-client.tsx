@@ -15,14 +15,12 @@ import {
   CameraIcon,
   EyeIcon,
   ImageIcon,
-  KeyRoundIcon,
   LinkIcon,
   LockIcon,
   PaletteIcon,
   RotateCcwIcon,
   ShieldIcon,
   SparklesIcon,
-  Trash2Icon,
   UserIcon,
 } from "lucide-react";
 import { PushSettings } from "@/components/notifications/push-settings";
@@ -70,13 +68,6 @@ type LinkedAccount = {
   accountId: string;
 };
 
-type AccountPasskey = {
-  id: string;
-  name?: string;
-  deviceType: string;
-  backedUp: boolean;
-  createdAt: Date;
-};
 
 
 const SECTIONS: { id: Section; labelKey: MessageKey; icon: ReactNode }[] = [
@@ -155,14 +146,9 @@ export function SettingsClient({
   const avatarInput = useRef<HTMLInputElement>(null);
   const cameraAvatarInput = useRef<HTMLInputElement>(null);
 
-  // Account form
+  // Account identity
   const [email, setEmail] = useState(initialSettings.email);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
-  const [passkeys, setPasskeys] = useState<AccountPasskey[]>([]);
-  const [passkeyName, setPasskeyName] = useState("");
   const [identityLoading, setIdentityLoading] = useState(true);
 
   const username = settings.username ?? "user";
@@ -249,56 +235,22 @@ export function SettingsClient({
     });
   }
 
-  function savePassword() {
-    flash(null, null);
-    if (newPassword.length < 8) {
-      flash(null, localizeError("Password must be at least 8 characters"));
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      flash(null, localizeError("Passwords do not match"));
-      return;
-    }
-    startTransition(async () => {
-      const { error: pwError } = await authClient.changePassword({
-        currentPassword,
-        newPassword,
-        revokeOtherSessions: true,
-      });
-      if (pwError) {
-        flash(
-          null,
-          localizeError(pwError.message, "Could not change password")
-        );
-        return;
-      }
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      flash(t("settings.passwordChanged"), null);
-    });
-  }
   const loadIdentityMethods = useCallback(
     async (showError = true) => {
-      const [accountsResult, passkeysResult] = await Promise.all([
-        authClient.listAccounts(),
-        authClient.passkey.listUserPasskeys(),
-      ]);
+      const accountsResult = await authClient.listAccounts();
       setIdentityLoading(false);
 
       if (accountsResult.data) {
         setLinkedAccounts(accountsResult.data);
       }
-      if (passkeysResult.data) {
-        setPasskeys(passkeysResult.data);
-      }
 
-      const loadError =
-        accountsResult.error?.message ?? passkeysResult.error?.message;
-      if (showError && loadError) {
+      if (showError && accountsResult.error) {
         flash(
           null,
-          localizeError(loadError, t("settings.identityLoadFailed"))
+          localizeError(
+            accountsResult.error.message,
+            t("settings.identityLoadFailed")
+          )
         );
       }
     },
@@ -350,45 +302,6 @@ export function SettingsClient({
     });
   }
 
-  function addPasskey() {
-    flash(null, null);
-    if (!window.PublicKeyCredential) {
-      flash(null, t("settings.passkeyUnsupported"));
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await authClient.passkey.addPasskey({
-        name: passkeyName.trim() || undefined,
-      });
-      if (result.error) {
-        flash(
-          null,
-          localizeError(result.error.message, t("settings.passkeyAddFailed"))
-        );
-        return;
-      }
-      setPasskeyName("");
-      await loadIdentityMethods(false);
-      flash(t("settings.passkeyAdded"), null);
-    });
-  }
-
-  function deletePasskey(id: string) {
-    flash(null, null);
-    startTransition(async () => {
-      const result = await authClient.passkey.deletePasskey({ id });
-      if (result.error) {
-        flash(
-          null,
-          localizeError(result.error.message, t("settings.passkeyDeleteFailed"))
-        );
-        return;
-      }
-      await loadIdentityMethods(false);
-      flash(t("settings.passkeyDeleted"), null);
-    });
-  }
 
 
   function savePreferences(patch: Record<string, unknown>) {
@@ -496,14 +409,10 @@ export function SettingsClient({
     if (section !== "account") return;
 
     let active = true;
-    void Promise.all([
-      authClient.listAccounts(),
-      authClient.passkey.listUserPasskeys(),
-    ]).then(([accountsResult, passkeysResult]) => {
+    void authClient.listAccounts().then((accountsResult) => {
       if (!active) return;
       setIdentityLoading(false);
       if (accountsResult.data) setLinkedAccounts(accountsResult.data);
-      if (passkeysResult.data) setPasskeys(passkeysResult.data);
     });
 
     return () => {
@@ -811,103 +720,7 @@ export function SettingsClient({
               </div>
             </SettingsCard>
 
-            <SettingsCard
-              title={t("settings.passkeys")}
-              description={t("settings.passkeysDesc")}
-            >
-              {passkeys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("settings.noPasskeys")}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {passkeys.map((passkey) => (
-                    <li
-                      key={passkey.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {passkey.name || t("settings.unnamedPasskey")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(passkey.createdAt).toLocaleDateString(
-                            locale
-                          )}
-                          {" · "}
-                          {passkey.deviceType}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        disabled={pending || identityLoading}
-                        aria-label={t("settings.deletePasskey")}
-                        onClick={() => deletePasskey(passkey.id)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={passkeyName}
-                  maxLength={80}
-                  placeholder={t("settings.passkeyNamePlaceholder")}
-                  onChange={(event) => setPasskeyName(event.target.value)}
-                />
-                <Button
-                  type="button"
-                  disabled={pending || identityLoading}
-                  onClick={addPasskey}
-                  className="shrink-0"
-                >
-                  <KeyRoundIcon className="size-4" />
-                  {t("settings.addPasskey")}
-                </Button>
-              </div>
-            </SettingsCard>
 
-            <SettingsCard
-              title={t("settings.password")}
-              description={t("settings.passwordDesc")}
-            >
-              <Field label={t("settings.currentPassword")}>
-                <Input
-                  type="password"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-              </Field>
-              <Field label={t("settings.newPassword")}>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </Field>
-              <Field label={t("settings.confirmPassword")}>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </Field>
-              <Button
-                type="button"
-                disabled={pending || !currentPassword || !newPassword}
-                onClick={savePassword}
-              >
-                {t("settings.changePassword")}
-              </Button>
-            </SettingsCard>
           </>
         ) : null}
 
