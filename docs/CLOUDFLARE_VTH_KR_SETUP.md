@@ -4,20 +4,19 @@
 
 ## 현재 상태
 
-### 완료된 항목
+### 목표 Cloudflare 계정
 
-- Worker: `vth`
-- 임시 운영 URL: <https://vth.thebignine.workers.dev>
-- D1: `vth-db`
-- R2: `vth-media`
+- Account: `viet-tai-han`
+- Account ID: `8cbaf5bd93f2cfcf2a01bcae16cdf2d8`
+- Worker: `vth` — Secret 등록 완료, 애플리케이션 코드 배포 대기
+- D1: `vth-db` — 생성 및 원격 migration 적용 완료
 - Vectorize: `vth-posts` — 768 dimensions, cosine
 - Vectorize metadata index:
   - `embeddingVersion`
   - `authorId`
 - Turnstile widget: `vth.kr production`
-  - 허용 도메인: `vth.kr`, `www.vth.kr`
+  - 허용 도메인: `vth.kr`
   - mode: Managed
-- 운영 D1 migration: 전체 적용 완료
 - 운영 Worker secret:
   - `BETTER_AUTH_SECRET`
   - `TURNSTILE_SECRET_KEY`
@@ -30,13 +29,43 @@
 
 ### 현재 차단 사항
 
-현재 `vth.kr`은 DNS에서 해석되지 않습니다. 아래의 **도메인 Zone 연결과 Worker Custom Domain 연결**을 완료해야 `https://vth.kr`로 접속할 수 있습니다.
+목표 계정 `viet-tai-han`에서 R2가 아직 활성화되지 않았습니다. `npx wrangler r2 bucket create vth-media`가 Cloudflare API 오류 `10042`로 거부되었습니다. R2를 Dashboard에서 활성화한 뒤 버킷을 만들고 다시 배포해야 합니다.
 
-Worker 자체는 <https://vth.thebignine.workers.dev>에서 배포 및 응답 확인이 완료되었습니다.
+`wrangler.jsonc`에는 `vth.kr` Custom Domain 자동 연결 설정이 이미 들어 있습니다.
+
+```jsonc
+"routes": [
+  {
+    "pattern": "vth.kr",
+    "custom_domain": true,
+    "zone_name": "vth.kr"
+  }
+]
+```
+
+R2가 활성화되면 다음 배포가 Worker 코드, R2 binding, Custom Domain을 함께 반영합니다.
 
 ---
 
+## 0. 목표 계정에서 R2 활성화
+
+이 단계만 Cloudflare Dashboard에서 한 번 눌러야 합니다. Worker를 수동 생성하는 작업이 아닙니다.
+
+1. Cloudflare Dashboard에서 계정 `viet-tai-han`을 선택합니다.
+2. **R2** 메뉴를 엽니다.
+3. `Get started`, `Enable R2` 또는 표시되는 R2 활성화 버튼을 선택합니다.
+4. 결제/약관 확인이 요구되면 Cloudflare 안내에 따라 완료합니다.
+5. 활성화 후 저장소 루트에서 다음 명령을 실행합니다.
+
+```bash
+npx wrangler r2 bucket create vth-media
+```
+
+버킷 생성이 완료되면 아래 배포 명령을 실행합니다. 현재 `wrangler.jsonc`가 목표 계정 `viet-tai-han`을 지정하므로 다른 계정에 생성하지 않습니다.
+
 ## 1. vth.kr을 Cloudflare Zone으로 추가
+이미 `vth.kr` Zone이 `Active`이면 이 단계는 건너뛰고 2단계로 진행합니다.
+
 
 1. Cloudflare Dashboard에 운영 계정으로 로그인합니다.
 2. **Websites → Add a site**를 선택합니다.
@@ -50,34 +79,43 @@ Worker 자체는 <https://vth.thebignine.workers.dev>에서 배포 및 응답 �
 
 ### DNS 레코드 주의
 
-Worker Custom Domain을 사용할 경우 서버 IP를 가리키는 `A` 레코드는 추가하지 않습니다. Custom Domain을 연결하면 Cloudflare가 Worker 라우팅과 인증서를 관리합니다.
+Custom Domain을 연결하면 Cloudflare가 `vth.kr`용 DNS 레코드와 인증서를 관리합니다. 기존에 `vth.kr`에 CNAME이 있다면 Custom Domain을 배포하기 전에 제거해야 합니다.
 
-`www.vth.kr`도 사용할 경우 아래 두 주소를 모두 Custom Domain으로 등록합니다.
-
-- `vth.kr`
-- `www.vth.kr`
-
----
+현재 운영 주소는 `vth.kr` 하나만 사용합니다. `www.vth.kr`은 이번 배포에 포함하지 않았습니다.
 
 ## 2. Worker에 Custom Domain 연결
 
-Zone이 `Active`가 된 뒤 다음 순서로 진행합니다.
+Zone이 `Active`라는 전제에서 `wrangler.jsonc`의 설정으로 자동 연결합니다.
 
-1. **Workers & Pages → vth**로 이동합니다.
-2. **Settings → Domains & Routes**를 엽니다.
-3. **Add → Custom Domain**을 선택합니다.
-4. `vth.kr`을 추가합니다.
-5. 필요하면 `www.vth.kr`도 추가합니다.
-6. HTTPS 인증서 발급과 DNS 상태가 완료될 때까지 기다립니다.
+```jsonc
+"routes": [
+  {
+    "pattern": "vth.kr",
+    "custom_domain": true,
+    "zone_name": "vth.kr"
+  }
+]
+```
+
+다음 배포 명령이 Custom Domain을 생성합니다.
+
+```powershell
+$env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
+$env:BETTER_AUTH_URL="https://vth.kr"
+$env:NEXTJS_ENV="production"
+npm run deploy
+```
+
+Cloudflare Dashboard에서는 **Workers & Pages → vth → Settings → Domains & Routes**에서 생성 결과만 확인하면 됩니다. 자동 생성이 실패한 경우에만 **Add → Custom Domain → vth.kr**을 사용합니다.
 
 완료 후 아래 주소를 확인합니다.
 
 - <https://vth.kr>
-- <https://www.vth.kr> (등록한 경우)
 
 `wrangler.jsonc`의 `BETTER_AUTH_URL`은 이미 `https://vth.kr`로 설정되어 있습니다. Custom Domain을 다른 주소로 정하면 이 값을 바꾸고 다시 배포해야 합니다.
 
 ---
+
 
 ## 3. SSL/TLS 설정
 

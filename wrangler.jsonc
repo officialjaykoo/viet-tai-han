@@ -1,6 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "vth",
+	"account_id": "8cbaf5bd93f2cfcf2a01bcae16cdf2d8",
 	"main": "./src/worker.ts",
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": [
@@ -16,7 +17,7 @@
 			"binding": "DB",
 			"database_name": "vth-db",
 			// Production D1 database created for vth.kr.
-			"database_id": "df74ef97-3487-4dd1-81ad-b208aa9bfdf9",
+			"database_id": "f25b46db-a5c9-4f2c-a0da-77752fa02876",
 			"migrations_dir": "./migrations"
 		}
 	],
@@ -61,10 +62,17 @@
 	],
 	"vars": {
 		"BETTER_AUTH_URL": "https://vth.kr",
-		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAEoM7KH1VQmUtF0I",
+		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAEoVpesbpDV5IzDW",
 		"NEXTJS_ENV": "production"
 	},
 	"workers_dev": true,
+	"routes": [
+		{
+			"pattern": "vth.kr",
+			"custom_domain": true,
+			"zone_name": "vth.kr"
+		}
+	],
 	"observability": {
 		"enabled": true,
 		"head_sampling_rate": 1,

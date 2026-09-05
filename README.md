@@ -112,7 +112,7 @@ The monetization foundation is implemented without pretending that a payment pro
 
 
 ## Deploy your own
-For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md). The Cloudflare resources and remote D1 migrations have already been created for this repository; do not recreate them unless you are provisioning a separate environment.
+For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md). The target account and production D1/Vectorize/Turnstile configuration are prepared; R2 must be enabled in the target account before creating `vth-media`. Do not recreate resources unless you are provisioning a separate environment.
 
 
 1. Create Cloudflare resources:
@@ -161,7 +161,7 @@ For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFL
    npm run deploy
    ```
 
-7. Attach a custom domain in the dashboard (Workers → Domains & Routes), or use `*.workers.dev`.
+7. `wrangler.jsonc` configures `vth.kr` as a Custom Domain; run the deploy after the zone is active and verify it under Workers → Domains & Routes. Use the dashboard Add → Custom Domain flow only if the automatic trigger update fails.
 
 ### Production notes
 
