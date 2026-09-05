@@ -63,7 +63,8 @@
 	"vars": {
 		"BETTER_AUTH_URL": "https://vth.kr",
 		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAEoYhTGuKEC24mJc",
-		"NEXTJS_ENV": "production"
+		"NEXTJS_ENV": "production",
+		"FACEBOOK_CLIENT_ID": "1369981351507264",
 	},
 	"workers_dev": true,
 	"routes": [
