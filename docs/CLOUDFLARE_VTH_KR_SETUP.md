@@ -172,6 +172,10 @@ npx wrangler secret put TURNSTILE_SECRET_KEY
 ### 추가 OAuth를 사용할 경우
 
 기본 인증은 이메일/사용자명 + 비밀번호로 동작합니다. Facebook과 Zalo는 ID와 secret을 모두 설정한 경우에만 활성화됩니다.
+현재 운영 Worker에는 두 provider 설정이 없습니다. 따라서 회원가입 화면의 Facebook/Zalo 버튼은 보이지만 클릭하면 provider 설정 오류가 납니다. 이메일/사용자명 + 비밀번호 가입은 별도로 동작합니다.
+
+비밀값은 채팅이나 GitHub에 보내지 말고, 아래 `wrangler secret put` 프롬프트에 직접 입력합니다.
+
 
 Cloudflare Dashboard의 **Worker → Settings → Variables and Secrets**에서 다음 공개 변수를 추가합니다.
 
@@ -194,6 +198,46 @@ OAuth callback URL:
 https://vth.kr/api/auth/callback/facebook
 https://vth.kr/api/auth/oauth2/callback/zalo
 ```
+
+### Facebook 설정
+
+1. Meta for Developers에서 앱을 만들고 Facebook Login(Web)을 추가합니다.
+2. 앱의 허용 도메인과 사이트 URL에 `https://vth.kr`을 등록합니다.
+3. Valid OAuth Redirect URI에 다음 주소를 정확히 등록합니다.
+
+   ```text
+   https://vth.kr/api/auth/callback/facebook
+   ```
+
+4. Cloudflare의 **Worker → Settings → Variables and Secrets**에 `FACEBOOK_CLIENT_ID`를 공개 변수로 저장합니다.
+5. 아래 명령을 실행하고 프롬프트에 Meta App Secret을 직접 입력합니다.
+
+   ```powershell
+   $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
+   npx wrangler secret put FACEBOOK_CLIENT_SECRET
+   ```
+
+Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가해야 합니다. 일반 사용자가 로그인하려면 앱을 Live 상태로 전환하고 Meta 검토가 필요한 권한을 처리해야 합니다.
+
+### Zalo 설정
+
+1. Zalo Developers에서 앱을 만들고 Login/OAuth를 활성화합니다.
+2. 앱의 redirect/callback URL에 다음 주소를 정확히 등록합니다.
+
+   ```text
+   https://vth.kr/api/auth/oauth2/callback/zalo
+   ```
+
+3. Cloudflare의 **Worker → Settings → Variables and Secrets**에 `ZALO_APP_ID`를 공개 변수로 저장합니다.
+4. 아래 명령을 실행하고 프롬프트에 Zalo App Secret을 직접 입력합니다.
+
+   ```powershell
+   $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
+   npx wrangler secret put ZALO_APP_SECRET
+   ```
+
+두 값(ID와 secret)이 모두 있어야 해당 provider가 Better Auth에 등록됩니다. 설정 후 새 로그인 시도 전에 Worker 배포와 provider 콘솔 저장이 완료되었는지 확인합니다.
+
 
 OAuth를 사용하지 않으면 아무것도 설정하지 않아도 됩니다.
 
