@@ -11,7 +11,7 @@
 - Worker: `vth`
 - Worker URL: <https://vth.viet-tai-han.workers.dev>
 - Custom Domain: <https://vth.kr>
-- Current Version ID: `051f6467-fba1-4379-8395-99e2be4a6b3c`
+- Current Version ID: `342c830d-a785-40dc-89f8-4f6f486b9a30`
 - D1: `vth-db` — 생성 및 원격 migration 적용 완료
 - R2: `vth-media` — 생성 및 Worker binding 완료
 - Vectorize: `vth-posts` — 768 dimensions, cosine
@@ -30,6 +30,13 @@
   - `NEXTJS_ENV=production`
 
 운영 D1에는 로컬 데모 데이터와 `seed.sql`을 넣지 않았습니다. 첫 운영 계정은 실제 가입으로 생성해야 합니다.
+
+### 보안 조치
+
+- 초기 설정 과정에서 노출 가능성이 있었던 운영 `BETTER_AUTH_SECRET`과 `TURNSTILE_SECRET_KEY`를 폐기하고 새 값으로 교체했습니다.
+- 이전 Turnstile 위젯을 삭제하고 `vth.kr` 전용 새 위젯을 생성했습니다.
+- 새 Secret과 새 공개 site key를 반영해 Worker를 재배포했습니다.
+- 실제 사용자 계정이나 개인 로그인 비밀번호는 생성·커밋하지 않았습니다.
 
 ### 배포 완료 상태
 
