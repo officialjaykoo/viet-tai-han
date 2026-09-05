@@ -112,6 +112,8 @@ The monetization foundation is implemented without pretending that a payment pro
 
 
 ## Deploy your own
+For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md). The Cloudflare resources and remote D1 migrations have already been created for this repository; do not recreate them unless you are provisioning a separate environment.
+
 
 1. Create Cloudflare resources:
 

@@ -15,8 +15,8 @@
 		{
 			"binding": "DB",
 			"database_name": "vth-db",
-			// Replace after: npx wrangler d1 create vth-db
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			// Production D1 database created for vth.kr.
+			"database_id": "df74ef97-3487-4dd1-81ad-b208aa9bfdf9",
 			"migrations_dir": "./migrations"
 		}
 	],
@@ -60,8 +60,9 @@
 		}
 	],
 	"vars": {
-		"BETTER_AUTH_URL": "http://localhost:3000",
-		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
+		"BETTER_AUTH_URL": "https://vth.kr",
+		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAEoM7KH1VQmUtF0I",
+		"NEXTJS_ENV": "production"
 	},
 	"workers_dev": true,
 	"observability": {
