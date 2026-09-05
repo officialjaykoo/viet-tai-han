@@ -22,6 +22,14 @@ export function middleware(request: NextRequest) {
     }
     return fakeNotFoundResponse();
   }
+  // OAuth callbacks are browser redirects, not public API calls.
+  if (
+    method === "GET" &&
+    (pathname.startsWith("/api/auth/callback/") ||
+      pathname.startsWith("/api/auth/oauth2/callback/"))
+  ) {
+    return NextResponse.next();
+  }
 
   if (pathname === "/api/billing/webhook") {
     return NextResponse.next();
