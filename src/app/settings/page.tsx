@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { SiteHeader } from "@/components/layout/site-header";
 import { SettingsClient } from "@/components/settings/settings-client";
+import { getOnboardingState } from "@/lib/onboarding";
 import { getPushStatus } from "@/lib/push";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -40,6 +41,8 @@ export default async function SettingsPage({
   if (!session?.user) {
     redirect("/login?next=/settings");
   }
+  const onboarding = await getOnboardingState(session.user.id);
+  if (!onboarding?.onboardingComplete) redirect("/onboarding");
 
   const { locale } = await getRequestLocale();
   const params = await searchParams;
@@ -75,6 +78,7 @@ export default async function SettingsPage({
           initialSection={parseSection(params.section)}
           initialPush={{
             available: push.available,
+            configuration: push.configuration,
             publicKey: push.publicKey,
             subscribed: push.subscribed,
           }}

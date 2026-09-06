@@ -8,7 +8,7 @@ import { readApiJson } from "@/lib/security/guard";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ allowIncomplete: true });
     const body = (await readApiJson(request).catch(() => null)) as {
       preferredLanguage?: string;
     } | null;

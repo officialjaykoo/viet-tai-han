@@ -24,6 +24,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import { PushSettings } from "@/components/notifications/push-settings";
+import type { PushConfigState } from "@/lib/push";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { useTheme } from "@/components/theme/theme-provider";
@@ -48,6 +49,7 @@ import {
 } from "@/lib/consent";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
+import { usernameCooldownEndsAt } from "@/lib/username";
 
 type Section = "profile" | "account" | "appearance" | "privacy" | "notifications";
 const PRO_PLAN_LABELS: Record<ProPlan, MessageKey> = {
@@ -119,6 +121,7 @@ export function SettingsClient({
   initialSection?: Section;
   initialPush: {
     available: boolean;
+    configuration: PushConfigState;
     publicKey: string | null;
     subscribed: boolean;
   };
@@ -145,9 +148,11 @@ export function SettingsClient({
       ? localizeError(initialIdentityError, t("settings.linkFailed"))
       : null
   );
-
-  // Profile form
+  // Public handle; it changes independently from the immutable user.id.
   const [name, setName] = useState(initialSettings.name);
+  const [usernameInput, setUsernameInput] = useState(
+    initialSettings.username ?? ""
+  );
   const [bio, setBio] = useState(initialSettings.bio ?? "");
   const [image, setImage] = useState(initialSettings.image);
   const avatarInput = useRef<HTMLInputElement>(null);
@@ -220,6 +225,30 @@ export function SettingsClient({
       }
       if (data.settings) setSettings(data.settings);
       flash(t("settings.profileSaved"), null);
+      router.refresh();
+    });
+  }
+  function saveUsername() {
+    flash(null, null);
+    startTransition(async () => {
+      const res = await apiFetch("/api/me/username", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usernameInput }),
+      });
+      const data = (await res.json()) as {
+        settings?: UserSettings;
+        error?: string;
+      };
+      if (!res.ok) {
+        flash(null, localizeError(data.error, t("settings.usernameSaveFailed")));
+        return;
+      }
+      if (data.settings) {
+        setSettings(data.settings);
+        setUsernameInput(data.settings.username ?? "");
+      }
+      flash(t("settings.usernameSaved"), null);
       router.refresh();
     });
   }
@@ -439,6 +468,17 @@ export function SettingsClient({
 
 
 
+  const usernameCooldownEnds = usernameCooldownEndsAt(
+    settings.usernameChangedAt
+  );
+  const usernameChangeLocked = Boolean(
+    usernameCooldownEnds && usernameCooldownEnds.getTime() > Date.now()
+  );
+  const normalizedUsernameInput = usernameInput
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase();
+
   return (
     <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
       <nav
@@ -573,10 +613,33 @@ export function SettingsClient({
             </div>
 
             <Field label={t("settings.username")}>
-              <Input value={`@${username}`} disabled readOnly />
+              <Input
+                value={usernameInput}
+                maxLength={24}
+                autoComplete="username"
+                onChange={(event) => setUsernameInput(event.target.value)}
+              />
               <p className="text-xs text-muted-foreground">
-                {t("settings.usernamePermanent")}
+                {usernameChangeLocked && usernameCooldownEnds
+                  ? t("settings.usernameChangeCooldown", {
+                      date: usernameCooldownEnds.toLocaleDateString(locale),
+                    })
+                  : t("settings.usernameChangeHint")}
               </p>
+              <Button
+                type="button"
+                disabled={
+                  pending ||
+                  usernameChangeLocked ||
+                  !normalizedUsernameInput ||
+                  normalizedUsernameInput === username
+                }
+                onClick={saveUsername}
+              >
+                {pending
+                  ? t("settings.saving")
+                  : t("settings.saveUsername")}
+              </Button>
             </Field>
 
             <Field label={t("settings.displayName")}>
@@ -973,6 +1036,7 @@ export function SettingsClient({
             </SettingsCard>
             <PushSettings
               available={initialPush.available}
+              configuration={initialPush.configuration}
               publicKey={initialPush.publicKey}
               initialSubscribed={initialPush.subscribed}
             />

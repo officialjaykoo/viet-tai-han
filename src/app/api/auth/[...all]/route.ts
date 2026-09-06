@@ -1,5 +1,5 @@
 import { getAuth } from "@/lib/auth";
-import { stripOAuthCompatibilityEmail } from "@/lib/oauth-identity";
+import { stripOAuthCompatibilityFields } from "@/lib/oauth-identity";
 import { HUMAN_COOKIE, openHumanToken } from "@/lib/security/human-cookie";
 
 function readCookie(header: string | null, name: string): string | null {
@@ -27,7 +27,6 @@ async function rejectNonHuman(request: Request): Promise<Response | null> {
 
 async function redactSessionResponse(response: Response): Promise<Response> {
   if (!response.ok) return response;
-
   let body: unknown;
   try {
     body = await response.clone().json();
@@ -44,7 +43,7 @@ async function redactSessionResponse(response: Response): Promise<Response> {
     return response;
   }
 
-  const safeUser = stripOAuthCompatibilityEmail(
+  const safeUser = stripOAuthCompatibilityFields(
     body.user as Record<string, unknown>
   );
   const safeBody = { ...(body as Record<string, unknown>), user: safeUser };

@@ -455,6 +455,10 @@ export const en = {
     pushEnabled: "Push notifications are enabled on this device.",
     pushDisabled: "Push notifications are disabled on this device.",
     pushUnavailable: "Push notifications are not configured on this server.",
+    pushInvalidConfiguration:
+      "Push notifications have an invalid server configuration.",
+    pushRuntimeUnavailable:
+      "Push notifications are unavailable in this server runtime.",
     pushUnsupported: "This browser needs HTTPS and push notification support.",
     pushPermissionDenied: "Browser notification permission was not granted.",
     pushFailed: "Could not update push notifications.",
@@ -543,7 +547,7 @@ export const en = {
     sectionNotifications: "Notifications",
     customizeProfile: "Customize profile",
     customizeProfileDesc:
-      "Avatar, display name, and bio. Username can’t be changed.",
+      "Avatar, display name, bio, and your public handle.",
     banner: "Banner",
     remove: "Remove",
     uploadAvatar: "Upload avatar",
@@ -555,7 +559,13 @@ export const en = {
     avatarHelp:
       "Use your camera, choose a photo from your gallery, or return to the default avatar.",
     username: "Username",
-    usernamePermanent: "Usernames are permanent on Việt tại Hàn.",
+    usernameChangeHint:
+      "Your public handle can be changed once every 90 days.",
+    usernameChangeCooldown:
+      "You can change your username again after {date}.",
+    saveUsername: "Save username",
+    usernameSaved: "Username updated",
+    usernameSaveFailed: "Could not save username",
     displayName: "Display name",
     bio: "Bio",
     bioPlaceholder: "About you",

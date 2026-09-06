@@ -1,16 +1,17 @@
 import { APIError, betterAuth } from "better-auth";
 import { setSessionCookie } from "better-auth/cookies";
 import { createAuthEndpoint } from "@better-auth/core/api";
-import { genericOAuth, username } from "better-auth/plugins";
+import { genericOAuth } from "better-auth/plugins";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Kysely } from "kysely";
 import { D1Dialect } from "kysely-d1";
 
 import {
-  createAvatarSeed,
-  encodeGeneratedAvatar,
-} from "@/lib/avatar";
-import { mapOAuthEmail } from "@/lib/oauth-identity";
+  mapOAuthEmail,
+  mapOAuthProfile,
+} from "@/lib/oauth-identity";
+import { createTemporaryUsername } from "@/lib/username";
+import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
 
 export type AppUserRole = "user" | "moderator" | "admin";
 export type AppUserStatus = "active" | "banned" | "shadowbanned";
@@ -36,6 +37,7 @@ type ZaloTokenResponse = {
 type ZaloProfile = {
   id?: string;
   name?: string;
+  username?: string;
   picture?: { data?: { url?: string } };
 };
 
@@ -119,8 +121,14 @@ function zaloOAuthConfig(env: AuthEnv) {
         if (!response.ok) return null;
 
         const profile = (await response.json()) as ZaloProfile;
-        if (!profile.id || !profile.name) return null;
+        if (!profile.id) return null;
 
+        const profileFields = mapOAuthProfile({
+          providerId: "zalo",
+          accountId: profile.id,
+          name: profile.name,
+          providerUsername: profile.username,
+        });
         const emailFields = mapOAuthEmail({
           providerId: "zalo",
           accountId: profile.id,
@@ -129,7 +137,7 @@ function zaloOAuthConfig(env: AuthEnv) {
 
         return {
           id: profile.id,
-          name: profile.name,
+          ...profileFields,
           ...emailFields,
           image: profile.picture?.data?.url,
         };
@@ -139,21 +147,6 @@ function zaloOAuthConfig(env: AuthEnv) {
 }
 
 
-const TEMPORARY_USERNAME_PREFIX = "vth_user_";
-
-async function createTemporaryUsername(db: D1Database): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
-    const candidate = `${TEMPORARY_USERNAME_PREFIX}${suffix}`;
-    const existing = await db
-      .prepare(`SELECT id FROM "user" WHERE username = ? COLLATE NOCASE`)
-      .bind(candidate)
-      .first<{ id: string }>();
-    if (!existing) return candidate;
-  }
-
-  throw new Error("Could not allocate a temporary username");
-}
 
 function userFieldString(
   user: Record<string, unknown>,
@@ -217,13 +210,27 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
               clientId: env.FACEBOOK_CLIENT_ID!,
               clientSecret: env.FACEBOOK_CLIENT_SECRET!,
               scope: ["email", "public_profile"],
-              mapProfileToUser: (profile) =>
-                mapOAuthEmail({
-                  providerId: "facebook",
-                  accountId: profile.id,
-                  email: profile.email,
-                  emailVerified: profile.email_verified,
-                }),
+              mapProfileToUser: (profile) => {
+                const facebookProfile = profile as typeof profile & {
+                  username?: string;
+                  handle?: string;
+                };
+                return {
+                  ...mapOAuthProfile({
+                    providerId: "facebook",
+                    accountId: String(profile.id),
+                    name: profile.name,
+                    providerUsername:
+                      facebookProfile.username ?? facebookProfile.handle,
+                  }),
+                  ...mapOAuthEmail({
+                    providerId: "facebook",
+                    accountId: String(profile.id),
+                    email: profile.email,
+                    emailVerified: profile.email_verified,
+                  }),
+                };
+              },
             },
           }
         : {}),
@@ -235,15 +242,35 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
               // Email is optional; only request profile data from Kakao.
               disableDefaultScope: true,
               scope: ["profile_image", "profile_nickname"],
-              mapProfileToUser: (profile) =>
-                mapOAuthEmail({
-                  providerId: "kakao",
-                  accountId: String(profile.id),
-                  email: profile.kakao_account?.email,
-                  emailVerified:
-                    profile.kakao_account?.is_email_valid === true &&
-                    profile.kakao_account?.is_email_verified === true,
-                }),
+              mapProfileToUser: (profile) => {
+                const kakaoProfile = (
+                  profile.kakao_account?.profile ?? profile.properties ?? {}
+                ) as {
+                  nickname?: unknown;
+                  username?: unknown;
+                };
+                const profileWithName = profile as typeof profile & {
+                  name?: unknown;
+                };
+                const nickname =
+                  kakaoProfile.nickname ?? profileWithName.name ?? undefined;
+                return {
+                  ...mapOAuthProfile({
+                    providerId: "kakao",
+                    accountId: String(profile.id),
+                    name: nickname,
+                    providerUsername: kakaoProfile.username,
+                  }),
+                  ...mapOAuthEmail({
+                    providerId: "kakao",
+                    accountId: String(profile.id),
+                    email: profile.kakao_account?.email,
+                    emailVerified:
+                      profile.kakao_account?.is_email_valid === true &&
+                      profile.kakao_account?.is_email_verified === true,
+                  }),
+                };
+              },
             },
           }
         : {}),
@@ -262,7 +289,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       enabled: false,
     },
     disabledPaths: [
-      "/sign-in/username",
       "/sign-in/email",
       "/sign-up/email",
       "/change-password",
@@ -270,6 +296,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       "/request-password-reset",
       "/reset-password",
       "/verify-password",
+      "/update-user",
     ],
     session: {
       expiresIn: 60 * 60 * 24 * 14,
@@ -277,10 +304,29 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       cookieCache: {
         enabled: true,
         maxAge: 60 * 5,
+        version: async (_session, cachedUser) => {
+          const row = await db
+            .prepare(
+              `SELECT username, usernameChangedAt
+               FROM "user" WHERE id = ?`
+            )
+            .bind(cachedUser.id)
+            .first<{
+              username: string | null;
+              usernameChangedAt: string | null;
+            }>();
+          return `${row?.username ?? ""}:${row?.usernameChangedAt ?? ""}`;
+        },
       },
     },
     user: {
       additionalFields: {
+        username: {
+          type: "string",
+          required: false,
+          input: false,
+          returned: true,
+        },
         contactEmail: {
           type: "string",
           required: false,
@@ -299,6 +345,12 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
           defaultValue: false,
           required: false,
           input: false,
+        },
+        onboardingUsernameCandidate: {
+          type: "string",
+          required: false,
+          input: true,
+          returned: false,
         },
         karma: {
           type: "number",
@@ -372,11 +424,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       },
     },
     plugins: [
-      username({
-        minUsernameLength: 3,
-        maxUsernameLength: 24,
-        usernameValidator: (value) => /^[a-zA-Z0-9_]+$/.test(value),
-      }),
       genericOAuth({ config: zaloOAuthConfig(env) }),
       ...(process.env.E2E_BOT_BYPASS === "1" ? [e2eSessionPlugin()] : []),
     ],
@@ -395,17 +442,11 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
             );
             const assignedUsername =
               currentUsername ?? (await createTemporaryUsername(db));
-            const displayUsername =
-              userFieldString(
-                user as Record<string, unknown>,
-                "displayUsername"
-              ) ?? assignedUsername;
 
             return {
               data: {
                 ...user,
                 username: assignedUsername,
-                displayUsername,
                 image:
                   user.image ?? encodeGeneratedAvatar(createAvatarSeed()),
               },

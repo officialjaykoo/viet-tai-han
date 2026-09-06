@@ -6,6 +6,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { listOwnedBusinesses } from "@/lib/businesses";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ function verificationKey(status: string) {
 export default async function MyBusinessesPage() {
   const session = await getSession();
   if (!session) redirect(`/login?next=${encodeURIComponent("/businesses/mine")}`);
+  await redirectIfIncompleteOnboarding(session.user.id);
   const { locale } = await getRequestLocale();
   const businesses = await listOwnedBusinesses(session.user.id);
 

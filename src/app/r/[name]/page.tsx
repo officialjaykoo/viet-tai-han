@@ -13,6 +13,7 @@ import { getFeedPosts, type FeedSort } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function SubredditPage({
   if (!sub || sub.is_removed) notFound();
 
   const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const joined = session?.user
     ? await isSubscribed(session.user.id, sub.id)

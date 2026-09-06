@@ -8,6 +8,7 @@ import {
   listOutgoingFriendRequests,
 } from "@/lib/friends";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function FriendsPage() {
   if (!session?.user) {
     redirect("/login?next=/friends");
   }
+  await redirectIfIncompleteOnboarding(session.user.id);
 
   const [friends, incoming, outgoing] = await Promise.all([
     listFriends(session.user.id),

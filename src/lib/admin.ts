@@ -116,7 +116,6 @@ export async function deleteAccount(input: {
        SET status = 'banned',
            name = 'deleted',
            username = NULL,
-           displayUsername = NULL,
            bio = NULL,
            email = 'deleted_' || id || '@red.invalid',
            updatedAt = datetime('now')

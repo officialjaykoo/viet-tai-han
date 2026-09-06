@@ -13,11 +13,11 @@ import {
 async function insertUser(userId: string, username: string) {
   await env.DB.prepare(
     `INSERT INTO "user" (
-       id, name, email, emailVerified, username, displayUsername,
+       id, name, email, emailVerified, username,
        role, status, preferredLanguage
-     ) VALUES (?, 'Temporary user', ?, 0, ?, ?, 'user', 'active', 'unknown')`
+     ) VALUES (?, 'Temporary user', ?, 0, ?, 'user', 'active', 'unknown')`
   )
-    .bind(userId, `${userId}@oauth.test`, username, username)
+    .bind(userId, `${userId}@oauth.test`, username)
     .run();
 }
 
@@ -48,21 +48,18 @@ describe("social-first onboarding", () => {
     expect(state.username).toMatch(/^new_[a-f0-9]{8}$/);
 
     const persisted = await env.DB.prepare(
-      `SELECT name, username, displayUsername, preferredLanguage,
-              onboardingComplete
+      `SELECT name, username, preferredLanguage, onboardingComplete
        FROM "user" WHERE id = ?`
     )
       .bind(userId)
       .first<{
         name: string;
         username: string;
-        displayUsername: string;
         preferredLanguage: string;
         onboardingComplete: number;
       }>();
     expect(persisted).toMatchObject({
       name: "Nguyễn User",
-      displayUsername: persisted?.username,
       preferredLanguage: "ko",
       onboardingComplete: 1,
     });
@@ -105,6 +102,15 @@ describe("social-first onboarding", () => {
         name: "Second User",
         username: "valid_name",
         preferredLanguage: "de",
+      })
+    ).rejects.toMatchObject({ status: 400 });
+
+    await expect(
+      completeOnboarding({
+        userId: secondId,
+        name: "   ",
+        username: "valid_name",
+        preferredLanguage: "vi",
       })
     ).rejects.toMatchObject({ status: 400 });
   });

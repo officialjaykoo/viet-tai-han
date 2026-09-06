@@ -3,13 +3,13 @@ export type ProfileLinkUser = {
   username?: string | null;
 };
 
-/** Build a profile link that still works before a social user picks a username. */
+/** Build a public profile link without exposing the internal user id. */
 export function getProfileHref(
   user: ProfileLinkUser | null | undefined,
   signedOutHref = "/login"
 ): string {
   const username = user?.username?.trim();
   if (username) return `/u/${encodeURIComponent(username)}`;
-  if (user?.id) return `/u/${encodeURIComponent(user.id)}`;
+  if (user?.id) return "/onboarding";
   return signedOutHref;
 }

@@ -4,11 +4,15 @@ import { CreateCommunityForm } from "@/components/communities/create-community-f
 import { SiteHeader } from "@/components/layout/site-header";
 import { listSubreddits } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import { tLocale } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
 export default async function CommunitiesPage() {
+  const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const communities = await listSubreddits(100);
   const { locale } = await getRequestLocale();
 

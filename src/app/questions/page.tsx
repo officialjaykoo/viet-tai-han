@@ -6,11 +6,13 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { listQuestions } from "@/lib/qna";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function QuestionsPage() {
   const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const questions = await listQuestions({
     limit: 50,

@@ -1,3 +1,8 @@
+import {
+  createUsernameCandidate,
+  normalizeDisplayName,
+} from "@/lib/username";
+
 export const SYNTHETIC_OAUTH_EMAIL_DOMAIN =
   "oauth.viet-tai-han.invalid";
 
@@ -39,12 +44,35 @@ export function isSyntheticOAuthEmail(value: unknown): boolean {
   );
 }
 
-/** Remove Better Auth's compatibility email before returning user data publicly. */
-export function stripOAuthCompatibilityEmail<T extends Record<string, unknown>>(
+/** Remove Better Auth compatibility fields before returning user data publicly. */
+export function stripOAuthCompatibilityFields<T extends Record<string, unknown>>(
   user: T
-): Omit<T, "email"> {
-  const { email: _email, ...safeUser } = user;
+): Omit<T, "email" | "onboardingUsernameCandidate" | "usernameChangedAt"> {
+  const {
+    email: _email,
+    onboardingUsernameCandidate: _candidate,
+    usernameChangedAt: _usernameChangedAt,
+    ...safeUser
+  } = user;
   return safeUser;
+}
+
+export function mapOAuthProfile(input: {
+  providerId: string;
+  accountId: string;
+  name?: unknown;
+  providerUsername?: unknown;
+}): {
+  name: string;
+  onboardingUsernameCandidate: string;
+} {
+  return {
+    name: normalizeDisplayName(input.name),
+    onboardingUsernameCandidate: createUsernameCandidate({
+      providerUsername: input.providerUsername,
+      displayName: input.name,
+    }),
+  };
 }
 
 export function mapOAuthEmail(input: {

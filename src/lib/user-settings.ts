@@ -9,6 +9,8 @@ export type AllowDms = "anyone" | "followers" | "nobody";
 export type UserSettings = {
   id: string;
   username: string | null;
+  onboardingUsernameCandidate: string | null;
+  usernameChangedAt: string | null;
   name: string;
   contactEmail: string | null;
   contactEmailVerified: boolean;
@@ -41,16 +43,19 @@ export async function getUserSettings(
   const db = await getDb();
   const row = await db
     .prepare(
-      `SELECT id, username, name, contactEmail, contactEmailVerified,
-              onboardingComplete, image, bio, bannerKey, preferredLanguage,
-              theme, isNsfw, showNsfw, allowDms, notifyComments, notifyFollows,
-              notifyChat, notifyMentions
+      `SELECT id, username, onboardingUsernameCandidate, usernameChangedAt,
+              name, contactEmail, contactEmailVerified, onboardingComplete,
+              image, bio, bannerKey, preferredLanguage, theme, isNsfw,
+              showNsfw, allowDms, notifyComments, notifyFollows, notifyChat,
+              notifyMentions
        FROM "user" WHERE id = ?`
     )
     .bind(userId)
     .first<{
       id: string;
       username: string | null;
+      onboardingUsernameCandidate: string | null;
+      usernameChangedAt: string | null;
       name: string;
       contactEmail: string | null;
       contactEmailVerified: number;
@@ -74,6 +79,8 @@ export async function getUserSettings(
   return {
     id: row.id,
     username: row.username,
+    onboardingUsernameCandidate: row.onboardingUsernameCandidate,
+    usernameChangedAt: row.usernameChangedAt,
     name: row.name,
     contactEmail: row.contactEmail,
     contactEmailVerified: Boolean(row.contactEmailVerified),

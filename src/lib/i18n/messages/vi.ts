@@ -455,6 +455,10 @@ export const vi: Messages = {
     pushEnabled: "Đã bật thông báo đẩy trên thiết bị này.",
     pushDisabled: "Đã tắt thông báo đẩy trên thiết bị này.",
     pushUnavailable: "Máy chủ chưa cấu hình thông báo đẩy.",
+    pushInvalidConfiguration:
+      "Cấu hình thông báo đẩy trên máy chủ không hợp lệ.",
+    pushRuntimeUnavailable:
+      "Không thể đọc cấu hình thông báo đẩy trong môi trường máy chủ hiện tại.",
     pushUnsupported: "Trình duyệt cần HTTPS và hỗ trợ thông báo đẩy.",
     pushPermissionDenied: "Chưa được cấp quyền thông báo trong trình duyệt.",
     pushFailed: "Không thể cập nhật thông báo đẩy.",
@@ -542,7 +546,7 @@ export const vi: Messages = {
     sectionNotifications: "Thông báo",
     customizeProfile: "Tùy chỉnh hồ sơ",
     customizeProfileDesc:
-      "Ảnh đại diện, tên hiển thị và giới thiệu. Tên người dùng không thể thay đổi.",
+      "Ảnh đại diện, tên hiển thị, giới thiệu và tên người dùng công khai.",
     banner: "Ảnh bìa",
     remove: "Xóa",
     uploadAvatar: "Tải ảnh đại diện",
@@ -550,11 +554,17 @@ export const vi: Messages = {
     changeAvatar: "Đổi ảnh đại diện",
     takePhoto: "Chụp ảnh",
     chooseFromGallery: "Chọn từ thư viện",
-    defaultAvatar: "Dùng ảnh đại diện mặc định",
+    defaultAvatar: "Dùng ảnh mặc định",
     avatarHelp:
-      "Dùng máy ảnh, chọn ảnh từ thư viện hoặc trở lại ảnh đại diện mặc định.",
+      "Dùng máy ảnh, chọn ảnh từ thư viện hoặc quay lại ảnh đại diện mặc định.",
     username: "Tên người dùng",
-    usernamePermanent: "Tên người dùng không thể thay đổi trên Việt tại Hàn.",
+    usernameChangeHint:
+      "Tên người dùng công khai có thể đổi một lần mỗi 90 ngày.",
+    usernameChangeCooldown:
+      "Bạn có thể đổi tên người dùng lần nữa sau {date}.",
+    saveUsername: "Lưu tên người dùng",
+    usernameSaved: "Đã cập nhật tên người dùng",
+    usernameSaveFailed: "Không thể lưu tên người dùng",
     displayName: "Tên hiển thị",
     bio: "Giới thiệu",
     bioPlaceholder: "Giới thiệu về bạn",

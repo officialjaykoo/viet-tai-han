@@ -10,7 +10,7 @@ import { readApiJson } from "@/lib/security/guard";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ allowIncomplete: true });
     const state = await getOnboardingState(session.user.id);
     if (!state) return await jsonLocalizedError("Not found", 404);
     return NextResponse.json({ state });
@@ -23,7 +23,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ allowIncomplete: true });
     const body = (await readApiJson(request).catch(() => null)) as {
       name?: string;
       username?: string;

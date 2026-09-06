@@ -1,5 +1,7 @@
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import { tLocale } from "@/lib/i18n/translate";
 import { CreatePostForm } from "@/components/posts/create-post-form";
 
@@ -11,6 +13,8 @@ export default async function SubmitInSubredditPage({
   params: Promise<{ name: string }>;
 }) {
   const { name } = await params;
+  const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
 
   return (

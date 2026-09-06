@@ -455,6 +455,10 @@ export const ru: Messages = {
     pushEnabled: "Push-уведомления включены на этом устройстве.",
     pushDisabled: "Push-уведомления отключены на этом устройстве.",
     pushUnavailable: "Push-уведомления не настроены на сервере.",
+    pushInvalidConfiguration:
+      "Конфигурация push-уведомлений на сервере недействительна.",
+    pushRuntimeUnavailable:
+      "В текущей серверной среде push-уведомления недоступны.",
     pushUnsupported: "Браузеру нужны HTTPS и поддержка push-уведомлений.",
     pushPermissionDenied: "Разрешение на уведомления в браузере не выдано.",
     pushFailed: "Не удалось изменить push-уведомления.",
@@ -543,19 +547,25 @@ export const ru: Messages = {
     sectionNotifications: "Уведомления",
     customizeProfile: "Настроить профиль",
     customizeProfileDesc:
-      "Аватар, отображаемое имя и описание. Имя пользователя изменить нельзя.",
+      "Аватар, отображаемое имя, описание и публичное имя пользователя.",
     banner: "Баннер",
     remove: "Убрать",
     uploadAvatar: "Загрузить аватар",
     shuffleAvatar: "Случайный аватар",
-    changeAvatar: "Изменить аватар",
+    changeAvatar: "Изменить фото профиля",
     takePhoto: "Сделать фото",
     chooseFromGallery: "Выбрать из галереи",
     defaultAvatar: "Использовать аватар по умолчанию",
     avatarHelp:
-      "Сделайте фото, выберите его из галереи или верните аватар по умолчанию.",
+      "Используйте камеру, выберите фото из галереи или верните аватар по умолчанию.",
     username: "Имя пользователя",
-    usernamePermanent: "Имена пользователей в Việt tại Hàn постоянны.",
+    usernameChangeHint:
+      "Публичное имя пользователя можно менять раз в 90 дней.",
+    usernameChangeCooldown:
+      "Снова изменить имя пользователя можно после {date}.",
+    saveUsername: "Сохранить имя пользователя",
+    usernameSaved: "Имя пользователя обновлено",
+    usernameSaveFailed: "Не удалось сохранить имя пользователя",
     displayName: "Отображаемое имя",
     bio: "О себе",
     bioPlaceholder: "Расскажите о себе",

@@ -47,9 +47,9 @@ export function MobileNav() {
 
   const items = [
     { href: "/", label: t("nav.home"), icon: HomeIcon },
+    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
-    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
     { href: "/businesses", label: t("nav.businesses"), icon: StoreIcon },
     { href: "/notifications", label: t("nav.notifications"), icon: BellIcon },
     { href: profileHref, label: t("nav.profile"), icon: UserRoundIcon },

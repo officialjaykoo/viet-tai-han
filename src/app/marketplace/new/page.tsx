@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function NewMarketplaceListingPage() {
   if (!session) {
     redirect(`/login?next=${encodeURIComponent("/marketplace/new")}`);
   }
+  await redirectIfIncompleteOnboarding(session.user.id);
   const { locale } = await getRequestLocale();
 
   return (

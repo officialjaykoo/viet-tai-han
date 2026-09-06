@@ -51,6 +51,26 @@ test.describe("cross-platform smoke", () => {
     }));
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
   });
+  test("service worker endpoint registers in the browser", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await dismissLanguagePrompt(page);
+    const response = await page.request.get("/sw.js");
+    expect(response.ok()).toBe(true);
+    expect(await response.text()).toContain("showNotification");
+
+    const scope = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return null;
+      const registration = await navigator.serviceWorker.register("/sw.js", {
+        scope: "/",
+      });
+      await registration.update();
+      const registeredScope = registration.scope;
+      await registration.unregister();
+      return registeredScope;
+    });
+    expect(scope ? new URL(scope).pathname : null).toBe("/");
+  });
+
 
   test("communities directory is reachable", async ({ page }) => {
     await page.goto("/communities", { waitUntil: "domcontentloaded" });

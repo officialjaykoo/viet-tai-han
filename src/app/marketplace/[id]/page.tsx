@@ -16,6 +16,7 @@ import {
   type ListingStatus,
 } from "@/lib/marketplace";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function MarketplaceListingPage({
 }) {
   const { id } = await params;
   const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const listing = await getListingDetail(id, session?.user?.id ?? null);
   if (!listing) notFound();

@@ -261,7 +261,7 @@ export async function getFeedPosts(options: {
          p.translation_status,
          u.id AS author_id,
          u.username AS author_username,
-         COALESCE(u.displayUsername, u.name) AS author_display_name,
+         u.name AS author_display_name,
          u.image AS author_image,
          u.role AS author_role,
          u.isNsfw AS author_is_nsfw,

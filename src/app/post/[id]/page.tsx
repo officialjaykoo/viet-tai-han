@@ -15,6 +15,7 @@ import { getPostDetail } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import { parseDiscoverySource } from "@/lib/vote-weight";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function PostPage({
   const { id } = await params;
   const { src } = await searchParams;
   const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const post = await getPostDetail(id, session?.user?.id ?? null);
   if (!post) notFound();

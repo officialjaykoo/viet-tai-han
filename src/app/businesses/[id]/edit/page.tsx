@@ -7,6 +7,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getBusinessDetail } from "@/lib/businesses";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function EditBusinessPage({
   if (!session) {
     redirect(`/login?next=${encodeURIComponent(`/businesses/${id}/edit`)}`);
   }
+  await redirectIfIncompleteOnboarding(session.user.id);
   const business = await getBusinessDetail(id, session.user.id);
   if (!business || !business.owner.isOwner) notFound();
   const { locale } = await getRequestLocale();

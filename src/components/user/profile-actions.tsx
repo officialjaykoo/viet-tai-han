@@ -42,6 +42,8 @@ type ProfileActionsProps = {
   initiallyFriendStatus: FriendStatus;
   initiallyFriendRequestId: string | null;
   showMessage?: boolean;
+  compact?: boolean;
+  showBlock?: boolean;
 };
 
 export function ProfileActions({
@@ -51,6 +53,8 @@ export function ProfileActions({
   initiallyFriendStatus,
   initiallyFriendRequestId,
   showMessage = true,
+  compact = false,
+  showBlock = true,
 }: ProfileActionsProps) {
   const router = useRouter();
   const { t } = useI18n();
@@ -63,6 +67,9 @@ export function ProfileActions({
   );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const buttonClass = compact
+    ? "min-h-8 gap-1 px-2 text-xs"
+    : "min-h-11 gap-1.5 sm:min-h-8";
 
   function run(action: Action) {
     setError(null);
@@ -131,7 +138,7 @@ export function ProfileActions({
           href={`/messages?to=${encodeURIComponent(username)}`}
           className={cn(
             buttonVariants({ variant: "secondary", size: "sm" }),
-            "min-h-11 gap-1.5 sm:min-h-8"
+            buttonClass
           )}
         >
           <MessageSquareIcon className="size-4" aria-hidden />
@@ -145,7 +152,7 @@ export function ProfileActions({
               <Button
                 type="button"
                 size="sm"
-                className="min-h-11 gap-1.5 sm:min-h-8"
+                className={buttonClass}
                 disabled={pending || !friendRequestId}
                 onClick={() => run("friend_accept")}
               >
@@ -156,7 +163,7 @@ export function ProfileActions({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="min-h-11 sm:min-h-8"
+                className={buttonClass}
                 disabled={pending || !friendRequestId}
                 onClick={() => run("friend_decline")}
               >
@@ -167,10 +174,8 @@ export function ProfileActions({
             <Button
               type="button"
               size="sm"
-              variant={
-                friendStatus === "none" ? "default" : "secondary"
-              }
-              className="min-h-11 gap-1.5 sm:min-h-8"
+              variant={friendStatus === "none" ? "default" : "secondary"}
+              className={buttonClass}
               disabled={pending}
               onClick={() =>
                 run(
@@ -210,25 +215,28 @@ export function ProfileActions({
           type="button"
           size="sm"
           variant={following ? "outline" : "default"}
-          className="min-h-11 gap-1.5 sm:min-h-8"
+          className={buttonClass}
           disabled={pending}
           onClick={() => run(following ? "unfollow" : "follow")}
+          title={following ? t("profile.unfollow") : t("profile.follow")}
         >
           <RssIcon className="size-4" aria-hidden />
           {following ? t("profile.unfollow") : t("profile.follow")}
         </Button>
       ) : null}
-      <Button
-        type="button"
-        size="sm"
-        variant={blocked ? "secondary" : "outline"}
-        className="min-h-11 gap-1.5 sm:min-h-8"
-        disabled={pending}
-        onClick={() => run(blocked ? "unblock" : "block")}
-      >
-        {blocked ? null : <UserRoundXIcon className="size-4" aria-hidden />}
-        {blocked ? t("settings.unblock") : t("profile.block")}
-      </Button>
+      {showBlock ? (
+        <Button
+          type="button"
+          size="sm"
+          variant={blocked ? "secondary" : "outline"}
+          className={buttonClass}
+          disabled={pending}
+          onClick={() => run(blocked ? "unblock" : "block")}
+        >
+          {blocked ? null : <UserRoundXIcon className="size-4" aria-hidden />}
+          {blocked ? t("settings.unblock") : t("profile.block")}
+        </Button>
+      ) : null}
       {error ? (
         <p className="w-full text-xs text-destructive" role="alert">
           {error}

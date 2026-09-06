@@ -96,6 +96,11 @@ export default async function HomePage({
     { href: "/", label: tLocale(locale, "nav.popular"), icon: FlameIcon },
     { href: "/?feed=home", label: tLocale(locale, "nav.home"), icon: HomeIcon },
     {
+      href: "/communities",
+      label: tLocale(locale, "nav.communities"),
+      icon: UsersRoundIcon,
+    },
+    {
       href: "/questions",
       label: tLocale(locale, "nav.questions"),
       icon: CircleHelpIcon,
@@ -104,11 +109,6 @@ export default async function HomePage({
       href: "/marketplace",
       label: tLocale(locale, "nav.marketplace"),
       icon: ShoppingBagIcon,
-    },
-    {
-      href: "/communities",
-      label: tLocale(locale, "nav.communities"),
-      icon: UsersRoundIcon,
     },
     {
       href: "/businesses",
@@ -186,10 +186,10 @@ export default async function HomePage({
                 </span>
               </Link>
               <div className="mb-2 h-px bg-border/70" />
-              {desktopLinks.map(({ href, label, icon: Icon }, index) => {
+              {desktopLinks.map(({ href, label, icon: Icon }) => {
                 const active =
-                  (index === 0 && mode === "popular") ||
-                  (index === 1 && mode === "home");
+                  (href === "/" && mode === "popular") ||
+                  (href === "/?feed=home" && mode === "home");
                 return (
                   <Link
                     key={href}

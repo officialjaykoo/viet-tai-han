@@ -21,15 +21,25 @@ export async function getSession() {
   });
   if (!session) return null;
 
-  const { email: _email, ...user } = session.user;
+  const {
+    email: _email,
+    onboardingUsernameCandidate: _candidate,
+    usernameChangedAt: _usernameChangedAt,
+    ...user
+  } = session.user as typeof session.user & {
+    onboardingUsernameCandidate?: string | null;
+    usernameChangedAt?: string | null;
+  };
   return { ...session, user };
 }
 
 /**
  * Require a signed-in, non-banned user for mutating actions.
  * Shadowbanned users may still act (their content is hidden from others).
+ * Incomplete accounts are limited to the onboarding flow unless explicitly
+ * allowed by the caller.
  */
-export async function requireSession() {
+export async function requireSession(options: { allowIncomplete?: boolean } = {}) {
   const session = await getSession();
 
   if (!session?.user) {
@@ -39,6 +49,14 @@ export async function requireSession() {
   const status = (session.user as { status?: string }).status ?? "active";
   if (status === "banned") {
     throw new AuthError("This account can't do that", 403);
+  }
+
+  if (!options.allowIncomplete) {
+    const { getOnboardingState } = await import("@/lib/onboarding");
+    const onboarding = await getOnboardingState(session.user.id);
+    if (!onboarding?.onboardingComplete) {
+      throw new AuthError("Complete onboarding before continuing", 409);
+    }
   }
 
   return session;

@@ -71,9 +71,9 @@ export function SiteHeader() {
   const mobileChromeVisible = useScrollVisibility();
   const primaryNav = [
     { href: "/", label: t("nav.popular"), icon: FlameIcon },
+    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
-    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
     { href: "/recommended", label: t("nav.forYou"), icon: SparklesIcon },
   ];
 

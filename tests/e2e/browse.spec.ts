@@ -15,6 +15,52 @@ test.describe("public browsing", () => {
     ).toBeVisible();
     await expect(page.getByRole("tab", { name: /đề xuất/i })).toBeVisible();
   });
+  test("navigation order preserves existing profile shortcuts", async ({
+    page,
+  }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await dismissLanguagePrompt(page);
+
+    await expect
+      .poll(() =>
+        page.locator("header nav a").evaluateAll((links) =>
+          links.map((link) => link.getAttribute("href"))
+        )
+      )
+      .toEqual(["/", "/communities", "/questions", "/marketplace", "/recommended"]);
+
+    const sideHrefs = await page.locator("aside nav a").evaluateAll((links) =>
+      links.map((link) => link.getAttribute("href"))
+    );
+    expect(sideHrefs.slice(1, 9)).toEqual([
+      "/",
+      "/?feed=home",
+      "/communities",
+      "/questions",
+      "/marketplace",
+      "/businesses",
+      "/recommended",
+      "/submit",
+    ]);
+    expect(sideHrefs[0]).toBe(sideHrefs.at(-1));
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await dismissLanguagePrompt(page);
+    const mobileHrefs = await page
+      .locator("nav.safe-pb-nav a")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+    expect(mobileHrefs.slice(0, 6)).toEqual([
+      "/",
+      "/communities",
+      "/questions",
+      "/marketplace",
+      "/businesses",
+      "/notifications",
+    ]);
+    expect(mobileHrefs[6]).toMatch(/^\/(?:login|u\/)/);
+  });
+
 
   test("community page loads from directory", async ({ page }) => {
     await page.goto("/r/cloudflare", { waitUntil: "domcontentloaded" });

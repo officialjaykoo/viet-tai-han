@@ -5,10 +5,14 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { listSubreddits } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
+import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function AskQuestionPage() {
+  const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const communities = (await listSubreddits(100))
     .filter((community) => !/^u_/i.test(community.name))

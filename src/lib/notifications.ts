@@ -137,7 +137,7 @@ export async function listNotifications(
       `SELECT
          n.id, n.kind, n.title, n.body, n.href, n.is_read, n.created_at,
          u.username AS actor_username,
-         COALESCE(u.displayUsername, u.name) AS actor_display_name,
+         u.name AS actor_display_name,
          u.image AS actor_image
        FROM notifications n
        LEFT JOIN "user" u ON u.id = n.actor_id

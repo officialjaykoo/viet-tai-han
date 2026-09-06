@@ -258,7 +258,7 @@ export async function getPostDetail(
              p.source_lang, p.title_translated, p.body_translated, p.translation_status,
              p.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
-             COALESCE(u.displayUsername, u.name) AS author_display_name,
+             u.name AS author_display_name,
              u.image AS author_image,
              ${AUTHOR_TAG_SELECT},
              s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
@@ -282,7 +282,7 @@ export async function getPostDetail(
              p.source_lang, p.title_translated, p.body_translated, p.translation_status,
              p.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
-             COALESCE(u.displayUsername, u.name) AS author_display_name,
+             u.name AS author_display_name,
              u.image AS author_image,
              ${AUTHOR_TAG_SELECT},
              s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
@@ -308,7 +308,7 @@ export async function getPostDetail(
              c.source_lang, c.body_translated, c.translation_status,
              c.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
-             COALESCE(u.displayUsername, u.name) AS author_display_name,
+             u.name AS author_display_name,
              u.image AS author_image,
              ${COMMENT_AUTHOR_TAG_SELECT},
              v.value AS viewer_vote,
@@ -331,7 +331,7 @@ export async function getPostDetail(
              c.source_lang, c.body_translated, c.translation_status,
              c.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
-             COALESCE(u.displayUsername, u.name) AS author_display_name,
+             u.name AS author_display_name,
              u.image AS author_image,
              ${COMMENT_AUTHOR_TAG_SELECT},
              NULL AS viewer_vote,
@@ -440,46 +440,39 @@ export async function getPostDetail(
   };
 }
 
-export async function getPublicProfile(
-  identifier: string
-): Promise<PublicProfile | null> {
-  const db = await getDb();
-  const row = await db
-    .prepare(
-      `SELECT id, username, name, image, bio, bannerKey, karma, postKarma, commentKarma,
-              createdAt, status, role, isNsfw,
-              EXISTS (
-                SELECT 1 FROM user_achievements ua
-                INNER JOIN achievements a ON a.id = ua.achievement_id
-                WHERE ua.user_id = "user".id AND a.slug = 'veteran'
-              ) AS has_veteran,
-              EXISTS (
-                SELECT 1 FROM subreddit_moderators WHERE user_id = "user".id
-              ) AS is_community_mod
-       FROM "user"
-       WHERE username = ? COLLATE NOCASE OR id = ?`
-    )
-    .bind(identifier, identifier)
-    .first<{
-      id: string;
-      username: string | null;
-      name: string;
-      image: string | null;
-      bio: string | null;
-      bannerKey: string | null;
-      karma: number;
-      postKarma: number;
-      commentKarma: number;
-      createdAt: string;
-      status: string;
-      role: string;
-      isNsfw: number;
-      has_veteran: number;
-      is_community_mod: number;
-    }>();
+type PublicProfileRow = {
+  id: string;
+  username: string | null;
+  name: string;
+  image: string | null;
+  bio: string | null;
+  bannerKey: string | null;
+  karma: number;
+  postKarma: number;
+  commentKarma: number;
+  createdAt: string;
+  status: string;
+  role: string;
+  isNsfw: number;
+  has_veteran: number;
+  is_community_mod: number;
+};
 
-  if (!row) return null;
+const PUBLIC_PROFILE_SELECT = `
+  SELECT u.id, u.username, u.name, u.image, u.bio, u.bannerKey, u.karma,
+         u.postKarma, u.commentKarma, u.createdAt, u.status, u.role, u.isNsfw,
+         EXISTS (
+           SELECT 1 FROM user_achievements ua
+           INNER JOIN achievements a ON a.id = ua.achievement_id
+           WHERE ua.user_id = u.id AND a.slug = 'veteran'
+         ) AS has_veteran,
+         EXISTS (
+           SELECT 1 FROM subreddit_moderators
+           WHERE user_id = u.id
+         ) AS is_community_mod
+`;
 
+function mapPublicProfile(row: PublicProfileRow): PublicProfile {
   return {
     id: row.id,
     username: row.username,
@@ -509,6 +502,53 @@ export async function getPublicProfile(
   };
 }
 
+export type PublicProfileLookup = {
+  profile: PublicProfile;
+  redirectUsername: string | null;
+};
+
+export async function resolvePublicProfile(
+  username: string
+): Promise<PublicProfileLookup | null> {
+  const db = await getDb();
+  const current = await db
+    .prepare(
+      `${PUBLIC_PROFILE_SELECT}
+       FROM "user" u
+       WHERE u.username = ? COLLATE NOCASE`
+    )
+    .bind(username)
+    .first<PublicProfileRow>();
+  if (current) {
+    return { profile: mapPublicProfile(current), redirectUsername: null };
+  }
+
+  const historical = await db
+    .prepare(
+      `${PUBLIC_PROFILE_SELECT}, h.username AS historicalUsername
+       FROM username_history h
+       INNER JOIN "user" u ON u.id = h.userId
+       WHERE h.username = ? COLLATE NOCASE
+         AND u.username IS NOT NULL
+       ORDER BY h.changedAt DESC
+       LIMIT 1`
+    )
+    .bind(username)
+    .first<PublicProfileRow & { historicalUsername: string }>();
+  if (!historical) return null;
+
+  return {
+    profile: mapPublicProfile(historical),
+    redirectUsername: historical.username,
+  };
+}
+
+export async function getPublicProfile(
+  identifier: string
+): Promise<PublicProfile | null> {
+  return (await resolvePublicProfile(identifier))?.profile ?? null;
+}
+
 export async function getRecommendations(userId: string, limit = 10) {
   const db = await getDb();
 
@@ -525,7 +565,7 @@ export async function getRecommendations(userId: string, limit = 10) {
            p.source_lang, p.title_translated, p.body_translated, p.translation_status,
            p.translation_target_lang,
            u.id AS author_id, u.username AS author_username,
-           COALESCE(u.displayUsername, u.name) AS author_display_name,
+           u.name AS author_display_name,
            u.image AS author_image,
            ${AUTHOR_TAG_SELECT},
            s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
@@ -572,7 +612,7 @@ export async function getRecommendations(userId: string, limit = 10) {
          p.source_lang, p.title_translated, p.body_translated, p.translation_status,
          p.translation_target_lang,
          u.id AS author_id, u.username AS author_username,
-         COALESCE(u.displayUsername, u.name) AS author_display_name,
+         u.name AS author_display_name,
          u.image AS author_image,
          ${AUTHOR_TAG_SELECT},
          s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
@@ -608,7 +648,7 @@ export async function getRecommendations(userId: string, limit = 10) {
          p.source_lang, p.title_translated, p.body_translated, p.translation_status,
          p.translation_target_lang,
          u.id AS author_id, u.username AS author_username,
-         COALESCE(u.displayUsername, u.name) AS author_display_name,
+         u.name AS author_display_name,
          u.image AS author_image,
          ${AUTHOR_TAG_SELECT},
          s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,

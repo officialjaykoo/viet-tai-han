@@ -5,8 +5,8 @@ import { createAuth } from "@/lib/auth";
 import {
   createSyntheticOAuthEmail,
   mapOAuthEmail,
+  mapOAuthProfile,
 } from "@/lib/oauth-identity";
-
 async function startOAuth(
   auth: ReturnType<typeof createAuth>,
   path: string,
@@ -73,13 +73,12 @@ describe("identity providers", () => {
     });
 
     const row = await env.DB.prepare(
-      `SELECT username, displayUsername FROM "user" WHERE id = ?`
+      `SELECT username FROM "user" WHERE id = ?`
     )
       .bind(userId)
-      .first<{ username: string; displayUsername: string }>();
+      .first<{ username: string }>();
 
     expect(row?.username).toMatch(/^vth_user_[a-f0-9]{12}$/);
-    expect(row?.displayUsername).toBe(row?.username);
   });
   it("persists a real Facebook email and sends new users to onboarding", async () => {
     const auth = createAuth(env.DB, {
@@ -105,7 +104,12 @@ describe("identity providers", () => {
     provider!.getUserInfo = async () => ({
       user: {
         id: accountId,
-        name: "Facebook User",
+        ...mapOAuthProfile({
+          providerId: "facebook",
+          accountId,
+          name: "Facebook User",
+          providerUsername: "facebook_handle",
+        }),
         ...mappedEmail,
       },
       data: {},
@@ -128,12 +132,9 @@ describe("identity providers", () => {
         { headers: { cookie: stateCookie(start) } }
       )
     );
-
-    expect(callback.status).toBe(302);
-    expect(redirectPath(callback)).toBe("/onboarding");
-
     const row = await env.DB.prepare(
-      `SELECT u.email, u.contactEmail, u.onboardingComplete
+      `SELECT u.email, u.contactEmail, u.onboardingComplete,
+              u.onboardingUsernameCandidate
        FROM "user" u
        JOIN account a ON a.userId = u.id
        WHERE a.providerId = 'facebook' AND a.accountId = ?`
@@ -143,6 +144,7 @@ describe("identity providers", () => {
         email: string;
         contactEmail: string | null;
         onboardingComplete: number;
+        onboardingUsernameCandidate: string | null;
       }>();
 
     expect(row).toMatchObject({
@@ -150,6 +152,70 @@ describe("identity providers", () => {
       contactEmail: "person@example.com",
       onboardingComplete: 0,
     });
+    expect(row?.onboardingUsernameCandidate).toBe("facebook_handle");
+  });
+
+  it("allows duplicate onboarding candidates across OAuth callbacks", async () => {
+    const auth = createAuth(env.DB, {
+      FACEBOOK_CLIENT_ID: "facebook-client",
+      FACEBOOK_CLIENT_SECRET: "facebook-secret",
+    });
+    const context = await auth.$context;
+    const provider = context.socialProviders.find(
+      (candidate) => candidate.id === "facebook"
+    );
+    expect(provider).toBeDefined();
+
+    let accountId = `facebook_${crypto.randomUUID()}`;
+    provider!.validateAuthorizationCode = async () => ({
+      accessToken: "facebook-token",
+    });
+    provider!.getUserInfo = async () => ({
+      user: {
+        id: accountId,
+        ...mapOAuthProfile({
+          providerId: "facebook",
+          accountId,
+          name: "Same OAuth Name",
+          providerUsername: "same_oauth_candidate",
+        }),
+        ...mapOAuthEmail({
+          providerId: "facebook",
+          accountId,
+          email: null,
+        }),
+      },
+      data: {},
+    });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      accountId = `facebook_${crypto.randomUUID()}`;
+      const start = await startOAuth(auth, "sign-in/social", {
+        provider: "facebook",
+        callbackURL: "/",
+        newUserCallbackURL: "/onboarding",
+        errorCallbackURL: "/login",
+      });
+      const authorizationURL = new URL(
+        ((await start.json()) as { url: string }).url
+      );
+      const callback = await auth.handler(
+        new Request(
+          `http://localhost:3000/api/auth/callback/facebook?code=test&state=${authorizationURL.searchParams.get(
+            "state"
+          )}`,
+          { headers: { cookie: stateCookie(start) } }
+        )
+      );
+      expect(callback.status).toBe(302);
+      expect(redirectPath(callback)).toBe("/onboarding");
+    }
+
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM "user"
+       WHERE onboardingUsernameCandidate = 'same_oauth_candidate'`
+    ).first<{ count: number }>();
+    expect(count?.count).toBe(2);
   });
   it("creates and reuses a Kakao identity without an email", async () => {
     const auth = createAuth(env.DB, {
@@ -276,7 +342,7 @@ describe("identity providers", () => {
           return Response.json({ access_token: "zalo-token" });
         }
         if (url.startsWith("https://graph.zalo.me/v2.0/me")) {
-          return Response.json({ id: accountId, name: "Zalo User" });
+          return Response.json({ id: accountId });
         }
         return originalFetch(input, init);
       });
@@ -305,14 +371,27 @@ describe("identity providers", () => {
 
       const email = createSyntheticOAuthEmail("zalo", accountId);
       const row = await env.DB.prepare(
-        `SELECT u.email, u.contactEmail
+        `SELECT u.email, u.contactEmail, u.name,
+                u.onboardingUsernameCandidate
          FROM "user" u
          JOIN account a ON a.userId = u.id
          WHERE a.providerId = 'zalo' AND a.accountId = ?`
       )
         .bind(accountId)
-        .first<{ email: string; contactEmail: string | null }>();
-      expect(row).toEqual({ email, contactEmail: null });
+        .first<{
+          email: string;
+          contactEmail: string | null;
+          name: string;
+          onboardingUsernameCandidate: string | null;
+        }>();
+      expect(row).toMatchObject({
+        email,
+        contactEmail: null,
+        name: "VTH User",
+      });
+      expect(row?.onboardingUsernameCandidate).toMatch(
+        /^vth_[a-f0-9]{12}$/
+      );
     } finally {
       fetchMock.mockRestore();
     }
@@ -565,6 +644,8 @@ describe("identity providers", () => {
       "request-password-reset",
       "reset-password",
       "verify-password",
+      "update-user",
+      "is-username-available",
     ]) {
       const response = await startOAuth(auth, path, {});
       expect(response.status).toBe(404);

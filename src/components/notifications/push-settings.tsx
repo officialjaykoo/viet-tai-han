@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-client";
+import type { PushConfigState } from "@/lib/push";
 
 function decodeVapidKey(value: string): Uint8Array {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -14,13 +15,29 @@ function decodeVapidKey(value: string): Uint8Array {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+type BrowserPushState = "unknown" | "supported" | "unsupported" | "denied";
+
+function detectBrowserPushState(): BrowserPushState {
+  if (
+    typeof window === "undefined" ||
+    !window.isSecureContext ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !("Notification" in window)
+  ) {
+    return "unsupported";
+  }
+  return Notification.permission === "denied" ? "denied" : "supported";
+}
 
 export function PushSettings({
   available,
+  configuration,
   publicKey,
   initialSubscribed,
 }: {
   available: boolean;
+  configuration: PushConfigState;
   publicKey: string | null;
   initialSubscribed: boolean;
 }) {
@@ -28,21 +45,35 @@ export function PushSettings({
   const [subscribed, setSubscribed] = useState(initialSubscribed);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [browserState, setBrowserState] =
+    useState<BrowserPushState>("unknown");
+
+  useEffect(() => {
+    // Browser-only capability detection must run after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBrowserState(detectBrowserPushState());
+  }, []);
 
   async function enable() {
     setError(null);
-    if (!available || !publicKey) {
-      setError(t("notifications.pushUnavailable"));
+    if (configuration !== "configured" || !available || !publicKey) {
+      setError(
+        configuration === "invalid"
+          ? t("notifications.pushInvalidConfiguration")
+          : configuration === "unavailable"
+            ? t("notifications.pushRuntimeUnavailable")
+            : t("notifications.pushUnavailable")
+      );
       return;
     }
-    if (
-      typeof window === "undefined" ||
-      !window.isSecureContext ||
-      !("serviceWorker" in navigator) ||
-      !("PushManager" in window) ||
-      !("Notification" in window)
-    ) {
+    const currentBrowserState = detectBrowserPushState();
+    setBrowserState(currentBrowserState);
+    if (currentBrowserState === "unsupported") {
       setError(t("notifications.pushUnsupported"));
+      return;
+    }
+    if (currentBrowserState === "denied") {
+      setError(t("notifications.pushPermissionDenied"));
       return;
     }
 
@@ -113,6 +144,24 @@ export function PushSettings({
       setBusy(false);
     }
   }
+  const serverConfigured = configuration === "configured" && available;
+  const browserBlocked =
+    browserState === "unsupported" || browserState === "denied";
+  const serverMessage =
+    configuration === "invalid"
+      ? t("notifications.pushInvalidConfiguration")
+      : configuration === "unavailable"
+        ? t("notifications.pushRuntimeUnavailable")
+        : t("notifications.pushUnavailable");
+  const statusMessage = subscribed
+    ? t("notifications.pushEnabled")
+    : !serverConfigured
+      ? serverMessage
+      : browserState === "unsupported"
+        ? t("notifications.pushUnsupported")
+        : browserState === "denied"
+          ? t("notifications.pushPermissionDenied")
+          : t("notifications.pushDisabled");
 
   return (
     <div className="space-y-3 rounded-2xl border border-border/60 p-4">
@@ -128,7 +177,7 @@ export function PushSettings({
         <Button
           type="button"
           variant={subscribed ? "outline" : "default"}
-          disabled={busy || !available}
+          disabled={busy || (!subscribed && (!serverConfigured || browserBlocked))}
           onClick={subscribed ? disable : enable}
         >
           {busy
@@ -138,11 +187,7 @@ export function PushSettings({
               : t("notifications.pushEnable")}
         </Button>
         <span className="text-sm text-muted-foreground" role="status">
-          {subscribed
-            ? t("notifications.pushEnabled")
-            : available
-              ? t("notifications.pushDisabled")
-              : t("notifications.pushUnavailable")}
+          {statusMessage}
         </span>
       </div>
       {error ? (

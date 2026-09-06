@@ -6,6 +6,8 @@ import { SearchForm } from "@/components/search/search-form";
 import { AccountTags } from "@/components/user/account-tags";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import { tLocale } from "@/lib/i18n/translate";
 import { formatListingPrice } from "@/lib/marketplace";
 import { normalizeSearchQuery, searchAll } from "@/lib/search";
@@ -22,6 +24,8 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const params = await searchParams;
   const query = normalizeSearchQuery(params.q ?? "");
   const results = query ? await searchAll(query) : null;

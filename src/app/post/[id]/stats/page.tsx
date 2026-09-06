@@ -7,6 +7,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function PostStatsPage({
   if (!session?.user) {
     redirect(`/login?next=/post/${id}/stats`);
   }
+  await redirectIfIncompleteOnboarding(session.user.id);
 
   const db = await getDb();
   const post = await db

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AdminPanel } from "@/components/admin/admin-panel";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getAdminOverview } from "@/lib/admin";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
@@ -16,6 +17,7 @@ export default async function AdminPage() {
   if (!session?.user) {
     redirect("/login?next=/admin");
   }
+  await redirectIfIncompleteOnboarding(session.user.id);
 
   try {
     await requireAdmin(session.user as SessionUser);

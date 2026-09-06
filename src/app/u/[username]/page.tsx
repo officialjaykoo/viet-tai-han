@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Suspense, type ReactNode } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PostCard } from "@/components/feed/post-card";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -14,8 +14,8 @@ import {
 } from "@/components/user/profile-tabs";
 import { listUserAchievements, syncUserAchievements } from "@/lib/achievements";
 import {
-  getPublicProfile,
   listUserComments,
+  resolvePublicProfile,
   type ProfileComment,
 } from "@/lib/content";
 import { listFriends } from "@/lib/friends";
@@ -24,6 +24,7 @@ import { parseSqliteDate } from "@/lib/format-time";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import type { FeedPost } from "@/lib/types";
 import { getProfileRelation } from "@/lib/user-actions";
 
@@ -74,10 +75,16 @@ export default async function ProfilePage({
   const { tab: tabParam } = await searchParams;
   const tab = parseTab(tabParam);
 
-  const profile = await getPublicProfile(identifier);
-  if (!profile || profile.status === "banned") notFound();
+  const lookup = await resolvePublicProfile(identifier);
+  if (!lookup || lookup.profile.status === "banned") notFound();
+  if (lookup.redirectUsername) {
+    const query = tabParam ? `?tab=${encodeURIComponent(tabParam)}` : "";
+    redirect(`/u/${encodeURIComponent(lookup.redirectUsername)}${query}`);
+  }
+  const profile = lookup.profile;
 
   const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const isOwner = session?.user?.id === profile.id;
   const relation = await getProfileRelation(session?.user?.id, profile.id);
@@ -108,8 +115,7 @@ export default async function ProfilePage({
     }
   }
 
-  const [display, achievements, postsFeed, comments, friends] = await Promise.all([
-    getPublicProfile(identifier),
+  const [achievements, postsFeed, comments, friends] = await Promise.all([
     listUserAchievements(profile.id),
     getFeedPosts({
       authorId: profile.id,
@@ -121,7 +127,7 @@ export default async function ProfilePage({
     listUserComments(profile.id, 30),
     listFriends(profile.id),
   ]);
-  const user = display ?? profile;
+  const user = profile;
   const posts = postsFeed.posts;
   const overview = buildOverview(posts, comments);
 

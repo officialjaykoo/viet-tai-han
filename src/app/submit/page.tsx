@@ -1,9 +1,13 @@
 import { SiteHeader } from "@/components/layout/site-header";
 import { CreatePostForm } from "@/components/posts/create-post-form";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 import { tLocale } from "@/lib/i18n/translate";
 
 export default async function SubmitPage() {
+  const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
 
   return (

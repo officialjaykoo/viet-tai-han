@@ -4,7 +4,8 @@ import {
   createSyntheticOAuthEmail,
   isSyntheticOAuthEmail,
   mapOAuthEmail,
-  stripOAuthCompatibilityEmail,
+  mapOAuthProfile,
+  stripOAuthCompatibilityFields,
 } from "@/lib/oauth-identity";
 
 describe("social OAuth identity email mapping", () => {
@@ -61,10 +62,12 @@ describe("social OAuth identity email mapping", () => {
     expect(otherProvider).not.toBe(first);
   });
 
-  it("never exposes the synthetic compatibility email publicly", () => {
-    const safeUser = stripOAuthCompatibilityEmail({
+  it("never exposes Better Auth compatibility fields publicly", () => {
+    const safeUser = stripOAuthCompatibilityFields({
       id: "user-1",
       email: createSyntheticOAuthEmail("zalo", "account-1"),
+      onboardingUsernameCandidate: "provider_candidate",
+      usernameChangedAt: "2026-01-01 00:00:00",
       name: "Zalo User",
     });
 
@@ -73,5 +76,33 @@ describe("social OAuth identity email mapping", () => {
       name: "Zalo User",
     });
     expect("email" in safeUser).toBe(false);
+    expect("onboardingUsernameCandidate" in safeUser).toBe(false);
+    expect("usernameChangedAt" in safeUser).toBe(false);
+  });
+
+  it("stores provider profile names as onboarding username candidates", () => {
+    expect(
+      mapOAuthProfile({
+        providerId: "facebook",
+        accountId: "provider-1",
+        name: "Nguyễn User",
+        providerUsername: "Provider_Handle",
+      })
+    ).toEqual({
+      name: "Nguyễn User",
+      onboardingUsernameCandidate: "provider_handle",
+    });
+  });
+
+  it("falls back when a provider omits the profile name", () => {
+    const mapped = mapOAuthProfile({
+      providerId: "zalo",
+      accountId: "provider-2",
+    });
+
+    expect(mapped.name).toBe("VTH User");
+    expect(mapped.onboardingUsernameCandidate).toMatch(
+      /^vth_[a-f0-9]{12}$/
+    );
   });
 });

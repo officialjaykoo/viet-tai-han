@@ -5,7 +5,11 @@ import {
   bytesToBase64Url,
   hmacSha256,
 } from "@/lib/security/crypto";
-import { buildWebPushRequest, type PushConfig } from "@/lib/push";
+import {
+  buildWebPushRequest,
+  inspectPushConfigValues,
+  type PushConfig,
+} from "@/lib/push";
 
 function buffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
@@ -41,6 +45,42 @@ async function hkdfExpand(
   }
   return concat(...blocks).slice(0, length);
 }
+
+describe("VAPID configuration", () => {
+  const publicKey = bytesToBase64Url(
+    Uint8Array.from({ length: 65 }, (_, index) => (index === 0 ? 4 : index))
+  );
+  const privateKey = bytesToBase64Url(
+    Uint8Array.from({ length: 32 }, (_, index) => index + 1)
+  );
+
+  it("distinguishes missing configuration", () => {
+    expect(inspectPushConfigValues({})).toEqual({
+      state: "missing",
+      publicKey: null,
+    });
+  });
+
+  it("rejects malformed keys or subject", () => {
+    expect(
+      inspectPushConfigValues({
+        publicKey: "not-a-key",
+        privateKey,
+        subject: "http://vth.kr",
+      })
+    ).toEqual({ state: "invalid", publicKey: null });
+  });
+
+  it("accepts an uncompressed P-256 key pair and valid subject", () => {
+    expect(
+      inspectPushConfigValues({
+        publicKey,
+        privateKey,
+        subject: "mailto:ops@vth.kr",
+      })
+    ).toEqual({ state: "configured", publicKey });
+  });
+});
 
 describe("Web Push encryption", () => {
   it("builds an RFC 8188 request that the subscription can decrypt", async () => {

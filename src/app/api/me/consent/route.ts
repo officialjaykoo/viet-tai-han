@@ -7,7 +7,7 @@ import { readApiJson } from "@/lib/security/guard";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ allowIncomplete: true });
     return NextResponse.json({ consent: await getUserConsent(session.user.id) });
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);
@@ -18,7 +18,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ allowIncomplete: true });
     const body = (await readApiJson(request).catch(() => null)) as {
       consentVersion?: unknown;
       analytics?: unknown;

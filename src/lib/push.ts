@@ -24,6 +24,13 @@ export type PushConfig = {
   subject: string;
 };
 
+export type PushConfigState = "configured" | "missing" | "invalid" | "unavailable";
+
+type PushConfigInspection = {
+  state: PushConfigState;
+  config: PushConfig | null;
+};
+
 export type PushSubscriptionInput = {
   endpoint: string;
   keys: {
@@ -117,35 +124,81 @@ export function validatePushSubscription(value: unknown): PushSubscriptionInput 
   };
 }
 
-export async function getPushConfig(): Promise<PushConfig | null> {
+export function inspectPushConfigValues(input: {
+  publicKey?: string | null;
+  privateKey?: string | null;
+  subject?: string | null;
+}): { state: PushConfigState; publicKey: string | null } {
+  const publicKey = input.publicKey?.trim();
+  const privateKey = input.privateKey?.trim();
+  const subject = input.subject?.trim();
+  if (!publicKey || !privateKey || !subject) {
+    return { state: "missing", publicKey: null };
+  }
+
+  try {
+    const publicBytes = base64UrlToBytes(publicKey);
+    const privateBytes = base64UrlToBytes(privateKey);
+    if (publicBytes.byteLength !== 65 || publicBytes[0] !== 4) {
+      throw new Error("Invalid VAPID public key");
+    }
+    if (privateBytes.byteLength !== 32) {
+      throw new Error("Invalid VAPID private key");
+    }
+    const subjectUrl = new URL(subject);
+    const validSubject =
+      (subjectUrl.protocol === "https:" && Boolean(subjectUrl.hostname)) ||
+      (subjectUrl.protocol === "mailto:" && Boolean(subjectUrl.pathname));
+    if (!validSubject) throw new Error("Invalid VAPID subject");
+  } catch {
+    return { state: "invalid", publicKey: null };
+  }
+
+  return { state: "configured", publicKey };
+}
+
+async function inspectPushConfig(): Promise<PushConfigInspection> {
   let env: CloudflareEnv;
   try {
     env = (await getEnv()) as CloudflareEnv;
   } catch {
-    return null;
+    return { state: "unavailable", config: null };
   }
+
   const publicKey = env.VAPID_PUBLIC_KEY?.trim();
   const privateKey = env.VAPID_PRIVATE_KEY?.trim();
   const subject = env.VAPID_SUBJECT?.trim();
-  if (!publicKey || !privateKey || !subject) return null;
-  try {
-    const publicBytes = base64UrlToBytes(publicKey);
-    const privateBytes = base64UrlToBytes(privateKey);
-    if (publicBytes.byteLength !== 65 || publicBytes[0] !== 4) return null;
-    if (privateBytes.byteLength !== 32) return null;
-    const subjectUrl = new URL(subject);
-    if (subjectUrl.protocol !== "https:" && subjectUrl.protocol !== "mailto:") {
-      return null;
-    }
-  } catch {
-    return null;
+  const values = inspectPushConfigValues({ publicKey, privateKey, subject });
+  if (values.state !== "configured") {
+    return { state: values.state, config: null };
   }
-  return { publicKey, privateKey, subject };
+
+  return {
+    state: "configured",
+    config: { publicKey: publicKey!, privateKey: privateKey!, subject: subject! },
+  };
+}
+
+export async function getPushConfigStatus(): Promise<{
+  state: PushConfigState;
+  available: boolean;
+  publicKey: string | null;
+}> {
+  const inspection = await inspectPushConfig();
+  return {
+    state: inspection.state,
+    available: inspection.state === "configured",
+    publicKey: inspection.config?.publicKey ?? null,
+  };
+}
+
+export async function getPushConfig(): Promise<PushConfig | null> {
+  return (await inspectPushConfig()).config;
 }
 
 export async function getPushStatus(userId: string) {
   const db = await getDb();
-  const config = await getPushConfig();
+  const configStatus = await getPushConfigStatus();
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS c
@@ -155,8 +208,9 @@ export async function getPushStatus(userId: string) {
     .bind(userId)
     .first<{ c: number }>();
   return {
-    available: Boolean(config),
-    publicKey: config?.publicKey ?? null,
+    available: configStatus.available,
+    configuration: configStatus.state,
+    publicKey: configStatus.publicKey,
     subscribed: Number(row?.c ?? 0) > 0,
   };
 }

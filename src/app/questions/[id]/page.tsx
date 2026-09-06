@@ -9,6 +9,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getQuestionDetail } from "@/lib/qna";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function QuestionPage({
 }) {
   const { id } = await params;
   const session = await getSession();
+  await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const question = await getQuestionDetail(id, session?.user?.id ?? null);
   if (!question) notFound();

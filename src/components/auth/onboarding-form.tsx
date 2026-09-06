@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/api-client";
 import { LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import type { OnboardingState } from "@/lib/onboarding";
+import { createUsernameCandidate } from "@/lib/username";
 
 const LANGUAGE_LABEL_KEYS: Record<Locale, MessageKey> = {
   vi: "language.vietnamese",
@@ -19,7 +20,6 @@ const LANGUAGE_LABEL_KEYS: Record<Locale, MessageKey> = {
   en: "language.english",
   ru: "language.russian",
 };
-const TEMPORARY_USERNAME_PREFIX = "vth_user_";
 
 export function OnboardingForm({ state }: { state: OnboardingState }) {
   const router = useRouter();
@@ -27,9 +27,8 @@ export function OnboardingForm({ state }: { state: OnboardingState }) {
   const localizeError = useLocalizedError();
   const [name, setName] = useState(state.name);
   const [username, setUsername] = useState(
-    state.username?.startsWith(TEMPORARY_USERNAME_PREFIX)
-      ? ""
-      : state.username ?? ""
+    state.onboardingUsernameCandidate ??
+      createUsernameCandidate({ displayName: state.name })
   );
   const [preferredLanguage, setPreferredLanguage] = useState<Locale>(
     isLocale(state.preferredLanguage) ? state.preferredLanguage : locale

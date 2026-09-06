@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CircleDotIcon } from "lucide-react";
 
+import { ProfileActions } from "@/components/user/profile-actions";
 import { apiFetch } from "@/lib/api-client";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { OnlineUser } from "@/lib/presence";
@@ -66,11 +67,11 @@ export function OnlinePeopleList({
       {users.length ? (
         <ul className="mt-3 divide-y divide-border/70">
           {users.map((user) => (
-            <li key={user.id}>
+            <li key={user.id} className="py-2">
               <Link
                 href={personHref(user.username)}
                 prefetch={false}
-                className="flex min-h-14 items-center gap-3 py-2 transition-colors hover:text-[var(--brand)]"
+                className="flex min-h-14 items-center gap-3 transition-colors hover:text-[var(--brand)]"
               >
                 <span className="relative shrink-0">
                   <UserAvatar
@@ -93,6 +94,15 @@ export function OnlinePeopleList({
                   </span>
                 </span>
               </Link>
+              <ProfileActions
+                username={user.username}
+                initiallyFollowing={user.following}
+                initiallyBlocked={false}
+                initiallyFriendStatus={user.friendStatus}
+                initiallyFriendRequestId={user.friendRequestId}
+                compact
+                showBlock={false}
+              />
             </li>
           ))}
         </ul>

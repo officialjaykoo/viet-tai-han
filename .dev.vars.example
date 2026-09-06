@@ -32,5 +32,6 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 #   wrangler secret put FACEBOOK_CLIENT_SECRET
 #   wrangler secret put ZALO_APP_SECRET
 #   wrangler secret put KAKAO_CLIENT_SECRET  # optional when enabled in Kakao
+#   wrangler secret put VAPID_PUBLIC_KEY
 #   wrangler secret put VAPID_PRIVATE_KEY
 #   wrangler secret put VAPID_SUBJECT

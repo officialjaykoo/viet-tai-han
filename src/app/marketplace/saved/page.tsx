@@ -8,12 +8,14 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { formatListingPrice, listSavedListings } from "@/lib/marketplace";
 import { getSession } from "@/lib/session";
+import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function SavedMarketplaceListingsPage() {
   const session = await getSession();
   if (!session) redirect(`/login?next=${encodeURIComponent("/marketplace/saved")}`);
+  await redirectIfIncompleteOnboarding(session.user.id);
   const { locale } = await getRequestLocale();
   const listings = await listSavedListings(session.user.id);
 

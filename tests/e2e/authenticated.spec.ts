@@ -100,6 +100,68 @@ test.describe("authenticated flows", () => {
     await page.getByRole("button", { name: /tạo cộng đồng/i }).click();
     await expect(page).toHaveURL(new RegExp(`/r/${name}`), { timeout: 45_000 });
   });
+  test("desktop header keeps navigation action order", async ({ page }) => {
+    await disguiseAutomation(page);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: /menu tài khoản/i })
+    ).toBeVisible({ timeout: 20_000 });
+    const links = await page.evaluate(() => {
+      const expected = [
+        "/",
+        "/communities",
+        "/questions",
+        "/marketplace",
+        "/recommended",
+        "/submit",
+        "/messages",
+        "/notifications",
+      ];
+      const primary = [...document.querySelectorAll("header nav a")].map(
+        (link) => {
+          const rect = link.getBoundingClientRect();
+          return { href: link.getAttribute("href"), left: rect.left };
+        }
+      );
+      const visible = (href: string) => {
+        const link = [...document.querySelectorAll("header a")].find((item) => {
+          if (item.getAttribute("href") !== href) return false;
+          const rect = item.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+        if (!link) return null;
+        const rect = link.getBoundingClientRect();
+        return { href, left: rect.left };
+      };
+      return {
+        primary,
+        actions: expected.slice(5).map(visible),
+      };
+    });
+    const expected = [
+      "/",
+      "/communities",
+      "/questions",
+      "/marketplace",
+      "/recommended",
+      "/submit",
+      "/messages",
+      "/notifications",
+    ];
+
+    expect(links.primary.map(({ href }) => href)).toEqual(expected.slice(0, 5));
+    expect(links.actions).not.toContain(null);
+    expect(links.actions.map((link) => link?.href)).toEqual(expected.slice(5));
+    const ordered = [
+      ...links.primary.map(({ left }) => left),
+      ...links.actions.map((link) => link?.left ?? Number.POSITIVE_INFINITY),
+    ];
+    expect(ordered).toEqual([...ordered].sort((a, b) => a - b));
+  });
+
   test("mobile chrome follows scroll direction and account menu", async ({
     page,
   }) => {

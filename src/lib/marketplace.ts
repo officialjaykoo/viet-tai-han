@@ -223,7 +223,7 @@ export async function listListings(
          l.id, l.kind, l.category, l.title, l.body, l.price, l.location,
          l.status, l.created_at,
          u.id AS seller_id, u.username AS seller_username,
-         COALESCE(u.displayUsername, u.name) AS seller_display_name,
+           u.name AS seller_display_name,
          u.image AS seller_image,
          ${savedSelect}
        FROM listings l
@@ -259,7 +259,7 @@ export async function getListingDetail(
          l.id, l.kind, l.category, l.title, l.body, l.price, l.location,
          l.status, l.created_at,
          u.id AS seller_id, u.username AS seller_username,
-         COALESCE(u.displayUsername, u.name) AS seller_display_name,
+           u.name AS seller_display_name,
          u.image AS seller_image,
          EXISTS (
            SELECT 1 FROM listing_saves ls

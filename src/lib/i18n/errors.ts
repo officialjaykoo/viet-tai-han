@@ -28,6 +28,12 @@ const ERROR_CATALOG: Record<
     en: "This account can't do that",
     ru: "Этот аккаунт не может этого сделать",
   },
+  "Complete onboarding before continuing": {
+    en: "Complete profile setup before continuing",
+    ru: "Сначала завершите настройку профиля",
+    vi: "Hãy hoàn tất thiết lập hồ sơ để tiếp tục",
+    ko: "계속하려면 프로필 설정을 완료하세요",
+  },
   "Request failed": {
     en: "Request failed",
     ru: "Не удалось выполнить запрос",
@@ -137,6 +143,36 @@ const ERROR_CATALOG: Record<
     ru: "Имя пользователя уже используется",
     vi: "Tên người dùng đã được sử dụng",
     ko: "이미 사용 중인 사용자 이름입니다",
+  },
+  "Username is reserved": {
+    en: "This username is temporarily reserved",
+    ru: "Это имя пользователя временно зарезервировано",
+    vi: "Tên người dùng này đang được giữ tạm thời",
+    ko: "이 사용자 이름은 현재 임시로 예약되어 있습니다",
+  },
+  "Username change is on cooldown": {
+    en: "You can’t change your username yet",
+    ru: "Пока нельзя изменить имя пользователя",
+    vi: "Bạn chưa thể đổi tên người dùng",
+    ko: "아직 사용자 이름을 변경할 수 없습니다",
+  },
+  "Complete onboarding before changing username": {
+    en: "Complete profile setup before changing your username",
+    ru: "Сначала завершите настройку профиля",
+    vi: "Hãy hoàn tất thiết lập hồ sơ trước khi đổi tên người dùng",
+    ko: "사용자 이름을 변경하기 전에 프로필 설정을 완료하세요",
+  },
+  "Username change could not be completed": {
+    en: "Could not change username. Try again.",
+    ru: "Не удалось изменить имя пользователя. Повторите попытку.",
+    vi: "Không thể đổi tên người dùng. Hãy thử lại.",
+    ko: "사용자 이름을 변경하지 못했습니다. 다시 시도하세요.",
+  },
+  "Onboarding already complete": {
+    en: "Profile setup is already complete",
+    ru: "Настройка профиля уже завершена",
+    vi: "Thiết lập hồ sơ đã hoàn tất",
+    ko: "프로필 설정이 이미 완료되었습니다",
   },
   "Onboarding language is required": {
     en: "Choose a language to continue",

@@ -153,7 +153,7 @@ export async function listQuestions(options: {
          q.id, q.title, q.body, q.answer_count, q.accepted_answer_id,
          q.is_locked, q.created_at,
          u.id AS author_id, u.username AS author_username,
-         COALESCE(u.displayUsername, u.name) AS author_display_name,
+         u.name AS author_display_name,
          u.image AS author_image,
          s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title
        FROM questions q
@@ -180,7 +180,7 @@ export async function getQuestionDetail(
          q.id, q.title, q.body, q.answer_count, q.accepted_answer_id,
          q.is_locked, q.created_at,
          u.id AS author_id, u.username AS author_username,
-         COALESCE(u.displayUsername, u.name) AS author_display_name,
+         u.name AS author_display_name,
          u.image AS author_image,
          s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title
        FROM questions q
@@ -201,7 +201,7 @@ export async function getQuestionDetail(
       `SELECT
          a.id, a.question_id, a.body, a.is_accepted, a.created_at,
          u.id AS author_id, u.username AS author_username,
-         COALESCE(u.displayUsername, u.name) AS author_display_name,
+         u.name AS author_display_name,
          u.image AS author_image
        FROM answers a
        INNER JOIN "user" u ON u.id = a.author_id

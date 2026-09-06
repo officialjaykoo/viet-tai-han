@@ -9,9 +9,9 @@ describe("getProfileHref", () => {
     );
   });
 
-  it("uses the user id when a social account has no username", () => {
+  it("sends an account without a public username to onboarding", () => {
     expect(getProfileHref({ id: "social-user-1", username: null })).toBe(
-      "/u/social-user-1"
+      "/onboarding"
     );
   });
 

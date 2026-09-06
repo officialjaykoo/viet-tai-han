@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import type { FriendStatus } from "@/lib/friends";
 
 export const ONLINE_WINDOW_MINUTES = 5;
 
@@ -8,6 +9,9 @@ export type OnlineUser = {
   name: string;
   image: string | null;
   lastSeenAt: string;
+  following: boolean;
+  friendStatus: FriendStatus;
+  friendRequestId: string | null;
 };
 
 type OnlineUserRow = {
@@ -16,6 +20,9 @@ type OnlineUserRow = {
   name: string;
   image: string | null;
   last_seen_at: string;
+  following: number;
+  friend_status: string;
+  friend_request_id: string | null;
 };
 
 export async function touchUserPresence(userId: string): Promise<void> {
@@ -49,21 +56,25 @@ export async function listOnlineUsers(
            WHERE b.blocker_id = u.id AND b.blocked_id = ?
          )`
     : "";
-  const friendJoin = hasViewer
+  const relationshipJoins = hasViewer
     ? `
        LEFT JOIN user_friendships f
-         ON f.status = 'accepted'
-        AND (
-          (f.requester_id = ? AND f.addressee_id = u.id)
-          OR (f.addressee_id = ? AND f.requester_id = u.id)
-        )`
+         ON (
+           (f.requester_id = ? AND f.addressee_id = u.id)
+           OR (f.addressee_id = ? AND f.requester_id = u.id)
+         )
+       LEFT JOIN user_follows follow
+         ON follow.follower_id = ? AND follow.following_id = u.id`
     : "";
   const order = hasViewer
-    ? "ORDER BY CASE WHEN f.id IS NULL THEN 1 ELSE 0 END, p.last_seen_at DESC, u.username ASC"
+    ? "ORDER BY CASE WHEN f.status = 'accepted' THEN 0 ELSE 1 END, p.last_seen_at DESC, u.username ASC"
     : "ORDER BY p.last_seen_at DESC, u.username ASC";
   const bindings: Array<string | number> = [];
   if (hasViewer) {
     bindings.push(
+      viewerUserId!,
+      viewerUserId!,
+      viewerUserId!,
       viewerUserId!,
       viewerUserId!,
       viewerUserId!,
@@ -75,10 +86,19 @@ export async function listOnlineUsers(
 
   const { results } = await db
     .prepare(
-      `SELECT u.id, u.username, u.name, u.image, p.last_seen_at
+      `SELECT u.id, u.username, u.name, u.image, p.last_seen_at,
+              CASE WHEN follow.follower_id IS NOT NULL THEN 1 ELSE 0 END AS following,
+              CASE
+                WHEN f.status = 'accepted' THEN 'friends'
+                WHEN f.status = 'pending' AND f.requester_id = ? THEN 'outgoing'
+                WHEN f.status = 'pending' AND f.addressee_id = ? THEN 'incoming'
+                ELSE 'none'
+              END AS friend_status,
+              CASE WHEN f.status = 'pending' THEN f.id ELSE NULL END
+                AS friend_request_id
        FROM user_presence p
        INNER JOIN "user" u ON u.id = p.user_id
-       ${friendJoin}
+       ${relationshipJoins}
        WHERE u.status = 'active'
          AND u.username IS NOT NULL
          AND p.last_seen_at >= datetime('now', '-${ONLINE_WINDOW_MINUTES} minutes')
@@ -95,5 +115,13 @@ export async function listOnlineUsers(
     name: row.name,
     image: row.image,
     lastSeenAt: row.last_seen_at,
+    following: Boolean(row.following),
+    friendStatus:
+      row.friend_status === "outgoing" ||
+      row.friend_status === "incoming" ||
+      row.friend_status === "friends"
+        ? row.friend_status
+        : "none",
+    friendRequestId: row.friend_request_id,
   }));
 }
