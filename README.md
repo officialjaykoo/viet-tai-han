@@ -50,7 +50,7 @@ flowchart LR
 ## Features
 
 - Communities, posts, comments, votes, profiles
-- Auth ([Better Auth](https://www.better-auth.com) with Facebook/Zalo OAuth and explicit account linking)
+- Auth ([Better Auth](https://www.better-auth.com) with Facebook/Zalo/Kakao OAuth and explicit account linking)
 - Search and AI-backed recommendations
 - Direct messages and notifications
 - Media uploads (R2)
@@ -131,12 +131,13 @@ For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFL
 
 2. Paste the returned IDs into `wrangler.jsonc` (`database_id`, and KV ids if used).
 
-3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and configure at least one of `FACEBOOK_CLIENT_ID` / `ZALO_APP_ID`. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins. For browser push, set the VAPID public key in `vars.VAPID_PUBLIC_KEY`.
+3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and configure at least one of `FACEBOOK_CLIENT_ID`, `ZALO_APP_ID`, or `KAKAO_CLIENT_ID`. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins. For browser push, set the VAPID public key in `vars.VAPID_PUBLIC_KEY`.
 
 4. Register the OAuth callbacks with each provider:
 
    - Facebook: `https://YOUR_ORIGIN/api/auth/callback/facebook`
    - Zalo: `https://YOUR_ORIGIN/api/auth/oauth2/callback/zalo`
+   - Kakao: `https://YOUR_ORIGIN/api/auth/callback/kakao`
 
 5. Set secrets:
 
@@ -145,13 +146,14 @@ For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFL
    wrangler secret put TURNSTILE_SECRET_KEY
    wrangler secret put FACEBOOK_CLIENT_SECRET  # when Facebook is enabled
    wrangler secret put ZALO_APP_SECRET          # when Zalo is enabled
+   wrangler secret put KAKAO_CLIENT_SECRET     # only when enabled in Kakao
    wrangler secret put VAPID_PRIVATE_KEY       # when browser push is enabled
    wrangler secret put VAPID_SUBJECT           # mailto: or https: contact URI
    wrangler secret put BILLING_WEBHOOK_SECRET  # required only when a provider webhook is enabled
    ```
 
    All three VAPID values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`) are required to enable push. The site must run on HTTPS (localhost is allowed by browsers); subscriptions can be managed under Settings → Notifications.
-   Facebook and Zalo remain disabled unless both the provider ID and secret are present. After signing in with either provider, link the other under Settings → Account → Connected accounts. Email/password and passkey authentication are disabled.
+   Facebook and Zalo remain disabled unless both the provider ID and secret are present. Kakao requires `KAKAO_CLIENT_ID`; its client secret is optional unless enabled in Kakao Developers. After signing in with any provider, link the others under Settings → Account → Connected accounts. Email/password and passkey authentication are disabled.
    The billing webhook is not a checkout implementation. Configure a provider adapter, user mapping, prices, refunds, and tax policy before setting `ads_enabled=1` or accepting real payments.
 
 6. Apply remote migrations, then deploy:

@@ -45,7 +45,7 @@ export default function SignupPage() {
 
   function startSocial(
     event: React.MouseEvent<HTMLButtonElement>,
-    provider: "facebook" | "zalo"
+    provider: "facebook" | "zalo" | "kakao"
   ) {
     event.preventDefault();
     setError(null);
@@ -66,12 +66,19 @@ export default function SignupPage() {
               errorCallbackURL: "/signup",
               requestSignUp: true,
             })
-          : await authClient.signIn.oauth2({
-              providerId: "zalo",
-              callbackURL: "/",
-              errorCallbackURL: "/signup",
-              requestSignUp: true,
-            });
+          : provider === "kakao"
+            ? await authClient.signIn.social({
+                provider: "kakao",
+                callbackURL: "/",
+                errorCallbackURL: "/signup",
+                requestSignUp: true,
+              })
+            : await authClient.signIn.oauth2({
+                providerId: "zalo",
+                callbackURL: "/",
+                errorCallbackURL: "/signup",
+                requestSignUp: true,
+              });
 
       if (result.error) {
         setError(
@@ -111,6 +118,7 @@ export default function SignupPage() {
               pending={pending}
               onFacebook={(event) => startSocial(event, "facebook")}
               onZalo={(event) => startSocial(event, "zalo")}
+              onKakao={(event) => startSocial(event, "kakao")}
             />
             <p className="border-t border-border/70 pt-4 text-center text-sm text-muted-foreground">
               {t("auth.hasAccount")}{" "}

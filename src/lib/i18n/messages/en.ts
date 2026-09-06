@@ -585,6 +585,7 @@ export const en = {
     unlink: "Unlink",
     linkFacebook: "Link Facebook",
     linkZalo: "Link Zalo",
+    linkKakao: "Link Kakao",
     identityLoadFailed: "Could not load sign-in methods",
     linkFailed: "Could not link account",
     unlinkFailed: "Could not unlink account",

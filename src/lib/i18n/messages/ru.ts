@@ -586,6 +586,7 @@ export const ru: Messages = {
     unlink: "Отвязать",
     linkFacebook: "Связать Facebook",
     linkZalo: "Связать Zalo",
+    linkKakao: "Связать Kakao",
     identityLoadFailed: "Не удалось загрузить способы входа",
     linkFailed: "Не удалось связать аккаунт",
     unlinkFailed: "Не удалось отвязать аккаунт",

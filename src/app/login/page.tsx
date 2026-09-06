@@ -42,7 +42,7 @@ function LoginForm() {
 
   function startIdentity(
     event: React.MouseEvent<HTMLButtonElement>,
-    method: "facebook" | "zalo"
+    method: "facebook" | "zalo" | "kakao"
   ) {
     event.preventDefault();
     setError(null);
@@ -63,11 +63,17 @@ function LoginForm() {
               callbackURL,
               errorCallbackURL: "/login",
             })
-          : await authClient.signIn.oauth2({
-              providerId: "zalo",
-              callbackURL,
-              errorCallbackURL: "/login",
-            });
+          : method === "kakao"
+            ? await authClient.signIn.social({
+                provider: "kakao",
+                callbackURL,
+                errorCallbackURL: "/login",
+              })
+            : await authClient.signIn.oauth2({
+                providerId: "zalo",
+                callbackURL,
+                errorCallbackURL: "/login",
+              });
 
       if (result.error) {
         setError(
@@ -106,6 +112,7 @@ function LoginForm() {
             pending={pending}
             onFacebook={(event) => startIdentity(event, "facebook")}
             onZalo={(event) => startIdentity(event, "zalo")}
+            onKakao={(event) => startIdentity(event, "kakao")}
           />
           <p className="border-t border-border/70 pt-4 text-center text-sm text-muted-foreground">
             {t("auth.noAccount")}{" "}

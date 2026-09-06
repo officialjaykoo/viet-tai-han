@@ -583,6 +583,7 @@ export const vi: Messages = {
     unlink: "Hủy liên kết",
     linkFacebook: "Liên kết Facebook",
     linkZalo: "Liên kết Zalo",
+    linkKakao: "Liên kết Kakao",
     identityLoadFailed: "Không thể tải phương thức đăng nhập",
     linkFailed: "Không thể liên kết tài khoản",
     unlinkFailed: "Không thể hủy liên kết tài khoản",

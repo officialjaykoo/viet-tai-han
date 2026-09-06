@@ -81,6 +81,8 @@ async function handleRealtime(
       FACEBOOK_CLIENT_SECRET: env.FACEBOOK_CLIENT_SECRET,
       ZALO_APP_ID: env.ZALO_APP_ID,
       ZALO_APP_SECRET: env.ZALO_APP_SECRET,
+      KAKAO_CLIENT_ID: env.KAKAO_CLIENT_ID,
+      KAKAO_CLIENT_SECRET: env.KAKAO_CLIENT_SECRET,
     });
     session = await auth.api.getSession({ headers: request.headers });
   } catch (error) {

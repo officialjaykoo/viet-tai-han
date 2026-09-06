@@ -19,6 +19,8 @@ type AuthEnv = {
   FACEBOOK_CLIENT_SECRET?: string;
   ZALO_APP_ID?: string;
   ZALO_APP_SECRET?: string;
+  KAKAO_CLIENT_ID?: string;
+  KAKAO_CLIENT_SECRET?: string;
 };
 
 type ZaloTokenResponse = {
@@ -161,7 +163,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
   const facebookEnabled = Boolean(
     env.FACEBOOK_CLIENT_ID && env.FACEBOOK_CLIENT_SECRET
   );
-
+  const kakaoEnabled = Boolean(env.KAKAO_CLIENT_ID);
 
   return betterAuth({
     database: {
@@ -175,15 +177,25 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
     trustedOrigins: configuredOrigins(baseURL, env.VTH_AUTH_ORIGINS),
     // Logical path only — browser never hits /api/auth directly; POST /i/api tunnels it.
     basePath: "/api/auth",
-    socialProviders: facebookEnabled
-      ? {
-          facebook: {
-            clientId: env.FACEBOOK_CLIENT_ID!,
-            clientSecret: env.FACEBOOK_CLIENT_SECRET!,
-            scope: ["email", "public_profile"],
-          },
-        }
-      : {},
+    socialProviders: {
+      ...(facebookEnabled
+        ? {
+            facebook: {
+              clientId: env.FACEBOOK_CLIENT_ID!,
+              clientSecret: env.FACEBOOK_CLIENT_SECRET!,
+              scope: ["email", "public_profile"],
+            },
+          }
+        : {}),
+      ...(kakaoEnabled
+        ? {
+            kakao: {
+              clientId: env.KAKAO_CLIENT_ID!,
+              clientSecret: env.KAKAO_CLIENT_SECRET,
+            },
+          }
+        : {}),
+    },
     account: {
       accountLinking: {
         enabled: true,
@@ -379,6 +391,8 @@ export async function getAuth(): Promise<Auth> {
       FACEBOOK_CLIENT_SECRET: env.FACEBOOK_CLIENT_SECRET,
       ZALO_APP_ID: env.ZALO_APP_ID,
       ZALO_APP_SECRET: env.ZALO_APP_SECRET,
+      KAKAO_CLIENT_ID: env.KAKAO_CLIENT_ID,
+      KAKAO_CLIENT_SECRET: env.KAKAO_CLIENT_SECRET,
     });
   }
 
@@ -395,5 +409,7 @@ export function createAuth(db: D1Database, env: AuthEnv = {}) {
     FACEBOOK_CLIENT_SECRET: env.FACEBOOK_CLIENT_SECRET,
     ZALO_APP_ID: env.ZALO_APP_ID,
     ZALO_APP_SECRET: env.ZALO_APP_SECRET,
+    KAKAO_CLIENT_ID: env.KAKAO_CLIENT_ID,
+    KAKAO_CLIENT_SECRET: env.KAKAO_CLIENT_SECRET,
   });
 }

@@ -120,6 +120,30 @@ describe("identity providers", () => {
     );
   });
 
+  it("starts Kakao OAuth with the configured callback", async () => {
+    const auth = createAuth(env.DB, {
+      KAKAO_CLIENT_ID: "kakao-client",
+      KAKAO_CLIENT_SECRET: "kakao-secret",
+    });
+    const response = await startOAuth(auth, "sign-in/social", {
+      provider: "kakao",
+      callbackURL: "/settings?section=account",
+    });
+    const payload = (await response.json()) as { url?: string };
+
+    expect(response.status).toBe(200);
+    const authorizationURL = new URL(payload.url!);
+    expect(authorizationURL.origin + authorizationURL.pathname).toBe(
+      "https://kauth.kakao.com/oauth/authorize"
+    );
+    expect(authorizationURL.searchParams.get("client_id")).toBe(
+      "kakao-client"
+    );
+    expect(authorizationURL.searchParams.get("redirect_uri")).toBe(
+      "http://localhost:3000/api/auth/callback/kakao"
+    );
+  });
+
   it("starts Zalo OAuth with PKCE and the generic callback", async () => {
     const auth = createAuth(env.DB, {
       ZALO_APP_ID: "zalo-app",

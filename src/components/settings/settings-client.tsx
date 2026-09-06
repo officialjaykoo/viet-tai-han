@@ -260,7 +260,7 @@ export function SettingsClient({
     [flash, localizeError, t]
   );
 
-  function linkIdentity(provider: "facebook" | "zalo") {
+  function linkIdentity(provider: "facebook" | "zalo" | "kakao") {
     flash(null, null);
     startTransition(async () => {
       const callbackURL = "/settings?section=account";
@@ -271,11 +271,17 @@ export function SettingsClient({
               callbackURL,
               errorCallbackURL: callbackURL,
             })
-          : await authClient.oauth2.link({
-              providerId: "zalo",
-              callbackURL,
-              errorCallbackURL: callbackURL,
-            });
+          : provider === "kakao"
+            ? await authClient.linkSocial({
+                provider: "kakao",
+                callbackURL,
+                errorCallbackURL: callbackURL,
+              })
+            : await authClient.oauth2.link({
+                providerId: "zalo",
+                callbackURL,
+                errorCallbackURL: callbackURL,
+              });
 
       if (result.error) {
         flash(
@@ -679,7 +685,11 @@ export function SettingsClient({
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={pending || identityLoading}
+                          disabled={
+                            pending ||
+                            identityLoading ||
+                            socialAccounts.length <= 1
+                          }
                           onClick={() => unlinkIdentity(account)}
                         >
                           {t("settings.unlink")}
@@ -689,15 +699,11 @@ export function SettingsClient({
                   ))}
                 </ul>
               )}
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-3">
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={
-                    pending ||
-                    identityLoading ||
-                    socialAccounts.length <= 1
-                  }
+                  disabled={pending || identityLoading}
                   onClick={() => linkIdentity("facebook")}
                 >
                   <LinkIcon className="size-4" />
@@ -706,15 +712,20 @@ export function SettingsClient({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={
-                    pending ||
-                    identityLoading ||
-                    socialAccounts.length <= 1
-                  }
+                  disabled={pending || identityLoading}
                   onClick={() => linkIdentity("zalo")}
                 >
                   <LinkIcon className="size-4" />
                   {t("settings.linkZalo")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={pending || identityLoading}
+                  onClick={() => linkIdentity("kakao")}
+                >
+                  <LinkIcon className="size-4" />
+                  {t("settings.linkKakao")}
                 </Button>
               </div>
             </SettingsCard>

@@ -10,6 +10,7 @@ function request(pathname: string, init?: RequestInit) {
 describe("middleware OAuth callback handling", () => {
   it.each([
     "/api/auth/callback/facebook?code=test",
+    "/api/auth/callback/kakao?code=test",
     "/api/auth/oauth2/callback/zalo?code=test",
   ])("allows browser callback %s without an API key", (pathname) => {
     const response = middleware(request(pathname, { method: "GET" }));

@@ -71,7 +71,7 @@
 | Marketplace/Jobs | listings, categories, location, saved/alert API/UI | 중고거래·구인·서비스 게시. 사기/연락처 노출 정책 포함. |
 | Business profile | business verification/profile/services/hours | 업체·서비스 디렉터리와 예약 진입점. |
 | Reports/policy | report center, appeals, policy pages, moderation queues | 신고·이의제기·운영 투명성. |
-| Identity | Facebook/Zalo OAuth, WebAuthn passkey, account linking | 가입 장벽과 계정 보안 개선. |
+| Identity | Facebook/Zalo/Kakao OAuth, WebAuthn passkey, account linking | 가입 장벽과 계정 보안 개선. |
 | Messaging delivery | push subscription, unread fanout, notification preference | DM/알림의 모바일 전달. |
 | Trust ledger | karma/reputation/transaction ledger | `0026_monetization_foundations.sql`에 `reputation_ledger` opening balance와 `transaction_ledger`를 추가하고, 신규 reputation 조정은 idempotency key로 기록한다. P1 기반 완료, 회계·정산 운영은 대기. |
 | Vietnamese discovery | diacritic-aware search, location/category index, multilingual embeddings | 다국어 임베딩·추천은 P1에서 완료했고 검색 정규화와 location/category index는 후속 작업. |
@@ -115,7 +115,7 @@
 - Cloudflare account 연결 및 `vth-db`, `vth-media`, `vth-posts`, optional KV 생성/ID.
 - `vth.kr` DNS/Worker route와 `BETTER_AUTH_URL=https://vth.kr`.
 - production `BETTER_AUTH_SECRET`, Turnstile site/secret.
-- Facebook/Zalo OAuth client/secret 및 callback URL.
+- Facebook/Zalo/Kakao OAuth client/secret 및 callback URL.
 - 이메일 발송 provider/도메인 인증.
 - WebAuthn RP ID/origin, Web Push `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, 지도/예약 provider keys. Native FCM/APNs are outside this web phase.
 - 결제 provider credentials/webhook endpoint, `BILLING_WEBHOOK_SECRET`, 상품·환불·세금 정책 승인과 provider customer→user 매핑.

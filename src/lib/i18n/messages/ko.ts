@@ -574,6 +574,7 @@ export const ko: Messages = {
     unlink: "연결 해제",
     linkFacebook: "Facebook 연결",
     linkZalo: "Zalo 연결",
+    linkKakao: "Kakao 연결",
     identityLoadFailed: "로그인 방식을 불러올 수 없습니다",
     linkFailed: "계정을 연결할 수 없습니다",
     unlinkFailed: "계정 연결을 해제할 수 없습니다",

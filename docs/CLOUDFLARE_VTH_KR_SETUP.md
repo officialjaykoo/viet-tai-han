@@ -171,9 +171,9 @@ npx wrangler secret put TURNSTILE_SECRET_KEY
 
 ### 추가 OAuth를 사용할 경우
 
-운영 인증은 Facebook 또는 Zalo OAuth만 사용합니다. 이메일/사용자명 + 비밀번호 가입·로그인 엔드포인트와 패스키 인증은 비활성화되어 있습니다. 두 provider는 ID와 secret을 모두 설정한 경우에만 활성화됩니다.
+운영 인증은 Facebook, Zalo 또는 Kakao OAuth를 사용합니다. 이메일/사용자명 + 비밀번호 가입·로그인 엔드포인트와 패스키 인증은 비활성화되어 있습니다. Facebook과 Zalo는 ID와 secret을 모두 설정해야 활성화되고, Kakao는 client ID가 있어야 활성화됩니다. Kakao client secret은 Kakao 앱에서 사용하도록 설정한 경우에만 추가합니다.
 
-회원은 Facebook 또는 Zalo 중 하나로 가입한 뒤, 로그인 후 **설정 → 계정 → 연결된 계정**에서 다른 provider를 명시적으로 연결할 수 있습니다. 연결이 완료되면 두 provider 중 어느 쪽으로도 같은 계정에 로그인됩니다.
+회원은 Facebook, Zalo 또는 Kakao 중 하나로 가입한 뒤, 로그인 후 **설정 → 계정 → 연결된 계정**에서 다른 provider를 명시적으로 연결할 수 있습니다. 연결이 완료되면 연결된 provider 중 어느 쪽으로도 같은 계정에 로그인됩니다.
 
 비밀값은 채팅이나 GitHub에 보내지 말고, 아래 `wrangler secret put` 프롬프트에 직접 입력합니다.
 
@@ -182,6 +182,7 @@ Cloudflare Dashboard의 **Worker → Settings → Variables and Secrets**에서 
 
 - `FACEBOOK_CLIENT_ID`
 - `ZALO_APP_ID`
+- `KAKAO_CLIENT_ID` — Kakao REST API key
 - `VTH_AUTH_ORIGINS` — preview/custom origin이 추가로 필요할 때만, 쉼표로 구분
 
 `wrangler.jsonc`에 공개 변수를 추가하는 방식도 사용할 수 있습니다. 파일을 변경했다면 아래 배포 절차를 다시 실행합니다.
@@ -191,13 +192,17 @@ Secret은 다음 명령으로 등록합니다.
 ```bash
 npx wrangler secret put FACEBOOK_CLIENT_SECRET
 npx wrangler secret put ZALO_APP_SECRET
+npx wrangler secret put KAKAO_CLIENT_SECRET
 ```
+
+`KAKAO_CLIENT_SECRET`은 Kakao 앱에서 client secret을 활성화한 경우에만 등록합니다.
 
 OAuth callback URL:
 
 ```text
 https://vth.kr/api/auth/callback/facebook
 https://vth.kr/api/auth/oauth2/callback/zalo
+https://vth.kr/api/auth/callback/kakao
 ```
 
 ### Facebook 설정
@@ -237,9 +242,27 @@ Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가
    npx wrangler secret put ZALO_APP_SECRET
    ```
 
-두 값(ID와 secret)이 모두 있어야 해당 provider가 Better Auth에 등록됩니다. 설정 후 새 로그인 시도 전에 Worker 배포와 provider 콘솔 저장이 완료되었는지 확인합니다.
+### Kakao 설정
 
-Facebook 또는 Zalo를 최소 하나 구성해야 회원가입과 로그인이 가능합니다.
+1. Kakao Developers에서 앱을 만들고 Kakao Login을 활성화합니다.
+2. Kakao Login 설정의 Redirect URI에 다음 주소를 정확히 등록합니다.
+
+   ```text
+   https://vth.kr/api/auth/callback/kakao
+   ```
+
+3. 동의항목에서 로그인에 사용할 프로필 닉네임, 프로필 이미지, 이메일을 활성화합니다.
+4. Cloudflare의 **Worker → Settings → Variables and Secrets**에 Kakao REST API key를 `KAKAO_CLIENT_ID`로 공개 저장합니다.
+5. Kakao 앱에서 client secret을 활성화한 경우에만 아래 명령으로 secret을 등록합니다.
+
+   ```powershell
+   $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
+   npx wrangler secret put KAKAO_CLIENT_SECRET
+   ```
+
+설정 후 새 로그인 시도 전에 Worker 배포와 각 provider 콘솔 저장이 완료되었는지 확인합니다.
+
+Facebook, Zalo 또는 Kakao 중 최소 하나를 구성해야 회원가입과 로그인이 가능합니다.
 
 ### Web Push를 사용할 경우
 
