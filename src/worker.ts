@@ -43,6 +43,26 @@ type EnvWithLimits = CloudflareEnv & {
   EXPENSIVE_IP_RATE_LIMITER?: RateLimit;
 };
 const REALTIME_PATH = "/api/messages/realtime";
+const DEVELOPER_HOST = "developers.vth.kr";
+
+function routeDeveloperRequest(request: Request): Request {
+  const url = new URL(request.url);
+  if (url.hostname.toLowerCase() !== DEVELOPER_HOST) return request;
+
+  const pathname = url.pathname;
+  const isAsset =
+    pathname.startsWith("/_next/") ||
+    pathname === "/icon.png" ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/speculation-rules.json" ||
+    /\.[a-z0-9]+$/i.test(pathname);
+
+  if (isAsset || pathname.startsWith("/developers")) return request;
+
+  url.pathname = pathname === "/" ? "/developers" : `/developers${pathname}`;
+  return new Request(url, request);
+}
 
 function realtimeJson(data: unknown, status: number): Response {
   return Response.json(data, {
@@ -149,7 +169,8 @@ export default {
         return await handleRealtime(request, env);
       }
 
-      const response = await handler.fetch(request, env, ctx);
+      const appRequest = routeDeveloperRequest(request);
+      const response = await handler.fetch(appRequest, env, ctx);
 
       // Cloudflare Speed Brain injects Speculation-Rules that make Chromium
       // fire Sec-Purpose: prefetch navigations. Those are intentionally refused
