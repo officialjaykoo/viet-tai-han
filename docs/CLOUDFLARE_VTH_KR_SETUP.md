@@ -253,6 +253,7 @@ Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가
    ```
 
 3. 동의항목에서 로그인에 사용할 프로필 닉네임, 프로필 이미지, 이메일을 활성화합니다.
+   Better Auth가 기본으로 요청하는 scope는 `account_email`, `profile_image`, `profile_nickname`입니다. `KOE205`가 나오면 이 세 동의항목이 Kakao Login 설정에 등록·활성화됐는지 확인합니다. `account_email`은 Biz App 요건이 적용될 수 있습니다.
 4. Cloudflare의 **Worker → Settings → Variables and Secrets**에 Kakao REST API key를 `KAKAO_CLIENT_ID`로 공개 저장합니다.
 5. Kakao 앱에서 client secret을 활성화한 경우에만 아래 명령으로 secret을 등록합니다.
 

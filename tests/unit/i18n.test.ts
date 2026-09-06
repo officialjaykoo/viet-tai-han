@@ -55,12 +55,18 @@ describe("request locale detection", () => {
     expect(resolveLocale({ countryCode: "XX" })).toBe("en");
   });
 
-  it("explains Kakao KOE004 in the selected UI language", () => {
+  it("explains Kakao auth errors in the selected UI language", () => {
     expect(localizeErrorMessage("KOE004", "ko")).toContain(
       "카카오 로그인"
     );
     expect(localizeErrorMessage("KOE004", "en")).toContain(
       "Kakao Login is not enabled"
+    );
+    expect(localizeErrorMessage("KOE205", "ko")).toContain(
+      "동의항목"
+    );
+    expect(localizeErrorMessage("KOE205", "en")).toContain(
+      "consent item"
     );
   });
 });

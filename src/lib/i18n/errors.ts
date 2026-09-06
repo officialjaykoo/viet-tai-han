@@ -14,6 +14,12 @@ const ERROR_CATALOG: Record<
     ko: "이 앱의 카카오 로그인이 활성화되지 않았습니다. Kakao Developers에서 카카오 로그인을 켠 후 다시 시도하세요.",
     ru: "Вход через Kakao не включён для этого приложения. Включите Kakao Login в Kakao Developers и повторите попытку.",
   },
+  KOE205: {
+    en: "Kakao rejected a consent item requested by this app. Enable nickname, profile image, and Kakao account email in Kakao Developers. Email access may require a Biz App.",
+    vi: "Kakao từ chối một mục đồng ý mà ứng dụng yêu cầu. Hãy bật biệt danh, ảnh hồ sơ và email tài khoản Kakao trong Kakao Developers. Quyền email có thể cần Biz App.",
+    ko: "앱이 요청한 카카오 동의항목이 설정되지 않았습니다. Kakao Developers에서 닉네임·프로필 사진·카카오계정 이메일 동의항목을 설정하세요. 이메일은 Biz 앱 승인이 필요할 수 있습니다.",
+    ru: "Kakao отклонил запрошенный пункт согласия. В Kakao Developers включите никнейм, изображение профиля и email аккаунта Kakao. Для доступа к email может потребоваться Biz App.",
+  },
   "Sign in to continue": {
     en: "Sign in to continue",
     ru: "Войдите, чтобы продолжить",
