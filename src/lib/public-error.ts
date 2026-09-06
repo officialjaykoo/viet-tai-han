@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { Locale } from "@/lib/i18n/config";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
 import { localizeErrorMessage } from "@/lib/i18n/errors";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { AuthError } from "@/lib/session";
@@ -9,7 +9,7 @@ import { AuthError } from "@/lib/session";
 export function toPublicErrorMessage(
   error: unknown,
   fallback = "Something went wrong",
-  locale: Locale = "vi"
+  locale: Locale = DEFAULT_LOCALE
 ): string {
   if (!(error instanceof AuthError) && !(error instanceof Error)) {
     return localizeErrorMessage(fallback, locale, fallback);
@@ -27,7 +27,7 @@ export function jsonPublicError(
   error: unknown,
   fallback: string,
   status?: number,
-  locale: Locale = "vi"
+  locale: Locale = DEFAULT_LOCALE
 ): Response {
   if (error instanceof AuthError) {
     return Response.json(

@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
+import { LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import type {
   AllowDms,
@@ -53,6 +54,12 @@ const PRO_PLAN_LABELS: Record<ProPlan, MessageKey> = {
   monthly: "settings.proPlanMonthly",
   annual: "settings.proPlanAnnual",
   lifetime: "settings.proPlanLifetime",
+};
+const LANGUAGE_LABEL_KEYS: Record<Locale, MessageKey> = {
+  vi: "language.vietnamese",
+  ko: "language.korean",
+  en: "language.english",
+  ru: "language.russian",
 };
 
 type BlockedUser = {
@@ -331,10 +338,7 @@ export function SettingsClient({
       }
       if (data.settings) {
         setSettings(data.settings);
-        if (
-          data.settings.preferredLanguage === "vi" ||
-          data.settings.preferredLanguage === "ko"
-        ) {
+        if (isLocale(data.settings.preferredLanguage)) {
           void setLanguage(data.settings.preferredLanguage);
         }
         if (
@@ -770,13 +774,8 @@ export function SettingsClient({
             </Field>
 
             <Field label={t("language.settingsLabel")}>
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ["vi", t("language.vietnamese")],
-                    ["ko", t("language.korean")],
-                  ] as const
-                ).map(([code, label]) => (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {LOCALES.map((code) => (
                   <button
                     key={code}
                     type="button"
@@ -791,7 +790,7 @@ export function SettingsClient({
                         : "border-border/60 text-muted-foreground hover:bg-muted"
                     )}
                   >
-                    {label}
+                    {t(LANGUAGE_LABEL_KEYS[code])}
                   </button>
                 ))}
               </div>

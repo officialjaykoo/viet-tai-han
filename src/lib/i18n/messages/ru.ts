@@ -37,14 +37,11 @@ export const ru: Messages = {
     empty: "Сейчас больше никого нет онлайн.",
   },
   language: {
-    promptVi: "Хотите использовать вьетнамский?",
-    promptKo: "Хотите переключиться на корейский?",
-    preferVietnamese: "Я предпочитаю вьетнамский",
-    preferKorean: "Я предпочитаю корейский",
     settingsLabel: "Предпочитаемый язык",
     vietnamese: "Вьетнамский",
     korean: "Корейский",
-    unknown: "Неизвестно",
+    english: "Английский",
+    russian: "Русский",
     change: "Язык",
   },
   auth: {

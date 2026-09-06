@@ -16,19 +16,16 @@ import {
   DEFAULT_LOCALE,
   LANG_COOKIE,
   isLocale,
-  needsLanguagePrompt,
-  resolveLocale,
   type Locale,
   type PreferredLanguage,
 } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import { getMessages, translate } from "@/lib/i18n/translate";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 type I18nContextValue = {
   locale: Locale;
   preferredLanguage: PreferredLanguage;
-  showPrompt: boolean;
   setLanguage: (locale: Locale) => Promise<void>;
   t: (key: MessageKey, params?: Record<string, string | number>) => string;
 };
@@ -76,8 +73,7 @@ export function I18nProvider({
   useEffect(() => {
     const fromCookie = readCookieLocale() ?? cookieLocale;
 
-    // Cookie is source of truth for display so SSR and client stay in sync.
-    // Session preference only fills in when no cookie is set.
+    // An explicit cookie wins so SSR and client navigation keep the selected language.
     if (isLocale(fromCookie)) {
       setCookieLocale(fromCookie);
       setLocale(fromCookie);
@@ -92,8 +88,6 @@ export function I18nProvider({
           }).then(() => {
             setPreferredLanguage(fromCookie);
           });
-        } else {
-          setPreferredLanguage(sessionPref);
         }
       } else if (signedIn && sessionPref === "unknown") {
         setPreferredLanguage("unknown");
@@ -121,38 +115,15 @@ export function I18nProvider({
       return;
     }
 
-    if (signedIn && sessionPref === "unknown") {
-      setPreferredLanguage("unknown");
-      setLocale(DEFAULT_LOCALE);
-      return;
-    }
-
-    if (!signedIn) {
-      setCookieLocale(null);
-      setLocale(DEFAULT_LOCALE);
-      setPreferredLanguage("unknown");
-    }
-  }, [sessionPref, signedIn, cookieLocale]);
-
-  const showPrompt = needsLanguagePrompt({
-    preferredLanguage: signedIn ? preferredLanguage : "unknown",
-    cookieLocale,
-    signedIn,
-  });
+    // No explicit choice yet: retain the server-detected browser/IP locale.
+    setLocale(initialLocale);
+    setPreferredLanguage("unknown");
+  }, [sessionPref, signedIn, cookieLocale, initialLocale]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
     document.title = getMessages(locale).meta.title;
   }, [locale]);
-
-  useEffect(() => {
-    if (!showPrompt) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [showPrompt]);
 
   const setLanguage = useCallback(
     async (next: Locale) => {
@@ -187,11 +158,10 @@ export function I18nProvider({
     () => ({
       locale,
       preferredLanguage,
-      showPrompt,
       setLanguage,
       t,
     }),
-    [locale, preferredLanguage, showPrompt, setLanguage, t]
+    [locale, preferredLanguage, setLanguage, t]
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
@@ -204,7 +174,6 @@ export function useI18n() {
     return {
       locale: DEFAULT_LOCALE,
       preferredLanguage: "unknown" as PreferredLanguage,
-      showPrompt: false,
       setLanguage: async () => {},
       t: (key: MessageKey, params?: Record<string, string | number>) =>
         translate(messages, key, params),
@@ -213,9 +182,3 @@ export function useI18n() {
   return ctx;
 }
 
-export function useResolvedInitialLocale(
-  preferredLanguage: PreferredLanguage,
-  cookieLocale: string | null
-): Locale {
-  return resolveLocale({ preferredLanguage, cookieLocale });
-}

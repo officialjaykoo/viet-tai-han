@@ -8,6 +8,12 @@ const ERROR_CATALOG: Record<
   string,
   { en: string; ru: string; vi?: string; ko?: string }
 > = {
+  KOE004: {
+    en: "Kakao Login is not enabled for this app. Enable Kakao Login in Kakao Developers and try again.",
+    vi: "Kakao Login chưa được bật cho ứng dụng này. Hãy bật Kakao Login trong Kakao Developers rồi thử lại.",
+    ko: "이 앱의 카카오 로그인이 활성화되지 않았습니다. Kakao Developers에서 카카오 로그인을 켠 후 다시 시도하세요.",
+    ru: "Вход через Kakao не включён для этого приложения. Включите Kakao Login в Kakao Developers и повторите попытку.",
+  },
   "Sign in to continue": {
     en: "Sign in to continue",
     ru: "Войдите, чтобы продолжить",
@@ -380,11 +386,11 @@ const ERROR_CATALOG: Record<
     en: "Failed to load ad",
     ru: "Не удалось загрузить рекламу",
   },
-  "preferredLanguage must be vi or ko": {
-    en: "preferredLanguage must be vi or ko",
-    ru: "Язык должен быть vi или ko",
-    vi: "preferredLanguage phải là vi hoặc ko",
-    ko: "언어는 vi 또는 ko여야 합니다",
+  "preferredLanguage must be one of vi, ko, en, or ru": {
+    en: "preferredLanguage must be one of vi, ko, en, or ru",
+    ru: "Язык должен быть одним из: vi, ko, en или ru",
+    vi: "preferredLanguage phải là một trong vi, ko, en hoặc ru",
+    ko: "언어는 vi, ko, en 또는 ru 중 하나여야 합니다",
   },
   "Could not update language": {
     en: "Could not update language",
@@ -681,7 +687,16 @@ const ERROR_CATALOG: Record<
 };
 
 function genericError(locale: Locale): string {
-  return locale === "ko" ? "문제가 발생했습니다" : "요청을 처리하지 못했습니다";
+  switch (locale) {
+    case "vi":
+      return "Đã xảy ra lỗi";
+    case "ko":
+      return "문제가 발생했습니다";
+    case "ru":
+      return "Произошла ошибка";
+    default:
+      return "Something went wrong";
+  }
 }
 
 function normalizeKey(message: string): string {

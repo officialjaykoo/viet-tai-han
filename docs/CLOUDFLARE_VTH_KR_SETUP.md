@@ -245,6 +245,7 @@ Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가
 ### Kakao 설정
 
 1. Kakao Developers에서 앱을 만들고 Kakao Login을 활성화합니다.
+   `KOE004`가 나오면 Client Secret 문제가 아니라 Kakao Developers의 **카카오 로그인 활성화 상태가 꺼진 것**입니다. `제품 설정 → 카카오 로그인 → 일반`에서 활성화 상태를 켜고 저장합니다.
 2. Kakao Login 설정의 Redirect URI에 다음 주소를 정확히 등록합니다.
 
    ```text

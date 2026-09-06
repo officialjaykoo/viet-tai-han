@@ -77,8 +77,10 @@ export function IdentityAuthButtons({
         onClick={onFacebook}
         className="h-11 gap-2 border-blue-500/30 bg-blue-500/[0.04] hover:border-blue-500/50 hover:bg-blue-500/[0.08]"
       >
-        <FacebookBrandIcon />
-        <span>Facebook</span>
+        <span className="grid w-24 grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-2 text-left">
+          <FacebookBrandIcon />
+          <span>Facebook</span>
+        </span>
       </Button>
       <Button
         type="button"
@@ -87,8 +89,10 @@ export function IdentityAuthButtons({
         onClick={onZalo}
         className="h-11 gap-2 border-sky-500/30 bg-sky-500/[0.04] hover:border-sky-500/50 hover:bg-sky-500/[0.08]"
       >
-        <ZaloBrandIcon />
-        <span>Zalo</span>
+        <span className="grid w-24 grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-2 text-left">
+          <ZaloBrandIcon />
+          <span>Zalo</span>
+        </span>
       </Button>
       <Button
         type="button"
@@ -97,8 +101,10 @@ export function IdentityAuthButtons({
         onClick={onKakao}
         className="h-11 gap-2 border-yellow-400/50 bg-yellow-300/[0.12] hover:border-yellow-500/70 hover:bg-yellow-300/[0.22]"
       >
-        <KakaoBrandIcon />
-        <span>Kakao</span>
+        <span className="grid w-24 grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-2 text-left">
+          <KakaoBrandIcon />
+          <span>Kakao</span>
+        </span>
       </Button>
     </div>
   );

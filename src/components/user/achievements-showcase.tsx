@@ -12,7 +12,7 @@ import type { UserAchievement } from "@/lib/achievements";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n/config";
 
-const TITLE_I18N: Partial<Record<string, { vi: string; ko: string }>> = {
+const TITLE_I18N: Partial<Record<string, Partial<Record<Locale, string>>>> = {
   poster: { vi: "Người viết bài", ko: "글 작성자" },
   commenter: { vi: "Người bình luận", ko: "댓글 작성자" },
   karma_climber: { vi: "Người xây dựng uy tín", ko: "신뢰 점수 성장" },
@@ -41,7 +41,9 @@ const TITLE_I18N: Partial<Record<string, { vi: string; ko: string }>> = {
   karma_1000: { vi: "1.000 điểm uy tín", ko: "신뢰 점수 1,000" },
 };
 
-const DESCRIPTION_I18N: Partial<Record<string, { vi: string; ko: string }>> = {
+const DESCRIPTION_I18N: Partial<
+  Record<string, Partial<Record<Locale, string>>>
+> = {
   admin: { vi: "Quản trị viên của trang", ko: "사이트 관리자" },
   moderator: {
     vi: "Điều phối viên cộng đồng hoặc trang",

@@ -79,6 +79,8 @@ Local auth is social-only. Set at least one provider's ID and secret in `.dev.va
 
 Turnstile test keys in `.dev.vars.example` always pass locally. Replace them with your own widget keys for production.
 
+The UI supports Vietnamese, Korean, English, and Russian. The default is English; an explicit cookie/account preference wins, then the browser `Accept-Language` header, then Cloudflare's country header. No language prompt is shown. Signed-in users can change the language under **Settings → Appearance**.
+
 ### Useful scripts
 
 | Script | Purpose |

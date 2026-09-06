@@ -5,7 +5,7 @@
 `red`의 Cloudflare/OpenNext/D1 기반을 유지하되, 베트남 거주 한인과 베트남 현지 사용자가 바로 이해할 수 있는 `Việt tại Hàn` 서비스로 전환한다. P0의 완료 기준은 다음과 같다.
 
 - `vth.kr` 제품 identity가 문서·metadata·header·seed·배포 설정에 일관되게 반영된다.
-- UI는 Vietnamese(`vi`)가 기본이고 Korean(`ko`)이 보조 언어다. SSR/client locale이 일치한다.
+- UI는 Vietnamese(`vi`), Korean(`ko`), English(`en`), Russian(`ru`) 네 언어를 지원한다. 기본값은 English이며 cookie/account preference, 브라우저 언어, Cloudflare 국가 순서로 자동 감지하고 SSR/client locale을 일치시킨다.
 - 390px 기준 가로 overflow 없이 header, feed, create, profile, settings를 사용할 수 있다.
 - 화면의 Reddit 전용 표기(`r/`, `u/`, subreddit, karma, Reddit clone)가 사용자 노출 영역에서 사라진다. 기존 내부 route/DB는 호환기간 유지한다.
 - Better Auth, D1, R2, `/i/api`, rate limit, Turnstile 경계가 vth 운영값으로 검증된다.
@@ -34,18 +34,18 @@
 | 5 | `src/components/layout/site-header.tsx`, `site-footer.tsx` | logo/aria/title/link copy를 `Việt tại Hàn` 또는 `VTH`로 교체. logo link는 `/` 유지. |
 | 6 | `README.md`, `seed.sql`, fixtures | 원본 red/Reddit 샘플을 vth 설명·샘플 community로 교체. 운영 seed 실행은 금지. |
 
-## P0-2 i18n: Vietnamese 기본, Korean 보조
+## P0-2 i18n: four UI locales with automatic detection
 
 | 단계 | 파일/경로 | 구현 |
 |---|---|---|
-| 1 | `src/lib/i18n/config.ts` | `LOCALES = ["vi", "ko"]`, `PREFERRED_LANGUAGES = ["unknown", "vi", "ko"]`, `DEFAULT_LOCALE = "vi"`, cookie `vth_lang`. `isLocale`/`isPreferredLanguage`를 동일 계약으로 변경. |
-| 2 | `src/lib/i18n/messages/vi.ts`, `ko.ts` | `messages/en.ts`의 `Messages` key를 빠짐없이 구현. 사용자 노출 title/nav/auth/feed/post/comment/settings/error copy를 우선 번역. key 누락은 typecheck에서 실패하게 한다. |
-| 3 | `src/lib/i18n/translate.ts` | catalog를 `vi`/`ko`로 교체. 원본 `en`/`ru`는 전환기간에만 별도 fallback으로 둘지 결정하고 사용자 선택지에서는 제거. |
-| 4 | `src/lib/i18n/errors.ts` | 화면에 노출되는 API canonical error에 vi/ko 문구를 추가하고, 미등록 오류는 locale별 안전한 generic fallback으로 표시. server는 stable code/message key를 유지하고 display만 locale화. |
-| 5 | `src/components/i18n/language-switcher.tsx` | 하드코딩 `en/ru` 배열 제거 후 `vi/ko` 배열을 사용. 버튼명은 각각 `Tiếng Việt`, `한국어`. |
-| 6 | `src/components/i18n/language-prompt.tsx` | Vietnamese 우선 prompt와 Korean 선택지를 제공. modal은 mobile bottom sheet, desktop dialog로 유지. |
-| 7 | `src/app/api/me/language/route.ts`, `src/lib/user-language.ts`, `migrations/0019_migrate_legacy_languages.sql` | validation/error copy를 vi/ko 기준으로 변경. 기존 DB `preferredLanguage` 값 en/ru는 forward migration으로 vi/ko에 매핑한다. |
-| 8 | `src/lib/i18n/server.ts`, `i18n-provider.tsx` | cookie 우선 SSR 계약 유지. signed-in preference가 없을 때 vi, cookie 선택 시 account preference를 동기화. |
+| 1 | `src/lib/i18n/config.ts` | `LOCALES = ["vi", "ko", "en", "ru"]`, `DEFAULT_LOCALE = "en"`, cookie `vth_lang`. Explicit cookie/account preference가 우선하고 `Accept-Language`와 Cloudflare country를 fallback으로 사용한다. |
+| 2 | `src/lib/i18n/messages/{vi,ko,en,ru}.ts` | `messages/en.ts`의 `Messages` key를 네 언어로 구현한다. |
+| 3 | `src/lib/i18n/translate.ts` | 네 언어 catalog를 로드한다. |
+| 4 | `src/lib/i18n/errors.ts` | 네 언어 오류 문구와 locale별 안전한 generic fallback을 제공한다. |
+| 5 | `src/components/i18n/language-switcher.tsx`, `settings-client.tsx` | 설정에서 Vietnamese, Korean, English, Russian을 선택할 수 있다. |
+| 6 | `src/components/i18n/language-prompt.tsx` | 자동 감지를 사용하므로 언어 선택 modal은 제거한다. |
+| 7 | `src/app/api/me/language/route.ts`, `src/lib/user-language.ts` | 네 언어만 저장하도록 validation한다. |
+| 8 | `src/lib/i18n/server.ts`, `i18n-provider.tsx` | 서버의 브라우저 언어·Cloudflare 국가 감지 결과를 초기 UI에 유지하고, 사용자가 설정한 cookie/account preference는 계속 동기화한다. |
 
 ## P0-3 공통 mobile-first layout
 

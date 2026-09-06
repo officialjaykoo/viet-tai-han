@@ -37,14 +37,11 @@ export const ko: Messages = {
     empty: "지금 온라인인 사람이 없습니다.",
   },
   language: {
-    promptVi: "베트남어로 사용하시겠어요?",
-    promptKo: "한국어로 사용하시겠어요?",
-    preferVietnamese: "Tiếng Việt 사용",
-    preferKorean: "한국어 사용",
     settingsLabel: "기본 언어",
     vietnamese: "Tiếng Việt",
     korean: "한국어",
-    unknown: "선택 안 함",
+    english: "English",
+    russian: "Русский",
     change: "언어",
   },
   auth: {

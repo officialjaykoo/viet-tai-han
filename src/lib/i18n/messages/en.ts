@@ -35,14 +35,11 @@ export const en = {
     empty: "No one else is online right now.",
   },
   language: {
-    promptVi: "Are you comfortable with Vietnamese?",
-    promptKo: "Would you like to switch to Korean?",
-    preferVietnamese: "I prefer Vietnamese",
-    preferKorean: "I prefer Korean",
     settingsLabel: "Preferred language",
     vietnamese: "Vietnamese",
     korean: "Korean",
-    unknown: "Unknown",
+    english: "English",
+    russian: "Russian",
     change: "Language",
   },
   auth: {

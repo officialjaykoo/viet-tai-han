@@ -1,8 +1,7 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import {
   LANG_COOKIE,
-  isLocale,
   resolveLocale,
   type Locale,
   type PreferredLanguage,
@@ -15,7 +14,7 @@ export async function getRequestLocale(): Promise<{
   cookieLocale: string | null;
   signedIn: boolean;
 }> {
-  const jar = await cookies();
+  const [jar, requestHeaders] = await Promise.all([cookies(), headers()]);
   const cookieLocale = jar.get(LANG_COOKIE)?.value ?? null;
   const session = await getSession();
   const preferredLanguage = ((session?.user as { preferredLanguage?: string } | undefined)
@@ -24,6 +23,10 @@ export async function getRequestLocale(): Promise<{
   const locale = resolveLocale({
     preferredLanguage: signedIn ? preferredLanguage : null,
     cookieLocale,
+    acceptLanguage: requestHeaders.get("accept-language"),
+    countryCode:
+      requestHeaders.get("cf-ipcountry") ??
+      requestHeaders.get("x-vercel-ip-country"),
   });
   return { locale, preferredLanguage, cookieLocale, signedIn };
 }

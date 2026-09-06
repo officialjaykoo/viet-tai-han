@@ -13,6 +13,7 @@ type TurnstileApi = {
     options: {
       sitekey: string;
       action?: string;
+      appearance?: "always" | "execute" | "interaction-only";
       callback?: (token: string) => void;
       "expired-callback"?: () => void;
       "error-callback"?: () => void;
@@ -60,6 +61,7 @@ export function TurnstileWidget({
       widgetIdRef.current = window.turnstile.render(hostRef.current, {
         sitekey,
         action: "turnstile-spin-v1",
+        appearance: "interaction-only",
         theme: "auto",
         callback: (token) => onTokenRef.current(token),
         "expired-callback": () => onTokenRef.current(null),
@@ -141,7 +143,7 @@ export function TurnstileWidget({
       />
       <div
         ref={hostRef}
-        className={cn("cf-turnstile min-h-[65px]", className)}
+        className={cn("cf-turnstile", className)}
         data-action="turnstile-spin-v1"
       />
     </>

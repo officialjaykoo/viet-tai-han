@@ -37,14 +37,11 @@ export const vi: Messages = {
     empty: "Hiện không có ai khác đang trực tuyến.",
   },
   language: {
-    promptVi: "Bạn muốn sử dụng tiếng Việt?",
-    promptKo: "Bạn muốn sử dụng tiếng Hàn?",
-    preferVietnamese: "Tôi chọn tiếng Việt",
-    preferKorean: "Tôi chọn tiếng Hàn",
     settingsLabel: "Ngôn ngữ ưu tiên",
     vietnamese: "Tiếng Việt",
     korean: "한국어",
-    unknown: "Chưa chọn",
+    english: "Tiếng Anh",
+    russian: "Tiếng Nga",
     change: "Ngôn ngữ",
   },
   auth: {
