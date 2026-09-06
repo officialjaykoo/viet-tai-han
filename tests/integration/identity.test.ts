@@ -20,7 +20,30 @@ async function startOAuth(
   );
 }
 
+
 describe("identity providers", () => {
+  it("assigns a temporary username to OAuth users without one", async () => {
+    const auth = createAuth(env.DB);
+    const context = await auth.$context;
+    const userId = `oauth_${crypto.randomUUID()}`;
+
+    await context.internalAdapter.createUser({
+      id: userId,
+      name: "OAuth User",
+      email: `${userId}@oauth.test`,
+      emailVerified: false,
+      image: null,
+    });
+
+    const row = await env.DB.prepare(
+      `SELECT username, displayUsername FROM "user" WHERE id = ?`
+    )
+      .bind(userId)
+      .first<{ username: string; displayUsername: string }>();
+
+    expect(row?.username).toMatch(/^vth_user_[a-f0-9]{12}$/);
+    expect(row?.displayUsername).toBe(row?.username);
+  });
   it("blocks credential authentication endpoints", async () => {
     const auth = createAuth(env.DB);
 

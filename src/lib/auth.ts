@@ -128,6 +128,31 @@ function zaloOAuthConfig(env: AuthEnv) {
 }
 
 
+const TEMPORARY_USERNAME_PREFIX = "vth_user_";
+
+async function createTemporaryUsername(db: D1Database): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
+    const candidate = `${TEMPORARY_USERNAME_PREFIX}${suffix}`;
+    const existing = await db
+      .prepare(`SELECT id FROM "user" WHERE username = ? COLLATE NOCASE`)
+      .bind(candidate)
+      .first<{ id: string }>();
+    if (!existing) return candidate;
+  }
+
+  throw new Error("Could not allocate a temporary username");
+}
+
+function userFieldString(
+  user: Record<string, unknown>,
+  field: string
+): string | null {
+  const value = user[field];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+
 function createAuthFromDb(db: D1Database, env: AuthEnv) {
   const kysely = new Kysely({
     dialect: new D1Dialect({ database: db }),
@@ -279,13 +304,25 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       user: {
         create: {
           before: async (user) => {
-            if (user.image) {
-              return { data: user };
-            }
+            const currentUsername = userFieldString(
+              user as Record<string, unknown>,
+              "username"
+            );
+            const assignedUsername =
+              currentUsername ?? (await createTemporaryUsername(db));
+            const displayUsername =
+              userFieldString(
+                user as Record<string, unknown>,
+                "displayUsername"
+              ) ?? assignedUsername;
+
             return {
               data: {
                 ...user,
-                image: encodeGeneratedAvatar(createAvatarSeed()),
+                username: assignedUsername,
+                displayUsername,
+                image:
+                  user.image ?? encodeGeneratedAvatar(createAvatarSeed()),
               },
             };
           },
