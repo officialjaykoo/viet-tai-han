@@ -65,12 +65,17 @@
 		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAEoYhTGuKEC24mJc",
 		"NEXTJS_ENV": "production",
 		"FACEBOOK_CLIENT_ID": "1027160433660070",
-		"KAKAO_CLIENT_ID": "055c7ca94e809f9f322d85a8f23fcf99",
+		"KAKAO_CLIENT_ID": "055c7ca94e809f9f322d85a8f23fcf99"
 	},
 	"workers_dev": true,
 	"routes": [
 		{
 			"pattern": "vth.kr",
+			"custom_domain": true,
+			"zone_name": "vth.kr"
+		},
+		{
+			"pattern": "developers.vth.kr",
 			"custom_domain": true,
 			"zone_name": "vth.kr"
 		}
