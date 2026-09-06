@@ -23,14 +23,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <Link
           href="/"
           aria-label={t("brand.homeAria")}
-          className="group mx-auto mb-7 flex w-fit flex-col items-center gap-3 rounded-2xl px-4 py-2 outline-none transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="group mx-auto mb-7 flex w-fit items-center rounded-2xl px-4 py-2 outline-none transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-ring/30"
         >
           <BrandLogo size="lg" />
-          <span aria-hidden="true" className="flex items-center gap-1.5">
-            <span className="h-1 w-8 rounded-full bg-[var(--flag-red)]" />
-            <span className="h-1 w-8 rounded-full bg-[var(--flag-gold)]" />
-            <span className="h-1 w-8 rounded-full bg-[var(--flag-red)]" />
-          </span>
         </Link>
         {children}
       </div>
