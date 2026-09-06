@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Geist_Mono, Manrope } from "next/font/google";
@@ -33,7 +34,30 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+async function isDeveloperHost(): Promise<boolean> {
+  const requestHeaders = await headers();
+  const forwardedHost = requestHeaders.get("x-forwarded-host");
+  const host = (forwardedHost || requestHeaders.get("host") || "")
+    .split(",")[0]
+    .trim()
+    .split(":")[0]
+    .toLowerCase();
+  return host === "developers.vth.kr";
+}
+
 export async function generateMetadata(): Promise<Metadata> {
+  if (await isDeveloperHost()) {
+    return {
+      title: "VTH Developers",
+      description: "Developer guide for the VTH social and community platform.",
+      icons: {
+        icon: "/icon.png",
+        shortcut: "/icon.png",
+        apple: "/icon.png",
+      },
+    };
+  }
+
   const { locale } = await getRequestLocale();
   const messages = getMessages(locale);
   return {
@@ -68,7 +92,41 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
 };
 
+function HtmlShell({
+  children,
+  lang,
+  bodyClassName,
+}: {
+  children: ReactNode;
+  lang: string;
+  bodyClassName: string;
+}) {
+  return (
+    <html
+      lang={lang}
+      className={cn("h-full antialiased", manrope.variable, geistMono.variable)}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className={bodyClassName}>{children}</body>
+    </html>
+  );
+}
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
+  if (await isDeveloperHost()) {
+    return (
+      <HtmlShell
+        lang="en"
+        bodyClassName="min-h-dvh bg-background font-sans text-foreground"
+      >
+        <ThemeProvider initialTheme="system">{children}</ThemeProvider>
+      </HtmlShell>
+    );
+  }
+
   const { locale, preferredLanguage, cookieLocale, signedIn } =
     await getRequestLocale();
   const pref: PreferredLanguage = isPreferredLanguage(preferredLanguage)
@@ -83,6 +141,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       : "system";
   const { env } = await getCloudflareContext({ async: true });
   const turnstileSiteKey = env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
+
   return (
     <html
       lang={locale}
