@@ -76,7 +76,10 @@ export async function checkSubjectRateLimit(options: {
   const db = await getDb();
   const windowStart = new Date(
     Date.now() - options.windowSeconds * 1000
-  ).toISOString();
+  )
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
 
   await db
     .prepare(

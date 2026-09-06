@@ -418,7 +418,7 @@ export const en = {
     openerPlaceholder: "Say hello — they must approve before chatting",
     requestChat: "Request chat",
     requestHint:
-      "New chats need approval to reduce spam. Accounts with low reputation can’t message.",
+      "New chats need approval to reduce spam. Requests are rate-limited.",
     chats: "Chats",
     noOpenChats: "No open chats yet.",
     noMessagesYet: "No messages yet",

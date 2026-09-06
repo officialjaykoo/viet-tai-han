@@ -44,14 +44,38 @@ const ERROR_CATALOG: Record<
   },
   "This content isn't allowed": {
     en: "This content isn't allowed",
+    vi: "Nội dung này không được phép",
+    ko: "허용되지 않는 내용입니다",
     ru: "Этот контент не допускается",
   },
   "You're doing that too often. Try again later.": {
     en: "You're doing that too often. Try again later.",
+    vi: "Bạn đang gửi yêu cầu quá thường xuyên. Hãy thử lại sau.",
+    ko: "요청이 너무 많습니다. 나중에 다시 시도해 주세요.",
     ru: "Слишком часто. Попробуйте позже.",
+  },
+  "You're doing that too fast. Slow down.": {
+    en: "You're doing that too fast. Slow down.",
+    vi: "Bạn đang thao tác quá nhanh. Hãy chậm lại.",
+    ko: "너무 빠르게 요청했습니다. 잠시 기다려 주세요.",
+    ru: "Вы действуете слишком быстро. Не торопитесь.",
+  },
+  "Too many requests from this network.": {
+    en: "Too many requests from this network.",
+    vi: "Có quá nhiều yêu cầu từ mạng này.",
+    ko: "이 네트워크에서 요청이 너무 많습니다.",
+    ru: "Слишком много запросов из этой сети.",
+  },
+  "Too many API requests. Try again later.": {
+    en: "Too many API requests. Try again later.",
+    vi: "Quá nhiều yêu cầu API. Hãy thử lại sau.",
+    ko: "API 요청이 너무 많습니다. 나중에 다시 시도해 주세요.",
+    ru: "Слишком много запросов API. Попробуйте позже.",
   },
   "User not found": {
     en: "User not found",
+    vi: "Không tìm thấy người dùng",
+    ko: "사용자를 찾을 수 없습니다",
     ru: "Пользователь не найден",
   },
   "Post not found": {
@@ -72,10 +96,14 @@ const ERROR_CATALOG: Record<
   },
   "Chat not found": {
     en: "Chat not found",
+    vi: "Không tìm thấy cuộc trò chuyện",
+    ko: "대화를 찾을 수 없습니다",
     ru: "Чат не найден",
   },
   "Request not found": {
     en: "Request not found",
+    vi: "Không tìm thấy yêu cầu",
+    ko: "요청을 찾을 수 없습니다",
     ru: "Запрос не найден",
   },
   "Campaign not found": {
@@ -88,38 +116,56 @@ const ERROR_CATALOG: Record<
   },
   "You can't message this user": {
     en: "You can't message this user",
+    vi: "Bạn không thể nhắn tin cho người dùng này",
+    ko: "이 사용자에게 메시지를 보낼 수 없습니다",
     ru: "Вы не можете написать этому пользователю",
   },
   "You can't message yourself": {
     en: "You can't message yourself",
+    vi: "Bạn không thể nhắn tin cho chính mình",
+    ko: "자기 자신에게 메시지를 보낼 수 없습니다",
     ru: "Нельзя написать самому себе",
   },
   "This user isn't accepting chat requests": {
     en: "This user isn't accepting chat requests",
+    vi: "Người dùng này không nhận yêu cầu trò chuyện",
+    ko: "이 사용자는 대화 요청을 받지 않습니다",
     ru: "Этот пользователь не принимает запросы на переписку",
   },
   "Message must be 1–2000 characters": {
     en: "Message must be 1–2000 characters",
+    vi: "Tin nhắn phải dài từ 1–2000 ký tự",
+    ko: "메시지는 1–2000자여야 합니다",
     ru: "Сообщение должно быть от 1 до 2000 символов",
   },
   "Message must be 1–4000 characters": {
     en: "Message must be 1–4000 characters",
+    vi: "Tin nhắn phải dài từ 1–4000 ký tự",
+    ko: "메시지는 1–4000자여야 합니다",
     ru: "Сообщение должно быть от 1 до 4000 символов",
   },
   "Chat already exists": {
     en: "Chat already exists",
+    vi: "Cuộc trò chuyện đã tồn tại",
+    ko: "이미 대화가 존재합니다",
     ru: "Чат уже существует",
   },
   "A chat request is already pending": {
     en: "A chat request is already pending",
+    vi: "Đã có một yêu cầu trò chuyện đang chờ xử lý",
+    ko: "대화 요청이 이미 처리 대기 중입니다",
     ru: "Запрос на переписку уже ожидает ответа",
   },
   "Request already handled": {
     en: "Request already handled",
+    vi: "Yêu cầu đã được xử lý",
+    ko: "대화 요청은 이미 처리되었습니다",
     ru: "Запрос уже обработан",
   },
   "Chat isn't open yet": {
     en: "Chat isn't open yet",
+    vi: "Cuộc trò chuyện chưa được mở",
+    ko: "아직 대화를 시작할 수 없습니다",
     ru: "Чат ещё не открыт",
   },
   "Display name is required": {
@@ -332,6 +378,8 @@ const ERROR_CATALOG: Record<
   },
   "Your karma is too low to send messages. Participate more first.": {
     en: "Your karma is too low to send messages. Participate more first.",
+    vi: "Điểm karma của bạn chưa đủ để gửi tin nhắn. Hãy tham gia thêm trước.",
+    ko: "메시지를 보내려면 카르마가 필요합니다. 먼저 더 활동해 주세요.",
     ru: "Недостаточно кармы для сообщений. Сначала поучаствуйте в обсуждениях.",
   },
   "Your karma is too low to create a community.": {

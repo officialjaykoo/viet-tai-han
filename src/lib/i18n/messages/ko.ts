@@ -413,7 +413,8 @@ export const ko: Messages = {
     username: "사용자 이름",
     openerPlaceholder: "인사를 보내세요 — 상대방이 수락해야 대화할 수 있습니다",
     requestChat: "대화 요청",
-    requestHint: "스팸을 줄이기 위해 새 대화는 승인이 필요합니다. 신뢰 점수가 낮은 계정은 메시지를 보낼 수 없습니다.",
+    requestHint:
+      "스팸을 줄이기 위해 새 대화는 승인이 필요하며, 요청 횟수가 제한됩니다.",
     chats: "대화",
     noOpenChats: "열린 대화가 아직 없습니다.",
     noMessagesYet: "아직 메시지가 없습니다",

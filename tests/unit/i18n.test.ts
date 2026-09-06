@@ -69,4 +69,28 @@ describe("request locale detection", () => {
       "nickname and profile image"
     );
   });
+  it("keeps DM request failures actionable in Korean and Vietnamese", () => {
+    expect(
+      localizeErrorMessage(
+        "Your karma is too low to send messages. Participate more first.",
+        "ko"
+      )
+    ).toBe("메시지를 보내려면 카르마가 필요합니다. 먼저 더 활동해 주세요.");
+    expect(
+      localizeErrorMessage("This user isn't accepting chat requests", "vi")
+    ).toBe("Người dùng này không nhận yêu cầu trò chuyện");
+    expect(
+      localizeErrorMessage("A chat request is already pending", "ko")
+    ).toBe("대화 요청이 이미 처리 대기 중입니다");
+    expect(localizeErrorMessage("Chat already exists", "vi")).toBe(
+      "Cuộc trò chuyện đã tồn tại"
+    );
+    expect(
+      localizeErrorMessage("You're doing that too often. Try again later.", "ko")
+    ).toBe("요청이 너무 많습니다. 나중에 다시 시도해 주세요.");
+    expect(localizeErrorMessage("You can't message this user", "ko")).toBe(
+      "이 사용자에게 메시지를 보낼 수 없습니다"
+    );
+  });
+
 });

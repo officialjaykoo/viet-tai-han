@@ -38,10 +38,10 @@ export async function requireCanCreatePost(user: SessionUser) {
 export async function requireCanMessage(user: SessionUser) {
   await requireActiveUser(user);
   const min = Number.parseInt(
-    await getSiteSetting("min_karma_to_dm", "1"),
+    await getSiteSetting("min_karma_to_dm", "0"),
     10
   );
-  const threshold = Number.isFinite(min) ? min : 1;
+  const threshold = Number.isFinite(min) ? min : 0;
   if (userKarma(user) < threshold) {
     throw new AuthError(
       "Your karma is too low to send messages. Participate more first.",

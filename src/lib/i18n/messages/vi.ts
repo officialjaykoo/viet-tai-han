@@ -418,7 +418,7 @@ export const vi: Messages = {
     openerPlaceholder: "Gửi lời chào — người kia cần chấp nhận trước khi trò chuyện",
     requestChat: "Gửi yêu cầu trò chuyện",
     requestHint:
-      "Cuộc trò chuyện mới cần được chấp nhận để giảm spam. Tài khoản có điểm uy tín thấp chưa thể nhắn tin.",
+      "Cuộc trò chuyện mới cần được chấp nhận để giảm spam. Số lượng yêu cầu bị giới hạn.",
     chats: "Cuộc trò chuyện",
     noOpenChats: "Chưa có cuộc trò chuyện đang mở.",
     noMessagesYet: "Chưa có tin nhắn",
