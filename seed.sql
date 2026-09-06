@@ -833,17 +833,17 @@ INSERT OR IGNORE INTO user_achievements (user_id, achievement_id, level) VALUES
   ('user_nate', 'ach_first_comment', 1),
   ('user_nate', 'ach_verified_start', 1);
 
--- Dev admin login (Better Auth credential / scrypt).
--- Email or username: alice@example.local / alice
--- Password: password123
-INSERT INTO account (
-  id, accountId, providerId, userId, password, createdAt, updatedAt
+-- Local fixtures represent completed profile setup.
+UPDATE "user" SET onboardingComplete = 1 WHERE id LIKE 'user_%';
+
+-- Dev social identity for E2E session setup (no credential account).
+INSERT OR IGNORE INTO account (
+  id, accountId, providerId, userId, createdAt, updatedAt
 ) VALUES (
-  'acc_alice_credential',
+  'acc_alice_facebook',
+  'e2e_alice',
+  'facebook',
   'user_alice',
-  'credential',
-  'user_alice',
-  '3ac61a6e170a63ca219a24a6b88d059e:43982cdb46f398e86ac34bb119014439f045d20172d1ea082eb14a9b6805c7172b33d8f73fb130d7420bbfe28c0c0b1436fb4bbf9804ca6cb4a55332b0751319',
   datetime('now'),
   datetime('now')
 );

@@ -92,6 +92,7 @@ export function CreateCommunityForm() {
       <Button
         type="button"
         className="min-h-11"
+        data-hydrated={hydrated}
         onClick={() => setOpen(true)}
       >
         {t("communities.createCommunity")}

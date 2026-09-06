@@ -18,7 +18,7 @@
 |---|---|---|---|
 | Cloudflare 실행 | `src/worker.ts`, `next.config.ts`, `open-next.config.ts` | OpenNext handler 앞에서 edge IP 제한을 적용하고 HTML에 speculation rule을 설정한다. | Worker 진입점은 유지. `vth` 리소스명과 custom worker 빌드 검증만 수행. |
 | D1 access | `src/lib/db.ts`, `migrations/0001_init.sql`~`0025_multilingual_content.sql` | Kysely-D1/쿼리 builder와 keyset cursor, visibility filter, 인덱스가 이미 있다. 로컬 migration 누적 이력이 적용된다. | 기존 migration은 수정하지 않고 후속 migration만 추가. |
-| 인증/세션 | `src/lib/auth.ts`, `src/lib/session.ts`, `src/lib/permissions.ts` | Better Auth email/password, 세션 캐시, banned 차단, role/status 입력 차단, admin/moderator 경계가 있다. | `vth.kr` trusted origin, OAuth, WebAuthn을 추가하고 secret을 운영값으로 교체. |
+| 인증/세션 | `src/lib/auth.ts`, `src/lib/session.ts`, `src/lib/permissions.ts` | Better Auth 세션과 banned 차단, role/status 입력 차단, admin/moderator 경계가 있다. | Social-only Facebook/Zalo/Kakao OAuth, provider/account canonical identity, onboarding, optional contact email, explicit linking을 유지한다. email/password와 passkey entry point는 비활성화. |
 | 게시물/댓글/투표 | `src/lib/actions.ts`, `src/lib/content.ts`, `src/lib/votes.ts`, `src/app/api/posts/**`, `src/app/api/comments/**` | 생성/수정/삭제/댓글/투표/신고/숨김 및 karma/rate limit/visibility filter가 연결되어 있다. | 핵심 피드 흐름은 유지. Vietnamese 커뮤니티·Q&A 도메인만 확장. |
 | 커뮤니티 | `src/lib/communities.ts`, `src/app/communities/page.tsx`, `src/app/r/[name]/page.tsx` | 커뮤니티 생성·구독·피드·moderator 경계가 구현되어 있다. | 내부 데이터는 호환 유지하고 사용자 노출 명칭을 `community`/`cộng đồng`로 변경. `/r/*`는 호환 redirect로 전환. |
 | 미디어 | `src/lib/media.ts`, `src/lib/image-process.ts`, `src/app/api/media/**`, `src/components/media/tunneled-media.tsx` | 1 MiB 제한, JPEG/PNG/WebP signature 검사, 메타데이터 제거, trailing payload 검사, R2 metadata, `/i/api` blob 로딩이 있다. | MIME/픽셀·quota·ownership 정책을 보강하되 터널 로딩 구조는 유지. |
@@ -51,7 +51,7 @@
 |---|---|---|---|
 | feed 광고 노출 | `src/lib/ads.ts`의 `withFeedAds`/`injectAdsIntoFeed` | `ads_enabled=0` 기본값, analytics consent 없이는 impression/click을 저장하지 않으며 Pro 활성 entitlement는 광고를 제거한다. | 정책·상품·anti-fraud 운영 승인 및 `ads_enabled=1` 전환 |
 | 원격 Workers AI/Vectorize | `src/lib/embeddings.ts`, `src/lib/translation.ts`, `wrangler.jsonc` | 로컬·preview에서 remote 호출을 자동 실행하지 않음. 추천은 hot/new/top fallback. | 실제 model cost budget, multilingual quality, Vectorize index와 장애 fallback 검증 후 on. |
-| production seed/demo | `seed.sql` | 운영 D1에 `alice/password123` 등 seed 금지. | 운영 초기화 절차에서 별도 관리자 bootstrap으로 대체. |
+| production seed/demo | `seed.sql` | 운영 D1에 demo 계정이나 credential/password seed를 넣지 않는다. | 운영 초기화 절차에서 별도 관리자 bootstrap으로 대체. |
 
 ## REMOVE LATER
 
@@ -71,8 +71,7 @@
 | Marketplace/Jobs | listings, categories, location, saved/alert API/UI | 중고거래·구인·서비스 게시. 사기/연락처 노출 정책 포함. |
 | Business profile | business verification/profile/services/hours | 업체·서비스 디렉터리와 예약 진입점. |
 | Reports/policy | report center, appeals, policy pages, moderation queues | 신고·이의제기·운영 투명성. |
-| Identity | Facebook/Zalo/Kakao OAuth, WebAuthn passkey, account linking | 가입 장벽과 계정 보안 개선. |
-| Messaging delivery | push subscription, unread fanout, notification preference | DM/알림의 모바일 전달. |
+| Identity | `src/lib/auth.ts`, `src/lib/oauth-identity.ts`, `src/app/onboarding`, account settings | Social-only Facebook/Zalo/Kakao OAuth, provider/account canonical identity, Better Auth compatibility email, onboarding, optional contact email, explicit account linking. |
 | Trust ledger | karma/reputation/transaction ledger | `0026_monetization_foundations.sql`에 `reputation_ledger` opening balance와 `transaction_ledger`를 추가하고, 신규 reputation 조정은 idempotency key로 기록한다. P1 기반 완료, 회계·정산 운영은 대기. |
 | Vietnamese discovery | diacritic-aware search, location/category index, multilingual embeddings | 다국어 임베딩·추천은 P1에서 완료했고 검색 정규화와 location/category index는 후속 작업. |
 | Observability | Sentry/Workers logs/health checks/security events | 오류·rate-limit·abuse·비용 모니터링. |

@@ -1,4 +1,5 @@
 import { getAuth } from "@/lib/auth";
+import { stripOAuthCompatibilityEmail } from "@/lib/oauth-identity";
 import { HUMAN_COOKIE, openHumanToken } from "@/lib/security/human-cookie";
 
 function readCookie(header: string | null, name: string): string | null {
@@ -24,23 +25,58 @@ async function rejectNonHuman(request: Request): Promise<Response | null> {
       );
 }
 
+async function redactSessionResponse(response: Response): Promise<Response> {
+  if (!response.ok) return response;
+
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return response;
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("user" in body) ||
+    !body.user ||
+    typeof body.user !== "object"
+  ) {
+    return response;
+  }
+
+  const safeUser = stripOAuthCompatibilityEmail(
+    body.user as Record<string, unknown>
+  );
+  const safeBody = { ...(body as Record<string, unknown>), user: safeUser };
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  return new Response(JSON.stringify(safeBody), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function handleAuthRequest(request: Request): Promise<Response> {
+  const rejected = await rejectNonHuman(request);
+  if (rejected) return rejected;
+
+  const auth = await getAuth();
+  const response = await auth.handler(request);
+  return new URL(request.url).pathname.endsWith("/get-session")
+    ? redactSessionResponse(response)
+    : response;
+}
 
 /**
  * Better Auth handler. Reachable only via POST /i/api tunnel (or public API key).
  * Logical path: /api/auth/*
  */
 export async function GET(request: Request) {
-  const rejected = await rejectNonHuman(request);
-  if (rejected) return rejected;
-
-  const auth = await getAuth();
-  return auth.handler(request);
+  return handleAuthRequest(request);
 }
 
 export async function POST(request: Request) {
-  const rejected = await rejectNonHuman(request);
-  if (rejected) return rejected;
-
-  const auth = await getAuth();
-  return auth.handler(request);
+  return handleAuthRequest(request);
 }

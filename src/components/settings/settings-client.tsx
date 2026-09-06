@@ -153,12 +153,12 @@ export function SettingsClient({
   const avatarInput = useRef<HTMLInputElement>(null);
   const cameraAvatarInput = useRef<HTMLInputElement>(null);
 
-  // Account identity
-  const [email, setEmail] = useState(initialSettings.email);
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
-  const socialAccounts = linkedAccounts.filter(
-    (account) => account.providerId !== "credential"
+  // Optional contact information; it is never the sign-in identity.
+  const [contactEmail, setContactEmail] = useState(
+    initialSettings.contactEmail ?? ""
   );
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const socialAccounts = linkedAccounts;
   const [identityLoading, setIdentityLoading] = useState(true);
 
   const username = settings.username ?? "user";
@@ -224,24 +224,34 @@ export function SettingsClient({
     });
   }
 
-  function saveEmail() {
+  function saveContactEmail() {
     flash(null, null);
     startTransition(async () => {
       const res = await apiFetch("/api/me/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section: "email", email }),
+        body: JSON.stringify({ section: "contactEmail", contactEmail }),
       });
-      const data = (await res.json()) as { email?: string; error?: string };
+      const data = (await res.json()) as {
+        contactEmail?: string | null;
+        contactEmailVerified?: boolean;
+        error?: string;
+      };
       if (!res.ok) {
-        flash(null, localizeError(data.error, "Could not update email"));
+        flash(
+          null,
+          localizeError(data.error, "Could not update contact email")
+        );
         return;
       }
-      if (data.email) {
-        setEmail(data.email);
-        setSettings((s) => ({ ...s, email: data.email! }));
-      }
-      flash(t("settings.emailUpdated"), null);
+      const nextContactEmail = data.contactEmail ?? "";
+      setContactEmail(nextContactEmail);
+      setSettings((s) => ({
+        ...s,
+        contactEmail: data.contactEmail ?? null,
+        contactEmailVerified: data.contactEmailVerified ?? false,
+      }));
+      flash(t("settings.contactEmailUpdated"), null);
     });
   }
 
@@ -251,7 +261,11 @@ export function SettingsClient({
       setIdentityLoading(false);
 
       if (accountsResult.data) {
-        setLinkedAccounts(accountsResult.data);
+        setLinkedAccounts(
+          accountsResult.data.filter(
+            (account) => account.providerId !== "credential"
+          )
+        );
       }
 
       if (showError && accountsResult.error) {
@@ -420,18 +434,8 @@ export function SettingsClient({
   }, [section]);
   useEffect(() => {
     if (section !== "account") return;
-
-    let active = true;
-    void authClient.listAccounts().then((accountsResult) => {
-      if (!active) return;
-      setIdentityLoading(false);
-      if (accountsResult.data) setLinkedAccounts(accountsResult.data);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [section]);
+    void loadIdentityMethods();
+  }, [loadIdentityMethods, section]);
 
 
 
@@ -644,23 +648,30 @@ export function SettingsClient({
               </div>
             </SettingsCard>
             <SettingsCard
-              title={t("settings.emailAddress")}
-              description={t("settings.emailAddressDesc")}
+              title={t("settings.contactEmail")}
+              description={t("settings.contactEmailDesc")}
             >
-              <Field label={t("settings.email")}>
+              <Field label={t("settings.contactEmail")}>
                 <Input
                   type="email"
-                  value={email}
+                  value={contactEmail}
+                  placeholder={t("settings.contactEmailPlaceholder")}
                   autoComplete="email"
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setContactEmail(event.target.value)}
                 />
               </Field>
               <Button
                 type="button"
-                disabled={pending || email === settings.email}
-                onClick={saveEmail}
+                disabled={
+                  pending ||
+                  contactEmail.trim().toLowerCase() ===
+                    (settings.contactEmail ?? "")
+                }
+                onClick={saveContactEmail}
               >
-                {t("settings.updateEmail")}
+                {contactEmail.trim()
+                  ? t("settings.updateContactEmail")
+                  : t("settings.clearContactEmail")}
               </Button>
             </SettingsCard>
 
@@ -674,64 +685,71 @@ export function SettingsClient({
                 </p>
               ) : (
                 <ul className="space-y-2">
-                  {linkedAccounts.map((account) => (
-                    <li
-                      key={account.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2"
-                    >
-                      <span className="text-sm font-medium capitalize">
-                        {account.providerId === "credential"
-                          ? t("settings.passwordAccount")
-                          : account.providerId}
-                      </span>
-                      {account.providerId !== "credential" ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={
-                            pending ||
-                            identityLoading ||
-                            socialAccounts.length <= 1
-                          }
-                          onClick={() => unlinkIdentity(account)}
-                        >
-                          {t("settings.unlink")}
-                        </Button>
-                      ) : null}
-                    </li>
-                  ))}
+                  {(
+                    [
+                      {
+                        provider: "facebook",
+                        labelKey: "settings.linkFacebook",
+                      },
+                      {
+                        provider: "kakao",
+                        labelKey: "settings.linkKakao",
+                      },
+                      {
+                        provider: "zalo",
+                        labelKey: "settings.linkZalo",
+                      },
+                    ] as const
+                  ).map(({ provider, labelKey }) => {
+                    const account = linkedAccounts.find(
+                      (candidate) => candidate.providerId === provider
+                    );
+                    return (
+                      <li
+                        key={provider}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {t(labelKey)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {account
+                              ? t("settings.connected")
+                              : t("settings.notConnected")}
+                          </p>
+                        </div>
+                        {account ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                              pending ||
+                              identityLoading ||
+                              socialAccounts.length <= 1
+                            }
+                            onClick={() => unlinkIdentity(account)}
+                          >
+                            {t("settings.unlink")}
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={pending || identityLoading}
+                            onClick={() => linkIdentity(provider)}
+                          >
+                            <LinkIcon className="size-4" />
+                            {t("settings.connect")}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending || identityLoading}
-                  onClick={() => linkIdentity("facebook")}
-                >
-                  <LinkIcon className="size-4" />
-                  {t("settings.linkFacebook")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending || identityLoading}
-                  onClick={() => linkIdentity("zalo")}
-                >
-                  <LinkIcon className="size-4" />
-                  {t("settings.linkZalo")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending || identityLoading}
-                  onClick={() => linkIdentity("kakao")}
-                >
-                  <LinkIcon className="size-4" />
-                  {t("settings.linkKakao")}
-                </Button>
-              </div>
             </SettingsCard>
 
 

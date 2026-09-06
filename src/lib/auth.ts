@@ -1,4 +1,6 @@
 import { APIError, betterAuth } from "better-auth";
+import { setSessionCookie } from "better-auth/cookies";
+import { createAuthEndpoint } from "@better-auth/core/api";
 import { genericOAuth, username } from "better-auth/plugins";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Kysely } from "kysely";
@@ -8,6 +10,7 @@ import {
   createAvatarSeed,
   encodeGeneratedAvatar,
 } from "@/lib/avatar";
+import { mapOAuthEmail } from "@/lib/oauth-identity";
 
 export type AppUserRole = "user" | "moderator" | "admin";
 export type AppUserStatus = "active" | "banned" | "shadowbanned";
@@ -21,6 +24,7 @@ type AuthEnv = {
   ZALO_APP_SECRET?: string;
   KAKAO_CLIENT_ID?: string;
   KAKAO_CLIENT_SECRET?: string;
+  RATE_LIMIT_ENABLED?: boolean;
 };
 
 type ZaloTokenResponse = {
@@ -117,11 +121,16 @@ function zaloOAuthConfig(env: AuthEnv) {
         const profile = (await response.json()) as ZaloProfile;
         if (!profile.id || !profile.name) return null;
 
+        const emailFields = mapOAuthEmail({
+          providerId: "zalo",
+          accountId: profile.id,
+          email: null,
+        });
+
         return {
           id: profile.id,
           name: profile.name,
-          email: `zalo-${profile.id}@oauth.viet-tai-han.invalid`,
-          emailVerified: false,
+          ...emailFields,
           image: profile.picture?.data?.url,
         };
       },
@@ -152,6 +161,30 @@ function userFieldString(
 ): string | null {
   const value = user[field];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+function e2eSessionPlugin() {
+  return {
+    id: "e2e-session",
+    endpoints: {
+      e2eSession: createAuthEndpoint(
+        "/e2e-session",
+        { method: "POST" },
+        async (ctx) => {
+          const user = await ctx.context.internalAdapter.findUserById("user_alice");
+          if (!user) {
+            throw APIError.from("NOT_FOUND", {
+              code: "E2E_USER_NOT_FOUND",
+              message: "E2E user not found",
+            });
+          }
+
+          const session = await ctx.context.internalAdapter.createSession(user.id);
+          await setSessionCookie(ctx, { session, user });
+          return ctx.json({ success: true });
+        }
+      ),
+    },
+  };
 }
 
 
@@ -184,6 +217,13 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
               clientId: env.FACEBOOK_CLIENT_ID!,
               clientSecret: env.FACEBOOK_CLIENT_SECRET!,
               scope: ["email", "public_profile"],
+              mapProfileToUser: (profile) =>
+                mapOAuthEmail({
+                  providerId: "facebook",
+                  accountId: profile.id,
+                  email: profile.email,
+                  emailVerified: profile.email_verified,
+                }),
             },
           }
         : {}),
@@ -192,6 +232,18 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
             kakao: {
               clientId: env.KAKAO_CLIENT_ID!,
               clientSecret: env.KAKAO_CLIENT_SECRET,
+              // Email is optional; only request profile data from Kakao.
+              disableDefaultScope: true,
+              scope: ["profile_image", "profile_nickname"],
+              mapProfileToUser: (profile) =>
+                mapOAuthEmail({
+                  providerId: "kakao",
+                  accountId: String(profile.id),
+                  email: profile.kakao_account?.email,
+                  emailVerified:
+                    profile.kakao_account?.is_email_valid === true &&
+                    profile.kakao_account?.is_email_verified === true,
+                }),
             },
           }
         : {}),
@@ -199,6 +251,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
     account: {
       accountLinking: {
         enabled: true,
+        trustedProviders: ["facebook", "kakao", "zalo"],
         disableImplicitLinking: true,
         allowDifferentEmails: true,
         allowUnlinkingAll: false,
@@ -228,6 +281,25 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
     },
     user: {
       additionalFields: {
+        contactEmail: {
+          type: "string",
+          required: false,
+          input: true,
+          returned: false,
+        },
+        contactEmailVerified: {
+          type: "boolean",
+          defaultValue: false,
+          required: false,
+          input: false,
+          returned: false,
+        },
+        onboardingComplete: {
+          type: "boolean",
+          defaultValue: false,
+          required: false,
+          input: false,
+        },
         karma: {
           type: "number",
           defaultValue: 0,
@@ -306,9 +378,10 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
         usernameValidator: (value) => /^[a-zA-Z0-9_]+$/.test(value),
       }),
       genericOAuth({ config: zaloOAuthConfig(env) }),
+      ...(process.env.E2E_BOT_BYPASS === "1" ? [e2eSessionPlugin()] : []),
     ],
     rateLimit: {
-      enabled: true,
+      enabled: env.RATE_LIMIT_ENABLED ?? true,
       window: 60,
       max: 40,
     },
@@ -393,6 +466,8 @@ export async function getAuth(): Promise<Auth> {
       ZALO_APP_SECRET: env.ZALO_APP_SECRET,
       KAKAO_CLIENT_ID: env.KAKAO_CLIENT_ID,
       KAKAO_CLIENT_SECRET: env.KAKAO_CLIENT_SECRET,
+      RATE_LIMIT_ENABLED:
+        process.env.E2E_BOT_BYPASS === "1" ? false : undefined,
     });
   }
 
@@ -411,5 +486,6 @@ export function createAuth(db: D1Database, env: AuthEnv = {}) {
     ZALO_APP_SECRET: env.ZALO_APP_SECRET,
     KAKAO_CLIENT_ID: env.KAKAO_CLIENT_ID,
     KAKAO_CLIENT_SECRET: env.KAKAO_CLIENT_SECRET,
+    RATE_LIMIT_ENABLED: false,
   });
 }

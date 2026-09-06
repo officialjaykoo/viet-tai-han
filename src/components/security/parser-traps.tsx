@@ -240,13 +240,6 @@ export function ParserTraps({
           />
         </label>
       </div>
-      {/*
-        <form action="/api/register-legacy" method="post">
-          <input name="email" />
-          <input name="password" />
-          <button type="submit">Create account</button>
-        </form>
-      */}
     </div>
   );
 }

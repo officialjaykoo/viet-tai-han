@@ -16,9 +16,13 @@ export class AuthError extends Error {
 
 export async function getSession() {
   const auth = await getAuth();
-  return auth.api.getSession({
+  const session = await auth.api.getSession({
     headers: await headers(),
   });
+  if (!session) return null;
+
+  const { email: _email, ...user } = session.user;
+  return { ...session, user };
 }
 
 /**

@@ -5,7 +5,6 @@ import { getSiteSetting } from "@/lib/settings";
 export type SessionUser = {
   id: string;
   name?: string | null;
-  email?: string | null;
   username?: string | null;
   role?: string | null;
   status?: string | null;

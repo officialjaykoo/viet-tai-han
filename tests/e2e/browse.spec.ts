@@ -29,7 +29,7 @@ test.describe("public browsing", () => {
     await page.goto("/search?q=cloudflare", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
     await expect(
-      page.getByRole("searchbox").or(page.getByPlaceholder(/tìm kiếm|cộng đồng/i)).first()
+      page.locator('main form[role="search"] input[type="search"]')
     ).toBeVisible();
   });
 

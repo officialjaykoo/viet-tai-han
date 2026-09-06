@@ -18,10 +18,10 @@
 - 기본 브랜치: `main`
 - 앱 runtime: Next.js 16 + React 19 + OpenNext Cloudflare
 - persistence: D1 + Kysely-D1, media R2
-- auth: Better Auth + username plugin
+- auth: Better Auth social-only Facebook/Zalo/Kakao + username plugin; no credential/password or passkey entry point
 - browser API: POST `/i/api` Protobuf tunnel
 - direct API: `/api/*` + `Authorization: Bearer <personal_api_key>`
-- local DB: migrations `0001`~`0025`, `seed.sql`
+- local DB: migrations `0001`~`0029`, `seed.sql`
 
 ## P0-1 identity와 환경
 
@@ -121,7 +121,7 @@
 1. Q&A와 답변 채택/검색 — **완료**. `0020_questions_answers.sql`, `/questions`, `/ask`, 답변·채택 API를 적용했다.
 2. 중고거래·구인·서비스 listing과 scam/report workflow — **완료**. `0021_marketplace.sql`, `/marketplace`, listing/save/alert/report API, 운영 리포트 큐와 통합 회귀 테스트를 적용했다.
 3. business profile, verification, 지도/예약 — **완료**. `0022_business_profiles.sql`, `/businesses`, 인증 심사 큐, 지도 링크, 예약 요청/상태 변경 API와 통합 테스트를 적용했다.
-4. Facebook/Zalo/Kakao OAuth, WebAuthn/passkey, account linking — **완료**. `0023_identity_providers.sql`, Better Auth provider/PKCE 구성, 로그인·가입 선택지, 설정의 명시적 계정 연결과 패스키 관리를 적용했다.
+4. Facebook/Zalo/Kakao OAuth, social-first onboarding, account linking — **완료**. `0023_identity_providers.sql`, `0029_social_first_identity.sql`, Better Auth provider/PKCE 구성, 공통 소셜 로그인·가입 화면, 최초 프로필 설정, nullable contact email, 설정의 명시적 계정 연결과 마지막 social account 보호를 적용했다. Better Auth 호환용 synthetic email은 provider/account ID에서 결정적으로 만들며 UI/API에는 노출하지 않는다. Passkey login은 비활성화되어 있다.
 5. push notification, DM moderation, unread fanout — **완료**. `0024_messaging_delivery.sql`, pure Web Push/VAPID subscription API, unread badges, DM 신고·운영 큐와 race-safe request transitions를 적용했다.
 6. Vietnamese content translation, multilingual embedding/recommendation — **완료**. `0025_multilingual_content.sql`의 translation target metadata, vi/ko/en/ru 감지·M2M100 번역, EmbeddingGemma 기반 768차원 추천, stale-vector guard, 운영 backfill을 적용했다.
 7. 광고/Pro/결제/ledger — **기반 구현 완료, 운영 결제 활성화 대기**. `0026_monetization_foundations.sql`의 동의·Pro 구독·청구 이벤트·transaction/reputation ledger, `/api/me/consent`, `/api/me/pro`, 서명된 provider-neutral `/api/billing/webhook`, 광고 기본 off·동의·active-window·dedupe·rate-limit 게이트를 적용했다. 실제 결제 provider checkout/credentials와 정책 승인 전에는 운영 결제를 켜지 않는다.

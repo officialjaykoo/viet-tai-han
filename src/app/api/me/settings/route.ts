@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getUserSettings,
   listBlockedUsers,
-  updateUserEmail,
+  updateUserContactEmail,
   updateUserPreferences,
   updateUserProfile,
   type AllowDms,
@@ -41,7 +41,7 @@ export async function PATCH(request: NextRequest) {
       bio?: string | null;
       image?: string | null;
       bannerKey?: string | null;
-      email?: string;
+      contactEmail?: string;
       theme?: ThemePreference;
       preferredLanguage?: string;
       isNsfw?: boolean;
@@ -68,11 +68,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ settings });
     }
 
-    if (body.section === "email") {
-      if (typeof body.email !== "string") {
-        return await jsonLocalizedError("email is required", 400);
+    if (body.section === "contactEmail") {
+      if (typeof body.contactEmail !== "string") {
+        return await jsonLocalizedError("contactEmail is required", 400);
       }
-      const result = await updateUserEmail(session.user.id, body.email);
+      const result = await updateUserContactEmail(
+        session.user.id,
+        body.contactEmail
+      );
       return NextResponse.json(result);
     }
 

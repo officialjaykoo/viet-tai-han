@@ -36,7 +36,6 @@ export async function POST(
     const user = session.user as {
       id: string;
       name?: string;
-      email?: string;
       status?: string | null;
       karma?: number | null;
       username?: string | null;
@@ -45,7 +44,6 @@ export async function POST(
     await requireCanMessage({
       id: user.id,
       name: user.name ?? "",
-      email: user.email ?? "",
       status: user.status,
       karma: user.karma,
       username: user.username,

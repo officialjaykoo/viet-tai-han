@@ -2,7 +2,7 @@
 
 import type { MutableRefObject } from "react";
 import Script from "next/script";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getTurnstileSiteKey } from "@/lib/security/turnstile-public";
 import { cn } from "@/lib/utils";
@@ -43,14 +43,18 @@ export function TurnstileWidget({
   resetRef,
 }: TurnstileWidgetProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
   const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
   onTokenRef.current = onToken;
 
   const sitekey = getTurnstileSiteKey();
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!sitekey || !hostRef.current) return;
+    if (!mounted || !sitekey || !hostRef.current) return;
 
     let cancelled = false;
 
@@ -107,7 +111,7 @@ export function TurnstileWidget({
         widgetIdRef.current = null;
       }
     };
-  }, [sitekey]);
+  }, [mounted, sitekey]);
 
   useEffect(() => {
     if (!resetRef) return;
@@ -123,6 +127,17 @@ export function TurnstileWidget({
       resetRef.current = null;
     };
   }, [resetRef]);
+
+  if (!mounted) {
+    return (
+      <div
+        ref={hostRef}
+        aria-hidden="true"
+        className={cn("cf-turnstile", className)}
+        data-action="turnstile-spin-v1"
+      />
+    );
+  }
 
   if (!sitekey) {
     return (

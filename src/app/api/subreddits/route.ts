@@ -26,13 +26,11 @@ export async function POST(request: NextRequest) {
       role?: string | null;
       username?: string | null;
       name?: string;
-      email?: string;
     };
     const { requireCanCreateCommunity } = await import("@/lib/permissions");
     await requireCanCreateCommunity({
       id: user.id,
       name: user.name ?? "",
-      email: user.email ?? "",
       status: user.status,
       karma: user.karma,
       role: user.role,

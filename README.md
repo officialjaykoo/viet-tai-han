@@ -50,7 +50,7 @@ flowchart LR
 ## Features
 
 - Communities, posts, comments, votes, profiles
-- Auth ([Better Auth](https://www.better-auth.com) with Facebook/Zalo/Kakao OAuth and explicit account linking)
+- Auth ([Better Auth](https://www.better-auth.com) social-only Facebook/Zalo/Kakao sign-in, onboarding, and explicit account linking)
 - Search and AI-backed recommendations
 - Direct messages and notifications
 - Media uploads (R2)
@@ -155,7 +155,7 @@ For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFL
    ```
 
    All three VAPID values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`) are required to enable push. The site must run on HTTPS (localhost is allowed by browsers); subscriptions can be managed under Settings → Notifications.
-   Facebook and Zalo remain disabled unless both the provider ID and secret are present. Kakao requires `KAKAO_CLIENT_ID`; its client secret is optional unless enabled in Kakao Developers. After signing in with any provider, link the others under Settings → Account → Connected accounts. Email/password and passkey authentication are disabled.
+   Facebook and Zalo remain disabled unless both the provider ID and secret are present. Kakao requires `KAKAO_CLIENT_ID`; its client secret is optional unless enabled in Kakao Developers. Social sign-in is the only account entry point: a new identity completes onboarding with name, username, and language, while an optional contact email is stored separately and is never used as a sign-in or linking key. After signing in with any provider, link the others under Settings → Account → Connected accounts. Email/password and passkey authentication are disabled.
    The billing webhook is not a checkout implementation. Configure a provider adapter, user mapping, prices, refunds, and tax policy before setting `ads_enabled=1` or accepting real payments.
 
 6. Apply remote migrations, then deploy:

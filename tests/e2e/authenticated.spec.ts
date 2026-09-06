@@ -88,6 +88,8 @@ test.describe("authenticated flows", () => {
     // Create community
     await page.goto("/communities", { waitUntil: "domcontentloaded" });
     await waitForHydration(page);
+    await page.getByRole("button", { name: /tạo cộng đồng/i }).click();
+    await waitForHydration(page);
     await warmBotGuard(page);
     const name = `e2e${Date.now().toString(36).slice(-6)}`;
     await page.getByPlaceholder(/tên \(ví dụ/i).fill(name);

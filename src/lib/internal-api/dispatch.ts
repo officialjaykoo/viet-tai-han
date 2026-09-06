@@ -143,6 +143,11 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/me/language/route"),
   },
   {
+    methods: ["GET", "PATCH"],
+    pattern: "/api/me/onboarding",
+    load: () => import("@/app/api/me/onboarding/route"),
+  },
+  {
     methods: ["POST"],
     pattern: "/api/me/nsfw",
     load: () => import("@/app/api/me/nsfw/route"),

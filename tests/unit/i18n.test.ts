@@ -63,10 +63,10 @@ describe("request locale detection", () => {
       "Kakao Login is not enabled"
     );
     expect(localizeErrorMessage("KOE205", "ko")).toContain(
-      "동의항목"
+      "닉네임과 프로필 사진"
     );
     expect(localizeErrorMessage("KOE205", "en")).toContain(
-      "consent item"
+      "nickname and profile image"
     );
   });
 });

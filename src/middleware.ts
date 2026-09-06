@@ -30,6 +30,13 @@ export function middleware(request: NextRequest) {
   ) {
     return NextResponse.next();
   }
+  if (
+    process.env.E2E_BOT_BYPASS === "1" &&
+    method === "POST" &&
+    pathname === "/api/auth/e2e-session"
+  ) {
+    return NextResponse.next();
+  }
 
   if (pathname === "/api/billing/webhook") {
     return NextResponse.next();

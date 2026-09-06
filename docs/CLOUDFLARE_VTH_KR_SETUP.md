@@ -171,9 +171,9 @@ npx wrangler secret put TURNSTILE_SECRET_KEY
 
 ### 추가 OAuth를 사용할 경우
 
-운영 인증은 Facebook, Zalo 또는 Kakao OAuth를 사용합니다. 이메일/사용자명 + 비밀번호 가입·로그인 엔드포인트와 패스키 인증은 비활성화되어 있습니다. Facebook과 Zalo는 ID와 secret을 모두 설정해야 활성화되고, Kakao는 client ID가 있어야 활성화됩니다. Kakao client secret은 Kakao 앱에서 사용하도록 설정한 경우에만 추가합니다.
+운영 인증은 Facebook, Zalo 또는 Kakao OAuth를 사용하는 social-only 흐름입니다. 이메일/사용자명 + 비밀번호 가입·로그인 엔드포인트와 passkey login은 비활성화되어 있습니다. 새 provider identity는 이름·사용자명·언어 onboarding을 완료해야 하며, 연락 이메일은 선택 사항인 별도 필드입니다.
 
-회원은 Facebook, Zalo 또는 Kakao 중 하나로 가입한 뒤, 로그인 후 **설정 → 계정 → 연결된 계정**에서 다른 provider를 명시적으로 연결할 수 있습니다. 연결이 완료되면 연결된 provider 중 어느 쪽으로도 같은 계정에 로그인됩니다.
+회원은 Facebook, Zalo 또는 Kakao 중 하나로 가입한 뒤, 로그인 후 **설정 → 계정 → 연결된 계정**에서 다른 provider를 명시적으로 연결할 수 있습니다. 이메일이 같다는 이유만으로 계정을 자동 병합하지 않으며, 마지막 social provider는 연결 해제할 수 없습니다.
 
 비밀값은 채팅이나 GitHub에 보내지 말고, 아래 `wrangler secret put` 프롬프트에 직접 입력합니다.
 
@@ -252,8 +252,8 @@ Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가
    https://vth.kr/api/auth/callback/kakao
    ```
 
-3. 동의항목에서 로그인에 사용할 프로필 닉네임, 프로필 이미지, 이메일을 활성화합니다.
-   Better Auth가 기본으로 요청하는 scope는 `account_email`, `profile_image`, `profile_nickname`입니다. `KOE205`가 나오면 이 세 동의항목이 Kakao Login 설정에 등록·활성화됐는지 확인합니다. `account_email`은 Biz App 요건이 적용될 수 있습니다.
+3. 동의항목에서 로그인에 사용할 프로필 닉네임과 프로필 이미지를 활성화합니다. 이메일 동의항목은 선택 사항이며, 현재 앱은 `account_email` scope를 요청하지 않습니다.
+   이메일이 없는 Kakao 계정도 provider ID 기반 synthetic email로 Better Auth 호환성을 유지하면서 가입할 수 있습니다. 이 주소는 UI/API/profile에 노출하지 않습니다.
 4. Cloudflare의 **Worker → Settings → Variables and Secrets**에 Kakao REST API key를 `KAKAO_CLIENT_ID`로 공개 저장합니다.
 5. Kakao 앱에서 client secret을 활성화한 경우에만 아래 명령으로 secret을 등록합니다.
 

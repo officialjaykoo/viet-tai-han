@@ -5,7 +5,8 @@ import { MIN_DWELL_MS } from "../../../src/lib/security/bot-signals";
 
 export const SEED_USER = {
   username: "alice",
-  password: "password123",
+  providerId: "facebook",
+  accountId: "e2e_alice",
 } as const;
 
 /** Prefer Vietnamese and skip the locale chooser dialog. */
@@ -35,6 +36,9 @@ export async function disguiseAutomation(page: Page) {
 /** Dismiss locale and privacy prompts if they still appear. */
 export async function dismissLanguagePrompt(page: Page) {
   const preferVi = page.getByRole("button", { name: /chọn tiếng việt/i });
+  await preferVi
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .catch(() => undefined);
   if (await preferVi.isVisible().catch(() => false)) {
     await preferVi.click();
     await expect(preferVi).toBeHidden({ timeout: 5_000 });
@@ -43,6 +47,9 @@ export async function dismissLanguagePrompt(page: Page) {
   const essentialConsent = page.getByRole("button", {
     name: /chỉ thiết yếu/i,
   });
+  await essentialConsent
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .catch(() => undefined);
   if (await essentialConsent.isVisible().catch(() => false)) {
     await expect(essentialConsent).toBeEnabled({ timeout: 20_000 });
     await essentialConsent.click();
@@ -68,36 +75,39 @@ export async function waitForHydration(page: Page) {
   });
 }
 
-/** Sign in as the local seed admin account. */
+/** Establish a test-only session for the seeded social account. */
 export async function loginAsAlice(page: Page, next = "/") {
   await seedLocaleCookie(page);
   await disguiseAutomation(page);
-  await page.goto(`/login?next=${encodeURIComponent(next)}`, {
-    waitUntil: "domcontentloaded",
-  });
-  await dismissLanguagePrompt(page);
-  await waitForHydration(page);
-  await expect(page.getByRole("heading", { name: /đăng nhập/i })).toBeVisible();
-  await warmBotGuard(page);
 
-  const username = page.getByLabel(/tên người dùng/i);
-  const password = page.getByLabel(/^mật khẩu$/i);
-  await username.fill(SEED_USER.username);
-  await password.fill(SEED_USER.password);
-  await page.keyboard.press("Tab");
-
-  await page.getByRole("button", { name: /^đăng nhập$/i }).click();
-  await expect(page.getByRole("button", { name: /đang đăng nhập/i })).toBeVisible({
-    timeout: 5_000,
-  }).catch(() => undefined);
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-    timeout: 45_000,
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+  await page.goto(`${baseURL}/login`, { waitUntil: "domcontentloaded" });
+  const result = await page.evaluate(async () => {
+    const response = await fetch("/api/auth/e2e-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: await response.text(),
+    };
   });
+  expect(result.ok, result.body || `HTTP ${result.status}`).toBeTruthy();
+
+  await page.goto(next, { waitUntil: "domcontentloaded" });
+  // Ensure the client session atom starts after the test session cookie exists.
+  await page.reload({ waitUntil: "domcontentloaded" });
   await dismissLanguagePrompt(page);
 }
 
 export async function expectSignedIn(page: Page) {
-  await expect(
-    page.getByRole("button", { name: /menu tài khoản/i })
-  ).toBeVisible({ timeout: 15_000 });
+  const accountMenu = page.getByRole("button", { name: /menu tài khoản/i });
+  try {
+    await accountMenu.waitFor({ state: "visible", timeout: 5_000 });
+  } catch {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await accountMenu.waitFor({ state: "visible", timeout: 15_000 });
+  }
 }

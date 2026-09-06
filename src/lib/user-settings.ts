@@ -10,7 +10,9 @@ export type UserSettings = {
   id: string;
   username: string | null;
   name: string;
-  email: string;
+  contactEmail: string | null;
+  contactEmailVerified: boolean;
+  onboardingComplete: boolean;
   image: string | null;
   bio: string | null;
   bannerKey: string | null;
@@ -39,9 +41,10 @@ export async function getUserSettings(
   const db = await getDb();
   const row = await db
     .prepare(
-      `SELECT id, username, name, email, image, bio,
-              bannerKey, preferredLanguage, theme, isNsfw, showNsfw, allowDms,
-              notifyComments, notifyFollows, notifyChat, notifyMentions
+      `SELECT id, username, name, contactEmail, contactEmailVerified,
+              onboardingComplete, image, bio, bannerKey, preferredLanguage,
+              theme, isNsfw, showNsfw, allowDms, notifyComments, notifyFollows,
+              notifyChat, notifyMentions
        FROM "user" WHERE id = ?`
     )
     .bind(userId)
@@ -49,7 +52,9 @@ export async function getUserSettings(
       id: string;
       username: string | null;
       name: string;
-      email: string;
+      contactEmail: string | null;
+      contactEmailVerified: number;
+      onboardingComplete: number;
       image: string | null;
       bio: string | null;
       bannerKey: string | null;
@@ -70,7 +75,9 @@ export async function getUserSettings(
     id: row.id,
     username: row.username,
     name: row.name,
-    email: row.email,
+    contactEmail: row.contactEmail,
+    contactEmailVerified: Boolean(row.contactEmailVerified),
+    onboardingComplete: Boolean(row.onboardingComplete),
     image: row.image,
     bio: row.bio,
     bannerKey: row.bannerKey,
@@ -85,6 +92,33 @@ export async function getUserSettings(
     notifyMentions: Boolean(row.notifyMentions),
   };
 }
+
+export async function updateUserContactEmail(
+  userId: string,
+  contactEmail: string
+) {
+  const normalized = contactEmail.trim().toLowerCase();
+  if (normalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new AuthError("Invalid contact email", 400);
+  }
+
+  const db = await getDb();
+  await db
+    .prepare(
+      `UPDATE "user"
+       SET contactEmail = ?, contactEmailVerified = 0,
+           updatedAt = datetime('now')
+       WHERE id = ?`
+    )
+    .bind(normalized || null, userId)
+    .run();
+
+  return {
+    contactEmail: normalized || null,
+    contactEmailVerified: false,
+  };
+}
+
 
 export async function updateUserProfile(input: {
   userId: string;
@@ -223,30 +257,6 @@ export async function updateUserPreferences(input: {
   return getUserSettings(input.userId);
 }
 
-export async function updateUserEmail(userId: string, email: string) {
-  const normalized = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new AuthError("Invalid email", 400);
-  }
-
-  const db = await getDb();
-  const taken = await db
-    .prepare(`SELECT id FROM "user" WHERE email = ? AND id != ?`)
-    .bind(normalized, userId)
-    .first();
-  if (taken) throw new AuthError("Email already in use", 409);
-
-  await db
-    .prepare(
-      `UPDATE "user"
-       SET email = ?, emailVerified = 0, updatedAt = datetime('now')
-       WHERE id = ?`
-    )
-    .bind(normalized, userId)
-    .run();
-
-  return { email: normalized };
-}
 
 export async function listBlockedUsers(userId: string) {
   const db = await getDb();

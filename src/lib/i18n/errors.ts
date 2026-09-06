@@ -15,10 +15,10 @@ const ERROR_CATALOG: Record<
     ru: "Вход через Kakao не включён для этого приложения. Включите Kakao Login в Kakao Developers и повторите попытку.",
   },
   KOE205: {
-    en: "Kakao rejected a consent item requested by this app. Enable nickname, profile image, and Kakao account email in Kakao Developers. Email access may require a Biz App.",
-    vi: "Kakao từ chối một mục đồng ý mà ứng dụng yêu cầu. Hãy bật biệt danh, ảnh hồ sơ và email tài khoản Kakao trong Kakao Developers. Quyền email có thể cần Biz App.",
-    ko: "앱이 요청한 카카오 동의항목이 설정되지 않았습니다. Kakao Developers에서 닉네임·프로필 사진·카카오계정 이메일 동의항목을 설정하세요. 이메일은 Biz 앱 승인이 필요할 수 있습니다.",
-    ru: "Kakao отклонил запрошенный пункт согласия. В Kakao Developers включите никнейм, изображение профиля и email аккаунта Kakao. Для доступа к email может потребоваться Biz App.",
+    en: "Kakao rejected a requested profile item. Enable nickname and profile image in Kakao Developers; email is optional.",
+    vi: "Kakao từ chối một mục hồ sơ được yêu cầu. Hãy bật biệt danh và ảnh hồ sơ trong Kakao Developers; email là tùy chọn.",
+    ko: "카카오가 요청한 프로필 항목을 거부했습니다. Kakao Developers에서 닉네임과 프로필 사진을 활성화하세요. 이메일은 선택 사항입니다.",
+    ru: "Kakao отклонил запрошенный пункт профиля. Включите никнейм и изображение профиля в Kakao Developers; email необязателен.",
   },
   "Sign in to continue": {
     en: "Sign in to continue",
@@ -120,6 +120,48 @@ const ERROR_CATALOG: Record<
     en: "Display name is required",
     ru: "Укажите отображаемое имя",
   },
+  "Username is required": {
+    en: "Username is required",
+    ru: "Укажите имя пользователя",
+    vi: "Vui lòng nhập tên người dùng",
+    ko: "사용자 이름을 입력하세요",
+  },
+  "Username must be 3–24 letters, numbers, or underscores": {
+    en: "Username must be 3–24 letters, numbers, or underscores",
+    ru: "Имя пользователя должно содержать 3–24 латинских буквы, цифры или подчёркивания",
+    vi: "Tên người dùng phải có 3–24 chữ cái, chữ số hoặc dấu gạch dưới",
+    ko: "사용자 이름은 영문, 숫자 또는 밑줄 3–24자여야 합니다",
+  },
+  "Username already in use": {
+    en: "Username already in use",
+    ru: "Имя пользователя уже используется",
+    vi: "Tên người dùng đã được sử dụng",
+    ko: "이미 사용 중인 사용자 이름입니다",
+  },
+  "Onboarding language is required": {
+    en: "Choose a language to continue",
+    ru: "Выберите язык, чтобы продолжить",
+    vi: "Hãy chọn ngôn ngữ để tiếp tục",
+    ko: "계속하려면 언어를 선택하세요",
+  },
+  "Onboarding fields are required": {
+    en: "Name, username, and language are required",
+    ru: "Нужны имя, имя пользователя и язык",
+    vi: "Cần có tên, tên người dùng và ngôn ngữ",
+    ko: "이름, 사용자 이름과 언어를 입력하세요",
+  },
+  "Invalid contact email": {
+    en: "Enter a valid contact email",
+    ru: "Введите корректный контактный email",
+    vi: "Hãy nhập email liên hệ hợp lệ",
+    ko: "유효한 연락 이메일을 입력하세요",
+  },
+  "contactEmail is required": {
+    en: "Contact email must be provided as text",
+    ru: "Контактный email должен быть текстом",
+    vi: "Email liên hệ phải là văn bản",
+    ko: "연락 이메일은 문자열이어야 합니다",
+  },
   "Invalid theme": {
     en: "Invalid theme",
     ru: "Некорректная тема",
@@ -131,14 +173,6 @@ const ERROR_CATALOG: Record<
   "Invalid DM preference": {
     en: "Invalid DM preference",
     ru: "Некорректная настройка сообщений",
-  },
-  "Invalid email": {
-    en: "Invalid email",
-    ru: "Некорректный email",
-  },
-  "Email already in use": {
-    en: "Email already in use",
-    ru: "Этот email уже используется",
   },
   "You can't block yourself": {
     en: "You can't block yourself",
@@ -340,10 +374,6 @@ const ERROR_CATALOG: Record<
     en: "section is required",
     ru: "Укажите раздел",
   },
-  "email is required": {
-    en: "email is required",
-    ru: "Укажите email",
-  },
   "Unknown section": {
     en: "Unknown section",
     ru: "Неизвестный раздел",
@@ -414,37 +444,9 @@ const ERROR_CATALOG: Record<
     en: "Could not save profile",
     ru: "Не удалось сохранить профиль",
   },
-  "Could not update email": {
-    en: "Could not update email",
-    ru: "Не удалось обновить email",
-  },
-  "Could not change password": {
-    en: "Could not change password",
-    ru: "Не удалось сменить пароль",
-  },
   "Could not save": {
     en: "Could not save",
     ru: "Не удалось сохранить",
-  },
-  "Password must be at least 8 characters": {
-    en: "Password must be at least 8 characters",
-    ru: "Пароль должен быть не короче 8 символов",
-  },
-  "Passwords do not match": {
-    en: "Passwords do not match",
-    ru: "Пароли не совпадают",
-  },
-  "Profile saved": {
-    en: "Profile saved",
-    ru: "Профиль сохранён",
-  },
-  "Email updated": {
-    en: "Email updated",
-    ru: "Email обновлён",
-  },
-  "Password changed": {
-    en: "Password changed",
-    ru: "Пароль изменён",
   },
   Saved: {
     en: "Saved",
@@ -501,22 +503,6 @@ const ERROR_CATALOG: Record<
   "Could not generate avatar": {
     en: "Could not generate avatar",
     ru: "Не удалось создать аватар",
-  },
-  "Invalid credentials": {
-    en: "Invalid credentials",
-    ru: "Неверный логин или пароль",
-  },
-  "User already exists": {
-    en: "User already exists",
-    ru: "Пользователь уже существует",
-  },
-  "Username is already taken": {
-    en: "Username is already taken",
-    ru: "Это имя пользователя уже занято",
-  },
-  "Password is too short": {
-    en: "Password is too short",
-    ru: "Пароль слишком короткий",
   },
   "Couldn't load messages": {
     en: "Couldn't load messages",

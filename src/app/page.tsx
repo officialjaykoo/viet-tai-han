@@ -10,6 +10,7 @@ import {
   UsersRoundIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Feed } from "@/components/feed/feed";
 import { FeedComposer } from "@/components/feed/feed-composer";
@@ -24,6 +25,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getSession } from "@/lib/session";
+import { getOnboardingState } from "@/lib/onboarding";
 import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 import type { PaginatedFeed } from "@/lib/types";
@@ -74,13 +76,21 @@ export default async function HomePage({
 }) {
   const params = await searchParams;
   const session = await getSession();
+  const onboarding = session?.user
+    ? await getOnboardingState(session.user.id)
+    : null;
+  if (onboarding && !onboarding.onboardingComplete) {
+    redirect("/onboarding");
+  }
   const { locale } = await getRequestLocale();
   const signedIn = Boolean(session?.user);
-  const username = (session?.user as { username?: string } | undefined)
-    ?.username ?? null;
+  const username =
+    onboarding?.username ??
+    (session?.user as { username?: string } | undefined)?.username ??
+    null;
   const profileHref = getProfileHref(session?.user);
   const profileLabel =
-    username ?? session?.user?.name ?? tLocale(locale, "nav.logIn");
+    username ?? onboarding?.name ?? session?.user?.name ?? tLocale(locale, "nav.logIn");
   const image = session?.user?.image ?? null;
   const desktopLinks = [
     { href: "/", label: tLocale(locale, "nav.popular"), icon: FlameIcon },

@@ -21,18 +21,25 @@ test.describe("cross-platform smoke", () => {
     ).toBeVisible();
   });
 
-  test("auth pages are usable on narrow viewports", async ({ page }) => {
-    await page.goto("/login", { waitUntil: "domcontentloaded" });
-    await dismissLanguagePrompt(page);
-    await expect(page.getByRole("heading", { name: /đăng nhập/i })).toBeVisible();
-    const username = page.getByLabel(/tên người dùng/i);
-    await expect(username).toBeVisible();
-    await expect(username).toBeEditable();
-
-    await page.goto("/signup", { waitUntil: "domcontentloaded" });
-    await dismissLanguagePrompt(page);
-    await expect(page.getByRole("heading", { name: /tham gia/i })).toBeVisible();
-    await expect(page.getByLabel(/^email$/i)).toBeVisible();
+  test("auth pages offer social continuation on narrow viewports", async ({
+    page,
+  }) => {
+    for (const path of ["/login", "/signup"]) {
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      await dismissLanguagePrompt(page);
+      await expect(
+        page.getByRole("heading", { name: /tiếp tục với/i })
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Facebook" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Zalo" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Kakao" })).toBeVisible();
+      await expect(page.getByText(/không cần email hoặc mật khẩu/i)).toBeVisible();
+      await expect(
+        page.locator(
+          'input:not([form="_red_trap"]):not([name="cf-turnstile-response"])'
+        )
+      ).toHaveCount(0);
+    }
   });
 
   test("layout does not overflow horizontally", async ({ page }) => {
