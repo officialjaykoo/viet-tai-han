@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 
 import { PostCard } from "@/components/feed/post-card";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ProfileCommentCard } from "@/components/user/profile-comment-card";
 import { ProfileFriends } from "@/components/user/profile-friends";
@@ -121,7 +122,7 @@ export default async function ProfilePage({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_12%,transparent),transparent_70%)]"
         />
-        <div className="relative mx-auto w-full max-w-6xl safe-px safe-pb py-4 sm:py-6">
+        <PageShell width="wide" className="py-4 sm:py-6">
           <ProfileHeader
             profile={user}
             isOwner={isOwner}
@@ -207,7 +208,7 @@ export default async function ProfilePage({
               isOwner={isOwner}
             />
           </div>
-        </div>
+        </PageShell>
       </main>
     </>
   );

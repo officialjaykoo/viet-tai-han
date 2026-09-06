@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { voteOnComment } from "@/lib/actions";
+import { removeVoteOnComment, voteOnComment } from "@/lib/actions";
 import { serializeCommentVoteResult } from "@/lib/serializers";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
-import type { VoteAction } from "@/lib/types";
+import type { VoteMutation } from "@/lib/types";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
 
-const ACTIONS = new Set<VoteAction>(["upvote", "downvote"]);
+const ACTIONS = new Set<VoteMutation>(["upvote", "downvote", "remove"]);
 
 export async function POST(
   request: NextRequest,
@@ -17,10 +17,13 @@ export async function POST(
     const session = await requireSession();
     const { id: commentId } = await context.params;
     const body = (await readApiJson(request)) as { action?: string };
-    const action = body.action as VoteAction | undefined;
+    const action = body.action as VoteMutation | undefined;
 
     if (!action || !ACTIONS.has(action)) {
-      return await jsonLocalizedError("action must be 'upvote' or 'downvote'", 400);
+      return await jsonLocalizedError(
+        "action must be 'upvote', 'downvote', or 'remove'",
+        400
+      );
     }
 
     const user = session.user as {
@@ -28,13 +31,19 @@ export async function POST(
       karma?: number | null;
       status?: string | null;
     };
-    const result = await voteOnComment({
-      commentId,
-      userId: user.id,
-      voterKarma: user.karma ?? 0,
-      userStatus: user.status,
-      action,
-    });
+    const result =
+      action === "remove"
+        ? await removeVoteOnComment({
+            commentId,
+            userId: user.id,
+          })
+        : await voteOnComment({
+            commentId,
+            userId: user.id,
+            voterKarma: user.karma ?? 0,
+            userStatus: user.status,
+            action,
+          });
 
     return NextResponse.json(serializeCommentVoteResult(result));
   } catch (error) {

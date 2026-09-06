@@ -1,8 +1,8 @@
 import { getDb } from "@/lib/db";
 import type { Locale } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/config";
+import { normalizeAvatarImage } from "@/lib/avatar";
 import { AuthError } from "@/lib/session";
-
 export type ThemePreference = "system" | "light" | "dark";
 export type AllowDms = "anyone" | "followers" | "nobody";
 
@@ -147,7 +147,9 @@ export async function updateUserProfile(input: {
       ? input.bio?.trim().slice(0, 300) || null
       : current.bio;
   const image =
-    input.image !== undefined ? input.image : current.image;
+    input.image !== undefined
+      ? normalizeAvatarImage(input.image)
+      : current.image;
   const bannerKey =
     input.bannerKey !== undefined ? input.bannerKey : current.bannerKey;
 

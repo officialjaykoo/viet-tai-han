@@ -231,6 +231,73 @@ export async function voteOnPost(
   };
 }
 
+export async function removeVoteOnPost(
+  postId: string,
+  actor: VoteActor
+): Promise<VoteResult> {
+  const db = await getDb();
+  const post = await db
+    .prepare(`SELECT author_id FROM posts WHERE id = ? AND is_removed = 0`)
+    .bind(postId)
+    .first<{ author_id: string }>();
+  if (!post) throw new Error("Post not found");
+
+  const existing = await db
+    .prepare(
+      `SELECT value, weight FROM votes
+       WHERE user_id = ? AND target_type = 'post' AND target_id = ?`
+    )
+    .bind(actor.userId, postId)
+    .first<{ value: number; weight: number }>();
+  if (!existing) {
+    return {
+      postId,
+      score: displayScore(await readPostScore(postId)),
+      viewerVote: null,
+    };
+  }
+
+  const shadowVoter = actor.userStatus === "shadowbanned";
+  const weight = Number(existing.weight ?? 0);
+  const signedContribution = existing.value === 1 ? weight : -weight;
+  const scoreDelta = shadowVoter ? 0 : -signedContribution;
+
+  await db
+    .prepare(
+      `DELETE FROM votes
+       WHERE user_id = ? AND target_type = 'post' AND target_id = ?`
+    )
+    .bind(actor.userId, postId)
+    .run();
+
+  if (!shadowVoter) {
+    await applyPostVoteDelta(
+      postId,
+      existing.value === 1 ? -1 : 0,
+      existing.value === -1 ? -1 : 0,
+      scoreDelta
+    );
+    const authorKarmaDelta = Math.trunc(scoreDelta / 100);
+    if (authorKarmaDelta !== 0 && post.author_id !== actor.userId) {
+      await adjustAuthorKarma(post.author_id, "post", authorKarmaDelta);
+    }
+  }
+
+  try {
+    const env = await getEnv();
+    const stub = getPostStub(env, postId);
+    await stub.getVotes(postId);
+  } catch {
+    // Local next-dev without DO binding is fine.
+  }
+
+  return {
+    postId,
+    score: displayScore(await readPostScore(postId)),
+    viewerVote: null,
+  };
+}
+
 export async function getLiveVotes(postId: string): Promise<VoteResult> {
   return {
     postId,

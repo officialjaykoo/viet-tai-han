@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createSubreddit } from "@/lib/actions";
 import { listSubreddits } from "@/lib/content";
-import { requireActiveUser } from "@/lib/permissions";
+import { requireAdmin } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
@@ -22,12 +22,11 @@ export async function POST(request: NextRequest) {
     const session = await requireSession();
     const user = session.user as {
       id: string;
+      name?: string | null;
+      role?: string | null;
       status?: string | null;
-      username?: string | null;
-      name?: string;
     };
-    await requireActiveUser(user);
-
+    const actor = await requireAdmin(user);
     const body = (await readApiJson(request)) as {
       name?: string;
       title?: string;
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createSubreddit({
-      userId: session.user.id,
+      actor,
       name: body.name,
       title: body.title,
       description: body.description,

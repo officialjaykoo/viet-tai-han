@@ -2,6 +2,7 @@
 
 import {
   BanIcon,
+  CopyIcon,
   EllipsisIcon,
   EyeOffIcon,
   FlagIcon,
@@ -11,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import { getCanonicalPostUrl } from "@/lib/post-url";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { apiFetch } from "@/lib/api-client";
 import {
@@ -50,6 +53,18 @@ export function PostOverflowMenu({
   const [mode, setMode] = useState<"menu" | "report">("menu");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function copyLink() {
+    setError(null);
+    try {
+      await copyTextToClipboard(
+        getCanonicalPostUrl(postId, window.location.origin)
+      );
+      setMessage(t("post.linkCopied"));
+    } catch {
+      setError(t("post.copyLinkFailed"));
+    }
+  }
 
   function requireAuth(status: number) {
     if (status === 401) {
@@ -143,6 +158,15 @@ export function PostOverflowMenu({
         <DropdownMenuContent align="end" className="min-w-52 w-52">
           {mode === "menu" ? (
             <DropdownMenuGroup>
+              <DropdownMenuItem
+                className="min-h-11"
+                disabled={pending}
+                onClick={copyLink}
+              >
+                <CopyIcon />
+                {t("post.copyLink")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="min-h-11"
                 disabled={pending}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PostStatsClient } from "@/components/posts/post-stats-client";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -40,22 +41,24 @@ export default async function PostStatsPage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 safe-px safe-pb py-6 sm:py-8">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            <Link href={`/post/${id}`} className="hover:underline">
-              {tLocale(locale, "post.backToPost")}
-            </Link>
-            <span className="mx-1.5" aria-hidden>
-              /
-            </span>
-            {tLocale(locale, "post.analytics")}
-          </p>
-          <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-balance">
-            {post.title}
-          </h1>
-        </div>
-        <PostStatsClient postId={id} />
+      <main className="flex-1">
+        <PageShell width="narrow" className="space-y-6">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              <Link href={`/post/${id}`} className="hover:underline">
+                {tLocale(locale, "post.backToPost")}
+              </Link>
+              <span className="mx-1.5" aria-hidden>
+                /
+              </span>
+              {tLocale(locale, "post.analytics")}
+            </p>
+            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-balance">
+              {post.title}
+            </h1>
+          </div>
+          <PostStatsClient postId={id} />
+        </PageShell>
       </main>
     </>
   );

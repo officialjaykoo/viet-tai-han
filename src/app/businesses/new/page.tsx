@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BusinessForm } from "@/components/business/business-form";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -20,7 +21,7 @@ export default async function NewBusinessPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="relative mx-auto w-full max-w-3xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="narrow" className="space-y-6">
           <Link href="/businesses" className="text-sm font-medium text-[var(--brand)] hover:underline">
             ← {tLocale(locale, "business.titlePage")}
           </Link>
@@ -33,7 +34,7 @@ export default async function NewBusinessPage() {
             </h1>
           </section>
           <BusinessForm />
-        </div>
+        </PageShell>
       </main>
     </>
   );

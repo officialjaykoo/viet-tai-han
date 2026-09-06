@@ -18,6 +18,7 @@ export interface CommentNode {
   parentId: string | null;
   body: string;
   score: number;
+  likeCount: number;
   depth: number;
   createdAt: string;
   isDeleted: boolean;
@@ -144,6 +145,7 @@ function mapFeedRow(
           }),
     commentCount: row.comment_count,
     createdAt: row.created_at,
+    likeCount: row.upvotes,
     viewerVote: voteValueToAction(row.viewer_vote),
     translation: mapTranslation(row),
     author: {
@@ -385,6 +387,7 @@ export async function getPostDetail(
               value: row.viewer_vote,
               weight: Number(row.viewer_vote_weight ?? 1),
             }),
+      likeCount: row.upvotes,
       depth: row.depth,
       createdAt: row.created_at,
       isDeleted: Boolean(row.is_deleted),

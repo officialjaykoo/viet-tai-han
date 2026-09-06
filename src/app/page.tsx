@@ -16,6 +16,7 @@ import { Feed } from "@/components/feed/feed";
 import { FeedComposer } from "@/components/feed/feed-composer";
 import { FeedShortcutRail } from "@/components/feed/feed-shortcut-rail";
 import { FeedModeTabs, FeedSortTabs } from "@/components/feed/feed-controls";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { OnlinePeopleList } from "@/components/online/online-people-list";
 import { withFeedAds } from "@/lib/ads";
@@ -168,7 +169,7 @@ export default async function HomePage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="relative mx-auto grid w-full max-w-3xl safe-px safe-pb py-4 sm:py-6 xl:max-w-[1240px] xl:grid-cols-[228px_minmax(0,680px)_280px] xl:gap-5">
+        <PageShell width="wide" className="grid py-4 sm:py-6 xl:grid-cols-[228px_minmax(0,680px)_280px] xl:gap-5">
           <aside className="hidden xl:block">
             <nav
               className="sticky top-[4.5rem] max-h-[calc(100dvh-5.5rem)] space-y-1 overflow-y-auto pr-2"
@@ -263,7 +264,7 @@ export default async function HomePage({
               />
             </div>
           </aside>
-        </div>
+        </PageShell>
       </main>
     </>
   );

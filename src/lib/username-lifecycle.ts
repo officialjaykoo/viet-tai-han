@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { normalizeAvatarImage } from "@/lib/avatar";
 import { AuthError } from "@/lib/session";
 import {
   getUsernameAvailability,
@@ -53,7 +54,10 @@ export async function updateUserProfileAndUsername(input: {
     input.bio !== undefined
       ? input.bio?.trim().slice(0, 300) || null
       : current.bio;
-  const image = input.image !== undefined ? input.image : current.image;
+  const image =
+    input.image !== undefined
+      ? normalizeAvatarImage(input.image)
+      : current.image;
   const bannerKey =
     input.bannerKey !== undefined ? input.bannerKey : current.bannerKey;
 

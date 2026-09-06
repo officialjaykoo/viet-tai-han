@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { BusinessForm } from "@/components/business/business-form";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -30,7 +31,7 @@ export default async function EditBusinessPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="relative mx-auto w-full max-w-3xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="narrow" className="space-y-6">
           <Link
             href={`/businesses/${business.slug}`}
             className="text-sm font-medium text-[var(--brand)] hover:underline"
@@ -46,7 +47,7 @@ export default async function EditBusinessPage({
             </h1>
           </section>
           <BusinessForm initial={business} />
-        </div>
+        </PageShell>
       </main>
     </>
   );

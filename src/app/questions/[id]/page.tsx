@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AcceptAnswerButton } from "@/components/questions/accept-answer-button";
 import { AnswerForm } from "@/components/questions/answer-form";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageShell } from "@/components/layout/page-shell";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -33,7 +34,7 @@ export default async function QuestionPage({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
         />
-        <div className="relative mx-auto w-full max-w-3xl space-y-8 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="narrow" className="space-y-8">
           <Link
             href="/questions"
             className="text-sm font-medium text-[var(--brand)] hover:underline"
@@ -177,7 +178,7 @@ export default async function QuestionPage({
               </Link>
             )}
           </section>
-        </div>
+        </PageShell>
       </main>
     </>
   );

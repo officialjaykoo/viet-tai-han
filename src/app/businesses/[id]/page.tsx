@@ -5,6 +5,7 @@ import { BusinessBookingPanel } from "@/components/business/business-booking-pan
 import { BusinessStatusControls } from "@/components/business/business-status-controls";
 import { BusinessVerificationForm } from "@/components/business/business-verification-form";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageShell } from "@/components/layout/page-shell";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { Locale } from "@/lib/i18n/config";
 import {
@@ -77,7 +78,7 @@ export default async function BusinessDetailPage({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
         />
-        <div className="relative mx-auto w-full max-w-4xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="standard" className="space-y-6">
           <Link href="/businesses" className="text-sm font-medium text-[var(--brand)] hover:underline">
             ← {tLocale(locale, "business.titlePage")}
           </Link>
@@ -214,7 +215,7 @@ export default async function BusinessDetailPage({
             verified={business.verificationStatus === "verified" && business.status === "active"}
             isOwner={business.owner.isOwner}
           />
-        </div>
+        </PageShell>
       </main>
     </>
   );

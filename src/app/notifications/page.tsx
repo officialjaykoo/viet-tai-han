@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { NotificationsClient } from "@/components/notifications/notifications-client";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -20,16 +21,18 @@ export default async function NotificationsPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 safe-px safe-pb py-6 sm:py-8">
-        <div>
-          <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-            {tLocale(locale, "notifications.activity")}
-          </p>
-          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-            {tLocale(locale, "notifications.title")}
-          </h1>
-        </div>
-        <NotificationsClient />
+      <main className="flex-1">
+        <PageShell width="standard" className="space-y-6">
+          <div>
+            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
+              {tLocale(locale, "notifications.activity")}
+            </p>
+            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
+              {tLocale(locale, "notifications.title")}
+            </h1>
+          </div>
+          <NotificationsClient />
+        </PageShell>
       </main>
     </>
   );

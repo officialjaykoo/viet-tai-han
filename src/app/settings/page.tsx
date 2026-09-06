@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
-import { SettingsClient } from "@/components/settings/settings-client";
 import { getOnboardingState } from "@/lib/onboarding";
+import { SettingsClient } from "@/components/settings/settings-client";
 import { getPushStatus } from "@/lib/push";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -60,32 +61,33 @@ export default async function SettingsPage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 safe-px safe-pb py-6 sm:py-8">
-        <div>
-          <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-            {tLocale(locale, "settings.pageEyebrow")}
-          </p>
-          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-            {tLocale(locale, "settings.pageTitle")}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {tLocale(locale, "settings.pageDescription")}
-          </p>
-        </div>
-        <SettingsClient
-          initialSettings={settings}
-          initialBlocked={blocked}
-          initialSection={parseSection(params.section)}
-          initialPush={{
-            available: push.available,
-            configuration: push.configuration,
-            publicKey: push.publicKey,
-            subscribed: push.subscribed,
-          }}
-          initialIdentityError={params.error}
-          initialConsent={consent}
-          initialPro={pro}
-        />
+      <main className="flex-1">
+        <PageShell width="narrow" className="space-y-6">
+          <div>
+            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
+              {tLocale(locale, "settings.pageEyebrow")}
+            </p>
+            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
+              {tLocale(locale, "settings.pageTitle")}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {tLocale(locale, "settings.pageDescription")}
+            </p>
+          </div>
+          <SettingsClient
+            initialSettings={settings}
+            initialBlocked={blocked}
+            initialSection={parseSection(params.section)}
+            initialPush={{
+              available: push.available,
+              configuration: push.configuration,
+              publicKey: push.publicKey,
+              subscribed: push.subscribed,
+            }}
+            initialConsent={consent}
+            initialPro={pro}
+          />
+        </PageShell>
       </main>
     </>
   );

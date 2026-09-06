@@ -127,12 +127,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     );
   }
 
+  const requestHeaders = await headers();
+  const requestPath =
+    requestHeaders.get("next-url") ??
+    requestHeaders.get("x-nextjs-rewrite") ??
+    "";
+  const isAdminPath =
+    requestPath === "/admin" || requestPath.startsWith("/admin/");
   const { locale, preferredLanguage, cookieLocale, signedIn } =
     await getRequestLocale();
   const pref: PreferredLanguage = isPreferredLanguage(preferredLanguage)
     ? preferredLanguage
     : "unknown";
-
   const session = signedIn ? await getSession() : null;
   const themeRaw = (session?.user as { theme?: string } | undefined)?.theme;
   const initialTheme: ThemePreference =
@@ -160,10 +166,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             initialCookieLocale={cookieLocale}
           >
             {children}
-            <OnlinePresenceBeacon enabled={signedIn} />
-            <MobileNav />
-            <SiteFooter />
-            <ConsentBanner signedIn={signedIn} />
+            {!isAdminPath ? <OnlinePresenceBeacon enabled={signedIn} /> : null}
+            {!isAdminPath ? <MobileNav /> : null}
+            {!isAdminPath ? <SiteFooter /> : null}
+            {!isAdminPath ? <ConsentBanner signedIn={signedIn} /> : null}
           </I18nProvider>
         </ThemeProvider>
       </body>

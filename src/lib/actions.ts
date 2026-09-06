@@ -7,7 +7,9 @@ import {
   bumpUserActivity,
   enforceCreateRateLimit,
 } from "@/lib/rate-limit";
+import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError } from "@/lib/session";
+import { displayScore } from "@/lib/vote-weight";
 
 export async function createPost(input: {
   userId: string;
@@ -509,6 +511,79 @@ export async function voteOnComment(input: {
     viewerVote: input.action,
   };
 }
+export async function removeVoteOnComment(input: {
+  commentId: string;
+  userId: string;
+}) {
+  const db = await getDb();
+  const comment = await db
+    .prepare(
+      `SELECT author_id, score, is_removed FROM comments WHERE id = ?`
+    )
+    .bind(input.commentId)
+    .first<{ author_id: string; score: number; is_removed: number }>();
+  if (!comment || comment.is_removed) {
+    throw new AuthError("Comment not found", 404);
+  }
+
+  const existing = await db
+    .prepare(
+      `SELECT value, weight FROM votes
+       WHERE user_id = ? AND target_type = 'comment' AND target_id = ?`
+    )
+    .bind(input.userId, input.commentId)
+    .first<{ value: number; weight: number }>();
+  if (!existing) {
+    return {
+      commentId: input.commentId,
+      score: displayScore(comment.score),
+      viewerVote: null,
+    };
+  }
+
+  const weight = Number(existing.weight ?? 0);
+  const scoreDelta = -(existing.value === 1 ? weight : -weight);
+  await db
+    .prepare(
+      `DELETE FROM votes
+       WHERE user_id = ? AND target_type = 'comment' AND target_id = ?`
+    )
+    .bind(input.userId, input.commentId)
+    .run();
+
+  await db
+    .prepare(
+      `UPDATE comments
+       SET upvotes = MAX(0, upvotes + ?),
+           downvotes = MAX(0, downvotes + ?),
+           score = score + ?,
+           updated_at = datetime('now')
+       WHERE id = ?`
+    )
+    .bind(
+      existing.value === 1 ? -1 : 0,
+      existing.value === -1 ? -1 : 0,
+      scoreDelta,
+      input.commentId
+    )
+    .run();
+
+  const authorKarmaDelta = Math.trunc(scoreDelta / 100);
+  if (authorKarmaDelta !== 0 && comment.author_id !== input.userId) {
+    await adjustAuthorKarma(comment.author_id, "comment", authorKarmaDelta);
+  }
+
+  const updated = await db
+    .prepare(`SELECT score FROM comments WHERE id = ?`)
+    .bind(input.commentId)
+    .first<{ score: number }>();
+
+  return {
+    commentId: input.commentId,
+    score: displayScore(updated?.score ?? comment.score),
+    viewerVote: null,
+  };
+}
 
 export async function editPost(input: {
   postId: string;
@@ -665,11 +740,12 @@ export async function editComment(input: {
 }
 
 export async function createSubreddit(input: {
-  userId: string;
+  actor: SessionUser;
   name: string;
   title: string;
   description?: string | null;
 }) {
+  await requireAdmin(input.actor);
   const { slugifySubreddit } = await import("@/lib/permissions");
   const name = slugifySubreddit(input.name);
   if (name.length < 3) {
@@ -702,14 +778,14 @@ export async function createSubreddit(input: {
       `INSERT INTO subreddits (id, name, title, description, created_by, subscriber_count)
        VALUES (?, ?, ?, ?, ?, 0)`
     )
-    .bind(id, name, title, input.description?.trim() || null, input.userId)
+    .bind(id, name, title, input.description?.trim() || null, input.actor.id)
     .run();
 
   await db
     .prepare(
       `INSERT INTO subscriptions (user_id, subreddit_id) VALUES (?, ?)`
     )
-    .bind(input.userId, id)
+    .bind(input.actor.id, id)
     .run();
 
   const { recountSubscribers } = await import("@/lib/communities");
@@ -719,10 +795,10 @@ export async function createSubreddit(input: {
     .prepare(
       `INSERT INTO subreddit_moderators (subreddit_id, user_id) VALUES (?, ?)`
     )
-    .bind(id, input.userId)
+    .bind(id, input.actor.id)
     .run();
 
-  syncAchievementsForEvent(input.userId, "community_created");
+  syncAchievementsForEvent(input.actor.id, "community_created");
 
   return { id, name };
 }

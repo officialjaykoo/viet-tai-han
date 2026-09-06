@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { FriendsClient } from "@/components/friends/friends-client";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import {
   listFriends,
@@ -33,13 +34,13 @@ export default async function FriendsPage() {
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_10%,transparent),transparent_70%)]"
         />
-        <div className="relative mx-auto w-full max-w-6xl safe-px safe-pb py-4 sm:py-6">
+        <PageShell width="wide" className="py-4 sm:py-6">
           <FriendsClient
             initialFriends={friends}
             initialIncoming={incoming}
             initialOutgoing={outgoing}
           />
-        </div>
+        </PageShell>
       </main>
     </>
   );

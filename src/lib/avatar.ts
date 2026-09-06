@@ -64,13 +64,32 @@ export function isGeneratedAvatar(image: string | null | undefined): boolean {
   return Boolean(image?.startsWith(GENERATED_AVATAR_PREFIX));
 }
 
+export function normalizeAvatarImage(image: unknown): string | null {
+  const value = typeof image === "string" ? image.trim() : "";
+  if (!value) return null;
+  if (isGeneratedAvatar(value) || value.startsWith("/")) return value;
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+
+  if (url.protocol === "https:") return value;
+  if (
+    url.protocol === "http:" &&
+    url.hostname.toLowerCase().endsWith(".kakaocdn.net")
+  ) {
+    url.protocol = "https:";
+    return url.toString();
+  }
+  return null;
+}
+
 export function isCustomAvatarUrl(image: string | null | undefined): boolean {
-  if (!image || isGeneratedAvatar(image)) return false;
-  return (
-    image.startsWith("http://") ||
-    image.startsWith("https://") ||
-    image.startsWith("/")
-  );
+  const normalized = normalizeAvatarImage(image);
+  return Boolean(normalized && !isGeneratedAvatar(normalized));
 }
 
 /** Prefer stored generated seed, else derive from username/id. */
@@ -170,9 +189,10 @@ export function resolveAvatarSrc(
   image: string | null | undefined,
   fallbackSeed: string
 ): { kind: "url" | "generated"; src: string } {
-  if (isCustomAvatarUrl(image)) {
-    return { kind: "url", src: image! };
+  const normalized = normalizeAvatarImage(image);
+  if (normalized && !isGeneratedAvatar(normalized)) {
+    return { kind: "url", src: normalized };
   }
-  const seed = resolveAvatarSeed(image, fallbackSeed);
+  const seed = resolveAvatarSeed(normalized, fallbackSeed);
   return { kind: "generated", src: avatarDataUri(seed) };
 }

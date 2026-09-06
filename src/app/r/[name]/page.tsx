@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { SubscribeButton } from "@/components/communities/subscribe-button";
 import { Feed } from "@/components/feed/feed";
 import { FeedSortTabs } from "@/components/feed/feed-controls";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { withFeedAds } from "@/lib/ads";
 import { isSubscribed } from "@/lib/communities";
@@ -57,7 +58,8 @@ export default async function SubredditPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="mx-auto w-full max-w-3xl safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="standard">
+          <div className="max-w-[760px]">
           <section className="mb-6 space-y-3">
             <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
               {tLocale(locale, "communities.title")}
@@ -94,7 +96,8 @@ export default async function SubredditPage({
             sort={sort}
             mode="community"
           />
-        </div>
+          </div>
+        </PageShell>
       </main>
     </>
   );

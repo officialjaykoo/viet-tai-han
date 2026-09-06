@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { MessagesClient } from "@/components/messages/messages-client";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -22,7 +23,7 @@ export default async function MessagesPage() {
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
         />
-        <div className="relative mx-auto w-full max-w-3xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="wide" className="space-y-6">
           <section>
             <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
               {tLocale(locale, "messages.inbox")}
@@ -43,7 +44,7 @@ export default async function MessagesPage() {
           >
             <MessagesClient />
           </Suspense>
-        </div>
+        </PageShell>
       </main>
     </>
   );

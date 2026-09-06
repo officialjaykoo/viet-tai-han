@@ -11,8 +11,11 @@ import {
   mapOAuthProfile,
 } from "@/lib/oauth-identity";
 import { createTemporaryUsername } from "@/lib/username";
-import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
-
+import {
+  createAvatarSeed,
+  encodeGeneratedAvatar,
+  normalizeAvatarImage,
+} from "@/lib/avatar";
 export type AppUserRole = "user" | "moderator" | "admin";
 export type AppUserStatus = "active" | "banned" | "shadowbanned";
 type AuthEnv = {
@@ -139,7 +142,7 @@ function zaloOAuthConfig(env: AuthEnv) {
           id: profile.id,
           ...profileFields,
           ...emailFields,
-          image: profile.picture?.data?.url,
+          image: normalizeAvatarImage(profile.picture?.data?.url) ?? undefined,
         };
       },
     },
@@ -248,12 +251,16 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
                 ) as {
                   nickname?: unknown;
                   username?: unknown;
+                  profile_image_url?: unknown;
                 };
                 const profileWithName = profile as typeof profile & {
                   name?: unknown;
                 };
                 const nickname =
                   kakaoProfile.nickname ?? profileWithName.name ?? undefined;
+                const image = normalizeAvatarImage(
+                  kakaoProfile.profile_image_url
+                );
                 return {
                   ...mapOAuthProfile({
                     providerId: "kakao",
@@ -269,6 +276,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
                       profile.kakao_account?.is_email_valid === true &&
                       profile.kakao_account?.is_email_verified === true,
                   }),
+                  ...(image ? { image } : {}),
                 };
               },
             },
@@ -442,13 +450,14 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
             );
             const assignedUsername =
               currentUsername ?? (await createTemporaryUsername(db));
+            const normalizedImage = normalizeAvatarImage(user.image);
 
             return {
               data: {
                 ...user,
                 username: assignedUsername,
                 image:
-                  user.image ?? encodeGeneratedAvatar(createAvatarSeed()),
+                  normalizedImage ?? encodeGeneratedAvatar(createAvatarSeed()),
               },
             };
           },

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ListingAlertList } from "@/components/marketplace/listing-alert-list";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -22,7 +23,7 @@ export default async function MarketplaceAlertsPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="relative mx-auto w-full max-w-3xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="standard" className="space-y-6">
           <Link
             href="/marketplace"
             className="text-sm font-medium text-[var(--brand)] hover:underline"
@@ -38,7 +39,7 @@ export default async function MarketplaceAlertsPage() {
             </p>
           </section>
           <ListingAlertList initialAlerts={alerts} />
-        </div>
+        </PageShell>
       </main>
     </>
   );

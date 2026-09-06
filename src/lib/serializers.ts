@@ -32,6 +32,7 @@ export type PublicComment = {
   parentId: string | null;
   body: string;
   score: number;
+  likeCount: number;
   depth: number;
   createdAt: string;
   isDeleted: boolean;
@@ -92,6 +93,7 @@ export function serializeFeedPost(
     url: post.url,
     mediaKey: post.mediaKey,
     score: post.score,
+    likeCount: post.likeCount,
     commentCount: post.commentCount,
     createdAt: post.createdAt,
     viewerVote: post.viewerVote,
@@ -138,6 +140,7 @@ export function serializeComment(
     parentId: comment.parentId,
     body: comment.body,
     score: comment.score,
+    likeCount: comment.likeCount,
     depth: comment.depth,
     createdAt: comment.createdAt,
     isDeleted: comment.isDeleted,

@@ -113,6 +113,7 @@ function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost 
           }),
     commentCount: row.comment_count,
     createdAt: row.created_at,
+    likeCount: row.upvotes,
     viewerVote: voteValueToAction(row.viewer_vote),
     translation: mapTranslation(row),
     author: {

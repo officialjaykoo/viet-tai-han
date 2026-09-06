@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -27,7 +28,7 @@ export default async function QuestionsPage() {
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_16%,transparent),transparent_68%)]"
         />
-        <div className="relative mx-auto w-full max-w-3xl space-y-8 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="standard" className="space-y-8">
           <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
@@ -116,7 +117,7 @@ export default async function QuestionsPage() {
               </ul>
             )}
           </section>
-        </div>
+        </PageShell>
       </main>
     </>
   );

@@ -26,12 +26,16 @@ import { voteOnPost } from "@/lib/votes";
 async function insertUser(
   id: string,
   username: string,
-  options: { karma?: number; allowDms?: "anyone" | "followers" | "nobody" } = {}
+  options: {
+    karma?: number;
+    allowDms?: "anyone" | "followers" | "nobody";
+    role?: "user" | "admin";
+  } = {}
 ) {
   await env.DB
     .prepare(
       `INSERT INTO "user" (id, name, email, emailVerified, username, karma, allowDms, role, status)
-       VALUES (?, ?, ?, 1, ?, ?, ?, 'user', 'active')`
+       VALUES (?, ?, ?, 1, ?, ?, ?, ?, 'active')`
     )
     .bind(
       id,
@@ -39,7 +43,8 @@ async function insertUser(
       `${id}@test.local`,
       username,
       options.karma ?? 0,
-      options.allowDms ?? "anyone"
+      options.allowDms ?? "anyone",
+      options.role ?? "user"
     )
     .run();
 }
@@ -345,17 +350,19 @@ describe("DM relationship policy (D1)", () => {
 
   it("allows zero and negative reputation users to use normal content actions", async () => {
     const suffix = crypto.randomUUID().slice(0, 8);
+    const adminId = `admin_${suffix}`;
     const creatorId = `normal_negative_creator_${suffix}`;
     const voterId = `normal_zero_voter_${suffix}`;
     await Promise.all([
+      insertUser(adminId, `admin_${suffix}`, { role: "admin" }),
       insertUser(creatorId, `normal_negative_creator_${suffix}`, { karma: -25 }),
       insertUser(voterId, `normal_zero_voter_${suffix}`, { karma: 0 }),
     ]);
 
     const community = await createSubreddit({
-      userId: creatorId,
+      actor: { id: adminId, role: "admin", status: "active" },
       name: `normal_${suffix}`,
-      title: "Normal users can create communities",
+      title: "Admin-created community",
     });
     const post = await createPost({
       userId: creatorId,

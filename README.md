@@ -4,6 +4,8 @@
 
 Live deployment: **https://vth.kr**
 
+Developer documentation: **https://developers.vth.kr**
+
 The software combines a Facebook/Instagram-style social graph with community, messaging, discovery, marketplace, and local-service features in a single application. It started from the MIT-licensed [`koval01/red`](https://github.com/koval01/red) codebase and has since been substantially reworked in product model, identity, authentication, messaging, moderation, localization, and Cloudflare architecture.
 
 > VTH is an independent project. It is not affiliated with Meta, Facebook, Instagram, Kakao, Zalo, Reddit, or Cloudflare.

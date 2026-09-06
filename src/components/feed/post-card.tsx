@@ -26,12 +26,14 @@ import { AccountTags } from "@/components/user/account-tags";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type {
   FeedPost,
-  VoteAction,
+  VoteMutation,
   VoteResult,
   ViewerVote,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import { getCanonicalPostUrl } from "@/lib/post-url";
 
 interface PostCardProps {
   post: FeedPost;
@@ -45,22 +47,26 @@ export function PostCard({
   const router = useRouter();
   const { t, locale } = useI18n();
   const localizeError = useLocalizedError();
-  const [score, setScore] = useState(post.score);
+  const [likeCount, setLikeCount] = useState(post.likeCount);
   const [viewerVote, setViewerVote] = useState<ViewerVote>(post.viewerVote);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
 
   useEffect(() => {
     const resetId = window.setTimeout(() => {
-      setScore(post.score);
+      setLikeCount(post.likeCount);
       setViewerVote(post.viewerVote);
       setDismissed(false);
       setShowTranslation(false);
+      setShareMessage(null);
+      setShareError(null);
     }, 0);
     return () => window.clearTimeout(resetId);
-  }, [post.id, post.score, post.viewerVote]);
+  }, [post.id, post.likeCount, post.viewerVote]);
 
   const offerTranslation = shouldOfferTranslation(post.translation, locale);
   const showing =
@@ -77,22 +83,20 @@ export function PostCard({
     return null;
   }
 
-  function applyVote(action: VoteAction) {
-    if (viewerVote === action || pending) {
-      return;
-    }
+  function applyVote(action: VoteMutation) {
+    if (pending) return;
 
     setError(null);
     const previous = viewerVote;
-    const snapshot = { score, viewerVote };
-    setViewerVote(action);
-
-    // Optimistic score nudge — server returns the real weighted score.
-    if (previous === null) {
-      setScore((v) => v + (action === "upvote" ? 1 : -1));
-    } else {
-      setScore((v) => v + (action === "upvote" ? 2 : -2));
-    }
+    const optimisticLikeDelta =
+      action === "upvote" && previous !== "upvote"
+        ? 1
+        : action === "remove" && previous === "upvote"
+          ? -1
+          : 0;
+    const snapshot = { likeCount, viewerVote };
+    setLikeCount((value) => Math.max(0, value + optimisticLikeDelta));
+    setViewerVote(action === "remove" ? null : action);
 
     startTransition(async () => {
       try {
@@ -103,7 +107,7 @@ export function PostCard({
         });
 
         if (response.status === 401) {
-          setScore(snapshot.score);
+          setLikeCount(snapshot.likeCount);
           setViewerVote(snapshot.viewerVote);
           router.push(
             `/login?next=${encodeURIComponent(`/post/${post.id}`)}`
@@ -119,35 +123,40 @@ export function PostCard({
         }
 
         const result = (await response.json()) as VoteResult;
-        setScore(result.score);
         setViewerVote(result.viewerVote);
       } catch (voteError) {
-        setScore(snapshot.score);
+        setLikeCount(snapshot.likeCount);
         setViewerVote(snapshot.viewerVote);
         setError(
           localizeError(
             voteError instanceof Error ? voteError.message : null,
-            "Couldn't apply vote. Try again."
+            "Couldn't apply like. Try again."
           )
         );
       }
     });
   }
-
-  const postHref = `/post/${post.id}?src=${discoverySource}`;
+  const canonicalPostHref = `/post/${encodeURIComponent(post.id)}`;
+  const postHref = `${canonicalPostHref}?src=${discoverySource}`;
   async function sharePost(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
+    setShareMessage(null);
+    setShareError(null);
 
-    const url = new URL(postHref, window.location.origin).toString();
+    const url = getCanonicalPostUrl(post.id, window.location.origin);
     try {
       if (typeof navigator.share === "function") {
         await navigator.share({ title: displayTitle, url });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
+      } else {
+        await copyTextToClipboard(url);
+        setShareMessage(t("post.linkCopied"));
       }
-    } catch {
-      // Sharing can be cancelled by the user.
+    } catch (shareError) {
+      if (shareError instanceof Error && shareError.name === "AbortError") {
+        return;
+      }
+      setShareError(t("post.copyLinkFailed"));
     }
   }
 
@@ -205,23 +214,26 @@ export function PostCard({
               <div className="min-w-0 flex-1">
                 <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 break-anywhere text-sm">
                   <Link
-                    href={`/u/${post.author.username}`}
+                    href={`/u/${encodeURIComponent(post.author.username)}`}
                     prefetch={false}
                     className="font-semibold text-foreground hover:underline"
                   >
-                    @{post.author.username}
+                    {post.author.displayName || `@${post.author.username}`}
                   </Link>
-                  <span aria-hidden className="text-muted-foreground">
-                    ·
-                  </span>
-                  <SubredditLabel
-                    name={post.subreddit.name}
-                    className="font-medium text-muted-foreground hover:text-foreground"
-                  />
+                  {post.author.displayName ? (
+                    <span className="text-xs text-muted-foreground">
+                      @{post.author.username}
+                    </span>
+                  ) : null}
+                  <AccountTags tags={post.author.tags} />
                 </p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                   <RelativeTime value={post.createdAt} />
-                  <AccountTags tags={post.author.tags} />
+                  <span aria-hidden>·</span>
+                  <SubredditLabel
+                    name={post.subreddit.name}
+                    className="font-normal text-muted-foreground hover:text-foreground"
+                  />
                 </p>
               </div>
               <div data-no-nav>
@@ -260,7 +272,7 @@ export function PostCard({
           <CardFooter className="mt-3 flex flex-wrap gap-1 border-t border-border/70 px-3 py-1.5">
             <div data-no-nav className="min-w-0 flex-1">
               <VoteControls
-                score={score}
+                likeCount={likeCount}
                 viewerVote={viewerVote}
                 pending={pending}
                 layout="horizontal"
@@ -306,6 +318,16 @@ export function PostCard({
                   ? t("translate.showOriginal")
                   : t("translate.action")}
               </button>
+            ) : null}
+            {shareMessage ? (
+              <span className="w-full px-2 text-xs text-muted-foreground" role="status">
+                {shareMessage}
+              </span>
+            ) : null}
+            {shareError ? (
+              <span className="w-full px-2 text-xs text-destructive" role="alert">
+                {shareError}
+              </span>
             ) : null}
             {error ? (
               <span className="w-full px-2 text-xs text-destructive" role="alert">

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 
 export type SeededUsers = {
+  adminId: string;
   authorId: string;
   voterId: string;
   subredditId: string;
@@ -11,11 +12,17 @@ export type SeededUsers = {
 export async function seedUsersAndSubreddit(
   suffix = crypto.randomUUID().slice(0, 8)
 ): Promise<SeededUsers> {
+  const adminId = `u_admin_${suffix}`;
   const authorId = `u_author_${suffix}`;
   const voterId = `u_voter_${suffix}`;
   const subredditId = `s_${suffix}`;
   const subredditName = `c_${suffix}`;
-
+  await env.DB.prepare(
+    `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
+     VALUES (?, 'Admin', ?, 1, ?, 50, 'admin', 'active')`
+  )
+    .bind(adminId, `${adminId}@test.local`, `admin_${suffix}`)
+    .run();
   await env.DB.prepare(
     `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
      VALUES (?, 'Author', ?, 1, ?, 50, 'user', 'active')`
@@ -36,8 +43,8 @@ export async function seedUsersAndSubreddit(
   )
     .bind(subredditId, subredditName, authorId)
     .run();
+  return { adminId, authorId, voterId, subredditId, subredditName };
 
-  return { authorId, voterId, subredditId, subredditName };
 }
 
 export async function getPostRow(postId: string) {

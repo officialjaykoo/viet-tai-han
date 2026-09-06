@@ -21,7 +21,7 @@ import { VoteControls } from "@/components/votes/vote-controls";
 import type { CommentNode } from "@/lib/content";
 import type {
   CommentVoteResult,
-  VoteAction,
+  VoteMutation,
   ViewerVote,
 } from "@/lib/types";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
@@ -42,7 +42,7 @@ function CommentItem({
   const router = useRouter();
   const { t, locale } = useI18n();
   const localizeError = useLocalizedError();
-  const [score, setScore] = useState(comment.score);
+  const [likeCount, setLikeCount] = useState(comment.likeCount);
   const [viewerVote, setViewerVote] = useState<ViewerVote>(comment.viewerVote);
   const [body, setBody] = useState(comment.body);
   const [replyOpen, setReplyOpen] = useState(false);
@@ -66,21 +66,20 @@ function CommentItem({
       ? comment.translation.bodyTranslated
       : body;
 
-  function vote(action: VoteAction) {
-    if (viewerVote === action || pending) {
-      return;
-    }
+  function vote(action: VoteMutation) {
+    if (pending) return;
 
     setError(null);
     const previous = viewerVote;
-    const snapshotScore = score;
-    setViewerVote(action);
-
-    if (previous === null) {
-      setScore((v) => v + (action === "upvote" ? 1 : -1));
-    } else {
-      setScore((v) => v + (action === "upvote" ? 2 : -2));
-    }
+    const optimisticLikeDelta =
+      action === "upvote" && previous !== "upvote"
+        ? 1
+        : action === "remove" && previous === "upvote"
+          ? -1
+          : 0;
+    const snapshot = { likeCount, viewerVote };
+    setLikeCount((value) => Math.max(0, value + optimisticLikeDelta));
+    setViewerVote(action === "remove" ? null : action);
 
     startTransition(async () => {
       const res = await apiFetch(`/api/comments/${comment.id}/vote`, {
@@ -89,22 +88,21 @@ function CommentItem({
         body: JSON.stringify({ action }),
       });
       if (res.status === 401) {
+        setLikeCount(snapshot.likeCount);
         setViewerVote(previous);
-        setScore(snapshotScore);
         router.push(`/login?next=${encodeURIComponent(`/post/${postId}`)}`);
         return;
       }
       if (!res.ok) {
-        setViewerVote(previous);
-        setScore(snapshotScore);
+        setLikeCount(snapshot.likeCount);
+        setViewerVote(snapshot.viewerVote);
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(localizeError(payload?.error, "Vote failed"));
+        setError(localizeError(payload?.error, "Like failed"));
         return;
       }
       const data = (await res.json()) as CommentVoteResult;
-      setScore(data.score);
       setViewerVote(data.viewerVote);
     });
   }
@@ -207,7 +205,7 @@ function CommentItem({
         {!comment.isDeleted ? (
           <div className="flex flex-wrap items-center gap-1">
             <VoteControls
-              score={score}
+              likeCount={likeCount}
               viewerVote={viewerVote}
               pending={pending}
               layout="horizontal"
@@ -263,11 +261,7 @@ function CommentItem({
               </>
             ) : null}
           </div>
-        ) : (
-          <p className="text-xs tabular-nums text-muted-foreground">
-            {score} pts
-          </p>
-        )}
+        ) : null}
         {editing ? (
           <div className="space-y-2 pt-1">
             <Textarea

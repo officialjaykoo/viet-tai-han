@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -28,7 +29,7 @@ export default async function MyBusinessesPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="relative mx-auto w-full max-w-4xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="standard" className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href="/businesses" className="text-sm font-medium text-[var(--brand)] hover:underline">
               ← {tLocale(locale, "business.titlePage")}
@@ -46,41 +47,28 @@ export default async function MyBusinessesPage() {
             </h1>
           </section>
           {businesses.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+            <p className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
               {tLocale(locale, "business.emptyMine")}
             </p>
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2">
               {businesses.map((business) => (
                 <li key={business.id} className="rounded-2xl border border-border/60 bg-card/70 p-4">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{business.category}</span>
-                    <span aria-hidden>·</span>
-                    <span>{tLocale(locale, verificationKey(business.verificationStatus))}</span>
-                    <span aria-hidden>·</span>
-                    <span>{tLocale(locale, business.status === "paused" ? "business.paused" : "business.active")}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{business.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{business.address}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{tLocale(locale, verificationKey(business.verificationStatus))}</span>
                   </div>
-                  <h2 className="mt-2 font-heading text-lg font-semibold">{business.name}</h2>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{business.description}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Link
-                      href={`/businesses/${business.slug}`}
-                      className="inline-flex min-h-9 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-                    >
-                      {tLocale(locale, "business.manage")}
-                    </Link>
-                    <Link
-                      href={`/businesses/${business.slug}/edit`}
-                      className="inline-flex min-h-9 items-center rounded-full border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
-                    >
-                      {tLocale(locale, "business.edit")}
-                    </Link>
-                  </div>
+                  <Link className="mt-4 inline-flex text-sm font-medium text-[var(--brand)] hover:underline" href={`/businesses/${business.slug}`}>
+                    {tLocale(locale, "common.edit")}
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </PageShell>
       </main>
     </>
   );

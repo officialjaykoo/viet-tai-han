@@ -1,12 +1,4 @@
 import { getDb } from "@/lib/db";
-import { listAdCampaigns } from "@/lib/ads";
-import {
-  listChatMessageReports,
-  listChatRoomReports,
-} from "@/lib/dm-moderation";
-import { listBurstPosts } from "@/lib/score-integrity";
-import { listBusinessVerificationQueue } from "@/lib/businesses";
-import { listListingReportQueue } from "@/lib/marketplace";
 import { invalidateBannedWordsCache } from "@/lib/moderation";
 import { AuthError } from "@/lib/session";
 
@@ -23,6 +15,9 @@ export async function setUserStatus(input: {
     unshadowban: "active",
   } as const;
 
+  if (input.actorId === input.targetUserId) {
+    throw new AuthError("Cannot moderate your own account", 400);
+  }
   const db = await getDb();
   const target = await db
     .prepare(`SELECT id FROM "user" WHERE id = ?`)
@@ -112,6 +107,9 @@ export async function deleteAccount(input: {
   targetUserId: string;
   reason?: string;
 }) {
+  if (input.actorId === input.targetUserId) {
+    throw new AuthError("Cannot delete your own account", 400);
+  }
   const db = await getDb();
   await db
     .prepare(
@@ -237,116 +235,157 @@ export async function removeBannedWord(id: string) {
   });
 }
 
-export async function getAdminOverview() {
+export async function listAdminBannedWords() {
+  const db = await getDb();
+  const { results } = await db
+    .prepare(`SELECT id, word, severity FROM banned_words ORDER BY word ASC`)
+    .all<{ id: string; word: string; severity: string }>();
+  return results ?? [];
+}
+
+
+export type AdminCommunity = {
+  id: string;
+  name: string;
+  title: string;
+  description: string | null;
+  memberCount: number;
+  postCount: number;
+  status: "active" | "removed";
+  createdAt: string;
+};
+
+export type AdminUser = {
+  id: string;
+  username: string | null;
+  name: string;
+  role: string;
+  status: string;
+  karma: number;
+  createdAt: string;
+};
+
+export async function getAdminDashboard() {
   const db = await getDb();
   const counts = await db
     .prepare(
       `SELECT
-         (SELECT COUNT(*) FROM "user") AS users,
+         (SELECT COUNT(*) FROM "user" WHERE status = 'active') AS users,
          (SELECT COUNT(*) FROM posts WHERE is_removed = 0) AS posts,
          (SELECT COUNT(*) FROM comments WHERE is_removed = 0) AS comments,
-         (SELECT COUNT(*) FROM subreddits WHERE is_removed = 0) AS subreddits,
-         (SELECT COUNT(*) FROM listings WHERE status != 'removed') AS listings,
+         (SELECT COUNT(*) FROM subreddits WHERE is_removed = 0) AS communities,
          (SELECT COUNT(*) FROM businesses WHERE status != 'removed') AS businesses,
-         (SELECT COUNT(*) FROM business_verification_requests WHERE status = 'pending') AS pending_business_verifications,
-         (SELECT COUNT(*) FROM listing_reports WHERE status = 'open') AS open_listing_reports,
-         (
-           SELECT COUNT(*) FROM chat_message_reports WHERE status = 'open'
-         ) + (
-           SELECT COUNT(*) FROM chat_room_reports WHERE status = 'open'
-         ) AS open_chat_reports,
+         (SELECT COUNT(*) FROM listings WHERE status != 'removed') AS listings,
+         (SELECT COUNT(*) FROM listing_reports WHERE status = 'open') AS marketplace_reports,
+         (SELECT COUNT(*) FROM chat_message_reports WHERE status = 'open') +
+           (SELECT COUNT(*) FROM chat_room_reports WHERE status = 'open') AS message_reports,
+         (SELECT COUNT(*) FROM business_verification_requests WHERE status = 'pending') AS business_verifications,
          (SELECT COUNT(*) FROM "user" WHERE status = 'banned') AS banned,
-         (SELECT COUNT(*) FROM "user" WHERE status = 'shadowbanned') AS shadowbanned,
-         (SELECT COUNT(*) FROM banned_words) AS banned_words`
+         (SELECT COUNT(*) FROM "user" WHERE status = 'shadowbanned') AS shadowbanned`
     )
-    .first<{
-      users: number;
-      posts: number;
-      comments: number;
-      businesses: number;
-      pending_business_verifications: number;
-      subreddits: number;
-      listings: number;
-      open_listing_reports: number;
-      open_chat_reports: number;
-      banned: number;
-      shadowbanned: number;
-      banned_words: number;
-    }>();
-
+    .first<Record<string, number>>();
   const { results: recentActions } = await db
     .prepare(
       `SELECT id, actor_id, target_user_id, target_type, target_id, action, reason, created_at
        FROM moderation_actions
        ORDER BY created_at DESC
-       LIMIT 25`
+       LIMIT 10`
     )
     .all();
 
-  const { results: warnings } = await db
+  return {
+    counts: counts ?? {},
+    recentActions: recentActions ?? [],
+  };
+}
+
+export async function listAdminCommunities(input: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const db = await getDb();
+  const search = input.search?.trim() ?? "";
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const pattern = `%${search}%`;
+  const { results } = await db
     .prepare(
-      `SELECT id, user_id, issued_by, message, created_at
-       FROM user_warnings
-       ORDER BY created_at DESC
-       LIMIT 25`
+      `SELECT
+         s.id,
+         s.name,
+         s.title,
+         s.description,
+         s.subscriber_count AS memberCount,
+         s.created_at AS createdAt,
+         CASE WHEN s.is_removed = 1 THEN 'removed' ELSE 'active' END AS status,
+         (
+           SELECT COUNT(*) FROM posts p
+           WHERE p.subreddit_id = s.id AND p.is_removed = 0
+         ) AS postCount
+       FROM subreddits s
+       WHERE (? = '' OR s.name LIKE ? OR s.title LIKE ?)
+       ORDER BY s.is_removed ASC, s.updated_at DESC
+       LIMIT ? OFFSET ?`
     )
-    .all();
+    .bind(search, pattern, pattern, limit, offset)
+    .all<AdminCommunity>();
+  return results ?? [];
+}
 
-  const { results: bannedWords } = await db
+export async function updateSubreddit(input: {
+  actorId: string;
+  subredditId: string;
+  title: string;
+  description?: string | null;
+}) {
+  const title = input.title.trim();
+  if (title.length < 3 || title.length > 100) {
+    throw new AuthError("Title must be 3–100 characters", 400);
+  }
+  const db = await getDb();
+  const sub = await db
+    .prepare(`SELECT id FROM subreddits WHERE id = ?`)
+    .bind(input.subredditId)
+    .first();
+  if (!sub) throw new AuthError("Community not found", 404);
+  await db
     .prepare(
-      `SELECT id, word, severity, created_at FROM banned_words ORDER BY word`
+      `UPDATE subreddits
+       SET title = ?, description = ?, updated_at = datetime('now')
+       WHERE id = ?`
     )
-    .all();
+    .bind(title, input.description?.trim() || null, input.subredditId)
+    .run();
+  await db
+    .prepare(
+      `INSERT INTO moderation_actions
+       (id, actor_id, target_type, target_id, action, reason)
+       VALUES (?, ?, 'subreddit', ?, 'update_subreddit', ?)`
+    )
+    .bind(crypto.randomUUID(), input.actorId, input.subredditId, title)
+    .run();
+}
 
-  const { results: users } = await db
+export async function listAdminUsers(input: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const db = await getDb();
+  const search = input.search?.trim() ?? "";
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const pattern = `%${search}%`;
+  const { results } = await db
     .prepare(
       `SELECT id, username, name, role, status, karma, createdAt
        FROM "user"
+       WHERE (? = '' OR username LIKE ? OR name LIKE ? OR id LIKE ?)
        ORDER BY createdAt DESC
-       LIMIT 50`
+       LIMIT ? OFFSET ?`
     )
-    .all();
-  const [
-    burstPosts,
-    adCampaigns,
-    listingReports,
-    businessVerifications,
-    chatMessageReports,
-    chatRoomReports,
-  ] = await Promise.all([
-    listBurstPosts(15),
-    listAdCampaigns(),
-    listListingReportQueue("open"),
-    listBusinessVerificationQueue("pending"),
-    listChatMessageReports("open"),
-    listChatRoomReports("open"),
-  ]);
-
-  return {
-    counts: counts ?? {
-      users: 0,
-      posts: 0,
-      comments: 0,
-      subreddits: 0,
-      listings: 0,
-      businesses: 0,
-      pending_business_verifications: 0,
-      open_listing_reports: 0,
-      open_chat_reports: 0,
-      banned: 0,
-      shadowbanned: 0,
-      banned_words: 0,
-    },
-    recentActions: recentActions ?? [],
-    warnings: warnings ?? [],
-    bannedWords: bannedWords ?? [],
-    users: users ?? [],
-    burstPosts,
-    businessVerifications,
-    adCampaigns,
-    chatReports: [...chatRoomReports, ...chatMessageReports].sort(
-      (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)
-    ),
-    listingReports,
-  };
+    .bind(search, pattern, pattern, pattern, limit, offset)
+    .all<AdminUser>();
+  return results ?? [];
 }

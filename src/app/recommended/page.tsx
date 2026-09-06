@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { Feed } from "@/components/feed/feed";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { withFeedAds } from "@/lib/ads";
 import { getRecommendations } from "@/lib/content";
@@ -33,16 +34,18 @@ export default async function RecommendedPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 safe-px safe-pb py-6 sm:py-8">
-        <section className="mb-6">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">
-            {tLocale(locale, "pages.recommended")}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {tLocale(locale, "pages.recommendedBlurb")}
-          </p>
-        </section>
-        <Feed initialFeed={initialFeed} />
+      <main className="flex-1">
+        <PageShell width="standard">
+          <section className="mb-6">
+            <h1 className="font-heading text-3xl font-semibold tracking-tight">
+              {tLocale(locale, "pages.recommended")}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {tLocale(locale, "pages.recommendedBlurb")}
+            </p>
+          </section>
+          <Feed initialFeed={initialFeed} />
+        </PageShell>
       </main>
     </>
   );

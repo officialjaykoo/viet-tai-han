@@ -14,7 +14,7 @@ export default function DeveloperLayout({ children }: { children: ReactNode }) {
             className="flex min-w-0 items-center gap-2 rounded-md font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <Image
-              src="/vth-logo.png"
+              src="/icon.png"
               alt=""
               width={22}
               height={22}
@@ -30,7 +30,7 @@ export default function DeveloperLayout({ children }: { children: ReactNode }) {
               href="https://vth.kr"
             >
               <Image
-                src="/vth-logo.png"
+                src="/icon.png"
                 alt=""
                 width={17}
                 height={17}

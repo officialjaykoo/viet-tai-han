@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { getSession } from "@/lib/session";
@@ -25,7 +26,7 @@ export default async function SubmitInSubredditPage({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_16%,transparent),transparent_68%)]"
         />
-        <div className="relative mx-auto w-full max-w-3xl safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="narrow">
           <section className="mb-6">
             <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
               {tLocale(locale, "post.submitTitle")}
@@ -41,7 +42,7 @@ export default async function SubmitInSubredditPage({
           <div className="rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6">
             <CreatePostForm defaultSubreddit={name} />
           </div>
-        </div>
+        </PageShell>
       </main>
     </>
   );

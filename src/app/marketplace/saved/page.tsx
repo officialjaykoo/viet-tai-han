@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ListingSaveButton } from "@/components/marketplace/listing-save-button";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -23,7 +24,7 @@ export default async function SavedMarketplaceListingsPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div className="relative mx-auto w-full max-w-4xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="standard" className="space-y-6">
           <Link
             href="/marketplace"
             className="text-sm font-medium text-[var(--brand)] hover:underline"
@@ -89,7 +90,7 @@ export default async function SavedMarketplaceListingsPage() {
               ))}
             </ul>
           )}
-        </div>
+        </PageShell>
       </main>
     </>
   );

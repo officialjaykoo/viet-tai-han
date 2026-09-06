@@ -8,10 +8,10 @@
  */
 
 import { createAuth } from "./lib/auth";
-import { ChatRoom } from "./workers/ChatRoom";
-import { PostObject } from "./workers/PostObject";
+import { guardWorkerRequest } from "./lib/worker-ingress";
 
-export { ChatRoom, PostObject };
+export { ChatRoom } from "./workers/ChatRoom";
+export { PostObject } from "./workers/PostObject";
 
 // `.open-next/worker.js` is produced by `opennextjs-cloudflare build`
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- generated before build
@@ -41,6 +41,7 @@ type EnvWithLimits = CloudflareEnv & {
   EDGE_IP_RATE_LIMITER?: RateLimit;
   TUNNEL_IP_RATE_LIMITER?: RateLimit;
   EXPENSIVE_IP_RATE_LIMITER?: RateLimit;
+  E2E_BOT_BYPASS?: string;
 };
 const REALTIME_PATH = "/api/messages/realtime";
 const DEVELOPER_HOST = "developers.vth.kr";
@@ -176,6 +177,9 @@ export default {
           if (!success) return tooManyRequests(60);
         }
       }
+
+      const ingressResponse = guardWorkerRequest(request, env);
+      if (ingressResponse) return ingressResponse;
 
       if (pathname === REALTIME_PATH) {
         return await handleRealtime(request, env);

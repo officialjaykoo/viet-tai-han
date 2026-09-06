@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ListingForm } from "@/components/marketplace/listing-form";
+import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -26,7 +27,7 @@ export default async function NewMarketplaceListingPage() {
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
         />
-        <div className="relative mx-auto w-full max-w-3xl space-y-6 safe-px safe-pb py-6 sm:py-8">
+        <PageShell width="narrow" className="space-y-6">
           <Link
             href="/marketplace"
             className="text-sm font-medium text-[var(--brand)] hover:underline"
@@ -47,7 +48,7 @@ export default async function NewMarketplaceListingPage() {
               <ListingForm />
             </div>
           </section>
-        </div>
+        </PageShell>
       </main>
     </>
   );

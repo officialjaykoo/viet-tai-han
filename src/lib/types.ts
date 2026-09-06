@@ -1,10 +1,8 @@
 import type { AccountTag } from "@/lib/tags";
 
 export type VoteAction = "upvote" | "downvote";
-
-/** Current viewer's vote on a target, if any. */
+export type VoteMutation = VoteAction | "remove";
 export type ViewerVote = VoteAction | null;
-
 export interface UserRow {
   id: string;
   username: string;
@@ -82,6 +80,7 @@ export interface FeedPost {
   score: number;
   commentCount: number;
   createdAt: string;
+  likeCount: number;
   viewerVote: ViewerVote;
   translation: ContentTranslation | null;
   author: {

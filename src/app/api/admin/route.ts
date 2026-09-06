@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createSubreddit } from "@/lib/actions";
 import {
   addBannedWord,
   deleteAccount,
   deleteSubreddit,
-  getAdminOverview,
+  getAdminDashboard,
   setUserStatus,
+  updateSubreddit,
   warnUser,
 } from "@/lib/admin";
 import { reviewBusinessVerification } from "@/lib/businesses";
@@ -14,7 +16,7 @@ import {
   reviewChatRoomReport,
 } from "@/lib/dm-moderation";
 import { reviewListingReport } from "@/lib/marketplace";
-import { listSiteSettings, setSiteSetting } from "@/lib/settings";
+import { setSiteSetting } from "@/lib/settings";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
@@ -24,9 +26,8 @@ export async function GET() {
   try {
     const session = await requireSession();
     await requireAdmin(session.user as SessionUser);
-    const overview = await getAdminOverview();
-    const settings = await listSiteSettings();
-    return NextResponse.json({ ...overview, settings });
+    const dashboard = await getAdminDashboard();
+    return NextResponse.json(dashboard);
   } catch (error) {
     if (error instanceof AuthError) {
       return await jsonAuthError(error);
@@ -44,6 +45,9 @@ export async function POST(request: NextRequest) {
       op?: string;
       userId?: string;
       subredditId?: string;
+      name?: string;
+      title?: string;
+      description?: string;
       word?: string;
       severity?: "shadow" | "block";
       wordId?: string;
@@ -64,6 +68,42 @@ export async function POST(request: NextRequest) {
     };
 
     switch (body.op) {
+      case "create_subreddit": {
+        if (!body.name || !body.title) {
+          return await jsonLocalizedError("Missing community fields", 400);
+        }
+        const result = await createSubreddit({
+          actor,
+          name: body.name,
+          title: body.title,
+          description: body.description,
+        });
+        return NextResponse.json(result, { status: 201 });
+      }
+      case "update_subreddit": {
+        if (!body.subredditId || !body.title) {
+          return await jsonLocalizedError("Missing community fields", 400);
+        }
+        await updateSubreddit({
+          actorId: actor.id,
+          subredditId: body.subredditId,
+          title: body.title,
+          description: body.description,
+        });
+        return NextResponse.json({ ok: true });
+      }
+      case "delete_subreddit": {
+        if (!body.subredditId) {
+          return await jsonLocalizedError("Missing subredditId", 400);
+        }
+        await deleteSubreddit({
+          actorId: actor.id,
+          subredditId: body.subredditId,
+          reason: body.reason,
+        });
+        return NextResponse.json({ ok: true });
+      }
+
       case "user_status": {
         if (!body.userId || !body.action) {
           return await jsonLocalizedError("Missing fields", 400);
@@ -94,17 +134,6 @@ export async function POST(request: NextRequest) {
         await deleteAccount({
           actorId: actor.id,
           targetUserId: body.userId,
-          reason: body.reason,
-        });
-        return NextResponse.json({ ok: true });
-      }
-      case "delete_subreddit": {
-        if (!body.subredditId) {
-          return await jsonLocalizedError("Missing subredditId", 400);
-        }
-        await deleteSubreddit({
-          actorId: actor.id,
-          subredditId: body.subredditId,
           reason: body.reason,
         });
         return NextResponse.json({ ok: true });

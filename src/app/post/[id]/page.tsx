@@ -1,16 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdSlot } from "@/components/ads/ad-slot";
 import { CommentComposer } from "@/components/comments/comment-composer";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageShell } from "@/components/layout/page-shell";
 import { PostCard } from "@/components/feed/post-card";
 import { TunneledOutboundLink } from "@/components/media/tunneled-outbound-link";
 import { PostAuthorActions } from "@/components/posts/post-author-actions";
 import { PostBodyPanel } from "@/components/posts/post-body-panel";
 import { PostViewBeacon } from "@/components/posts/post-view-beacon";
-import { SubredditLabel } from "@/components/posts/subreddit-label";
 import { getPostDetail } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -41,20 +40,7 @@ export default async function PostPage({
       <SiteHeader />
       <PostViewBeacon postId={post.id} discoverySource={discoverySource} />
       <main className="relative flex-1">
-        <div className="mx-auto w-full max-w-3xl space-y-6 safe-px safe-pb py-6 sm:py-8">
-          <p className="text-sm text-muted-foreground">
-            <SubredditLabel name={post.subreddit.name} />
-            <span className="mx-1.5" aria-hidden>
-              ·
-            </span>
-            <Link
-              href={`/u/${post.author.username}`}
-              prefetch={false}
-              className="hover:underline"
-            >
-              @{post.author.username}
-            </Link>
-          </p>
+        <PageShell width="narrow" className="space-y-6">
 
           <PostCard post={post} />
 
@@ -99,7 +85,7 @@ export default async function PostPage({
               viewerId={session?.user?.id ?? null}
             />
           </section>
-        </div>
+        </PageShell>
       </main>
     </>
   );

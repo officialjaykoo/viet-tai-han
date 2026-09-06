@@ -430,7 +430,7 @@ export function MessagesClient() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+    <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <aside className="space-y-6">
         {!selectedRoom ? (
           <section className="space-y-3">

@@ -293,11 +293,11 @@ describe("user actions (hide / block / follow / report)", () => {
 
 describe("communities", () => {
   it("creates a community, auto-subscribes, and makes creator a mod", async () => {
-    const { authorId } = await seedUsersAndSubreddit();
+    const { adminId } = await seedUsersAndSubreddit();
     const name = `newc_${crypto.randomUUID().slice(0, 6)}`;
 
     const created = await createSubreddit({
-      userId: authorId,
+      actor: { id: adminId, role: "admin", status: "active" },
       name,
       title: "Brand new community",
       description: "Integration community",
@@ -307,16 +307,28 @@ describe("communities", () => {
     const sub = await env.DB.prepare(
       `SELECT 1 AS ok FROM subscriptions WHERE user_id = ? AND subreddit_id = ?`
     )
-      .bind(authorId, created.id)
+      .bind(adminId, created.id)
       .first();
     expect(sub).toBeTruthy();
 
     const mod = await env.DB.prepare(
       `SELECT 1 AS ok FROM subreddit_moderators WHERE user_id = ? AND subreddit_id = ?`
     )
-      .bind(authorId, created.id)
+      .bind(adminId, created.id)
       .first();
     expect(mod).toBeTruthy();
+  });
+
+  it("rejects community creation by normal users", async () => {
+    const { authorId } = await seedUsersAndSubreddit();
+
+    await expect(
+      createSubreddit({
+        actor: { id: authorId, role: "user", status: "active" },
+        name: `user_${crypto.randomUUID().slice(0, 6)}`,
+        title: "Should not be created",
+      })
+    ).rejects.toMatchObject({ status: 403 });
   });
 });
 
