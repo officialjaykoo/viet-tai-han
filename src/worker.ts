@@ -47,7 +47,13 @@ const DEVELOPER_HOST = "developers.vth.kr";
 
 function routeDeveloperRequest(request: Request): Request {
   const url = new URL(request.url);
-  if (url.hostname.toLowerCase() !== DEVELOPER_HOST) return request;
+  const requestHostname = url.hostname.toLowerCase();
+  const headerHostname =
+    request.headers.get("host")?.split(":")[0].toLowerCase() ?? "";
+  const isDeveloperHost =
+    requestHostname === DEVELOPER_HOST || headerHostname === DEVELOPER_HOST;
+
+  if (!isDeveloperHost) return request;
 
   const pathname = url.pathname;
   const isAsset =
@@ -58,7 +64,13 @@ function routeDeveloperRequest(request: Request): Request {
     pathname === "/speculation-rules.json" ||
     /\.[a-z0-9]+$/i.test(pathname);
 
-  if (isAsset || pathname.startsWith("/developers")) return request;
+  if (
+    isAsset ||
+    pathname === "/developers" ||
+    pathname.startsWith("/developers/")
+  ) {
+    return request;
+  }
 
   url.pathname = pathname === "/" ? "/developers" : `/developers${pathname}`;
   return new Request(url, request);

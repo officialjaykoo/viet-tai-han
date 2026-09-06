@@ -60,7 +60,7 @@ export function CardGrid({
         <a
           key={href}
           href={`https://developers.vth.kr${href}`}
-          className="rounded-xl border border-border p-5 transition-colors hover:bg-muted/40"
+          className="rounded-xl border border-border p-5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <div className="font-medium">{title}</div>
           <div className="mt-2 text-sm leading-6 text-muted-foreground">{text}</div>

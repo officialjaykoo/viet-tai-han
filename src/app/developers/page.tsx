@@ -31,7 +31,7 @@ export default function DevelopersPage() {
       <div className="mt-8 flex flex-wrap gap-3">
         <a
           href="https://developers.vth.kr/getting-started"
-          className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Get started
         </a>
@@ -39,7 +39,7 @@ export default function DevelopersPage() {
           href="https://github.com/officialjaykoo/viet-tai-han"
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           View source
         </a>
