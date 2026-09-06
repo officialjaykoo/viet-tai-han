@@ -580,7 +580,7 @@ export const en = {
     changePassword: "Change password",
     connectedAccounts: "Connected accounts",
     connectedAccountsDesc:
-      "Link sign-in providers explicitly. Matching email addresses are never linked automatically.",
+      "Link sign-in providers explicitly. Matching email addresses are never linked automatically. Keep at least one social account connected.",
     passwordAccount: "Password",
     unlink: "Unlink",
     linkFacebook: "Link Facebook",

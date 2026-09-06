@@ -569,7 +569,7 @@ export const ko: Messages = {
     changePassword: "비밀번호 변경",
     connectedAccounts: "연결된 계정",
     connectedAccountsDesc:
-      "로그인 제공자를 직접 연결합니다. 이메일이 같아도 자동으로 연결하지 않습니다.",
+      "로그인 제공자를 직접 연결합니다. 이메일이 같아도 자동으로 연결하지 않습니다. 소셜 계정은 최소 1개를 연결해 두어야 합니다.",
     passwordAccount: "비밀번호",
     unlink: "연결 해제",
     linkFacebook: "Facebook 연결",

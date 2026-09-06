@@ -44,6 +44,42 @@ describe("identity providers", () => {
     expect(row?.username).toMatch(/^vth_user_[a-f0-9]{12}$/);
     expect(row?.displayUsername).toBe(row?.username);
   });
+
+  it("keeps at least one social account connected", async () => {
+    const auth = createAuth(env.DB);
+    const context = await auth.$context;
+    const userId = `unlink_${crypto.randomUUID()}`;
+
+    await context.internalAdapter.createUser({
+      id: userId,
+      name: "Unlink User",
+      email: `${userId}@oauth.test`,
+      emailVerified: false,
+      image: null,
+    });
+    const facebook = await context.internalAdapter.createAccount({
+      accountId: `${userId}_facebook`,
+      providerId: "facebook",
+      userId,
+    });
+    const zalo = await context.internalAdapter.createAccount({
+      accountId: `${userId}_zalo`,
+      providerId: "zalo",
+      userId,
+    });
+
+    await context.internalAdapter.deleteAccount(facebook.id);
+    await expect(
+      context.internalAdapter.deleteAccount(zalo.id)
+    ).rejects.toThrow("At least one social account must remain connected");
+
+    const remaining = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM account WHERE userId = ?`
+    )
+      .bind(userId)
+      .first<{ count: number }>();
+    expect(remaining?.count).toBe(1);
+  });
   it("blocks credential authentication endpoints", async () => {
     const auth = createAuth(env.DB);
 

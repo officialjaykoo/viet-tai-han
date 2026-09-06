@@ -149,6 +149,9 @@ export function SettingsClient({
   // Account identity
   const [email, setEmail] = useState(initialSettings.email);
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const socialAccounts = linkedAccounts.filter(
+    (account) => account.providerId !== "credential"
+  );
   const [identityLoading, setIdentityLoading] = useState(true);
 
   const username = settings.username ?? "user";
@@ -693,9 +696,7 @@ export function SettingsClient({
                   disabled={
                     pending ||
                     identityLoading ||
-                    linkedAccounts.some(
-                      (account) => account.providerId === "facebook"
-                    )
+                    socialAccounts.length <= 1
                   }
                   onClick={() => linkIdentity("facebook")}
                 >
@@ -708,9 +709,7 @@ export function SettingsClient({
                   disabled={
                     pending ||
                     identityLoading ||
-                    linkedAccounts.some(
-                      (account) => account.providerId === "zalo"
-                    )
+                    socialAccounts.length <= 1
                   }
                   onClick={() => linkIdentity("zalo")}
                 >

@@ -578,7 +578,7 @@ export const vi: Messages = {
     changePassword: "Đổi mật khẩu",
     connectedAccounts: "Tài khoản đã liên kết",
     connectedAccountsDesc:
-      "Liên kết rõ ràng các phương thức đăng nhập. Email trùng khớp không được tự động liên kết.",
+      "Liên kết rõ ràng các phương thức đăng nhập. Email trùng khớp không được tự động liên kết. Luôn giữ ít nhất một tài khoản mạng xã hội đã liên kết.",
     passwordAccount: "Mật khẩu",
     unlink: "Hủy liên kết",
     linkFacebook: "Liên kết Facebook",

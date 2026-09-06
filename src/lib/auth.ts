@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import { genericOAuth, username } from "better-auth/plugins";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Kysely } from "kysely";
@@ -328,6 +328,36 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
           },
         },
       },
+    account: {
+      delete: {
+        before: async (account, context) => {
+          const path = context?.path;
+          if (
+            path &&
+            path !== "/unlink-account" &&
+            path !== "/api/auth/unlink-account"
+          ) {
+            return;
+          }
+          if (account.providerId === "credential") return;
+
+          const result = await db
+            .prepare(
+              `SELECT COUNT(*) AS count
+               FROM account
+               WHERE userId = ? AND providerId <> 'credential'`
+            )
+            .bind(account.userId)
+            .first<{ count: number | string }>();
+          if (Number(result?.count ?? 0) <= 1) {
+            throw APIError.from("BAD_REQUEST", {
+              code: "LAST_SOCIAL_ACCOUNT",
+              message: "At least one social account must remain connected",
+            });
+          }
+        },
+      },
+    },
     },
   });
 }

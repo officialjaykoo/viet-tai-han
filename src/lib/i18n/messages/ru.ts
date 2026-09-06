@@ -581,7 +581,7 @@ export const ru: Messages = {
     changePassword: "Сменить пароль",
     connectedAccounts: "Связанные аккаунты",
     connectedAccountsDesc:
-      "Привязывайте способы входа явно. Совпадающие email не связываются автоматически.",
+      "Привязывайте способы входа явно. Совпадающие email не связываются автоматически. Должен оставаться хотя бы один социальный аккаунт.",
     passwordAccount: "Пароль",
     unlink: "Отвязать",
     linkFacebook: "Связать Facebook",
