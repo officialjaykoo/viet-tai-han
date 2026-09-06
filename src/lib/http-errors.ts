@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 
 import type { Locale } from "@/lib/i18n/config";
 import { getMessages } from "@/lib/i18n/translate";
@@ -144,10 +143,10 @@ export function renderErrorHtml(
 export function htmlErrorResponse(
   kind: HttpErrorKind,
   options?: { locale?: Locale; status?: number }
-): NextResponse {
+): Response {
   const status =
     options?.status ?? (kind === "method_not_allowed" ? 405 : 404);
-  return new NextResponse(renderErrorHtml(kind, options?.locale ?? "vi"), {
+  return new Response(renderErrorHtml(kind, options?.locale ?? "vi"), {
     status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -159,7 +158,7 @@ export function htmlErrorResponse(
 /** Always looks like a normal 404 — used for hidden internal paths. */
 export function fakeNotFoundResponse(options?: {
   locale?: Locale;
-}): NextResponse {
+}): Response {
   return htmlErrorResponse("not_found", {
     locale: options?.locale,
     status: 404,
@@ -170,7 +169,7 @@ export function htmlErrorIfBrowser(
   request: Request,
   kind: HttpErrorKind,
   options?: { locale?: Locale; status?: number }
-): NextResponse | null {
+): Response | null {
   if (!wantsHtml(request)) return null;
   return htmlErrorResponse(kind, options);
 }
