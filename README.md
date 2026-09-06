@@ -1,14 +1,14 @@
 # Việt tại Hàn
 
-**Việt tại Hàn (VTH)** is a social and community platform for Vietnamese people living in Korea.
+**Việt tại Hàn (VTH)** is a full-stack social and community platform built for Cloudflare.
 
-Live site: **https://vth.kr**
+Live deployment: **https://vth.kr**
 
-The project started from the MIT-licensed [`koval01/red`](https://github.com/koval01/red) codebase and has since been substantially reworked for a different product direction: a Facebook/Instagram-inspired social layer combined with practical community features for Vietnamese residents in Korea.
+The software combines a Facebook/Instagram-style social graph with community, messaging, discovery, marketplace, and local-service features in a single application. It started from the MIT-licensed [`koval01/red`](https://github.com/koval01/red) codebase and has since been substantially reworked in product model, identity, authentication, messaging, moderation, localization, and Cloudflare architecture.
 
 > VTH is an independent project. It is not affiliated with Meta, Facebook, Instagram, Kakao, Zalo, Reddit, or Cloudflare.
 
-## Product direction
+## What the software provides
 
 VTH is designed around people and relationships first, rather than around Reddit-style karma or anonymous forum mechanics.
 
@@ -21,11 +21,11 @@ Core product areas include:
 - **Communities, posts, comments, and voting**
 - **Questions & answers**
 - **Marketplace**
-- **Local businesses / 업체 directory**
+- **Local business / service discovery**
 - **Recommendations and discovery**
-- **Vietnamese, Korean, English, and Russian UI support**
+- **Multilingual UI**
 
-The current social model uses immutable `user.id` values internally. Public usernames are mutable handles and are not used as account identity.
+The social model uses immutable `user.id` values internally. Public usernames are mutable handles and are not used as account identity.
 
 ## Authentication
 
@@ -37,9 +37,7 @@ Supported providers:
 - Kakao
 - Zalo
 
-A new user completes onboarding after social sign-in. Password login is not the primary account model.
-
-Provider accounts map to an immutable VTH user ID. Email, when available, is contact metadata rather than the canonical identity or an automatic account-merging key.
+A new user completes onboarding after social sign-in. Provider accounts map to an immutable VTH user ID. Email, when available, is contact metadata rather than the canonical identity or an automatic account-merging key.
 
 ## Messaging model
 
