@@ -1,202 +1,190 @@
 # Việt tại Hàn
 
-Một nền tảng cộng đồng dành cho người Việt tại Hàn Quốc, chạy **hoàn toàn trên Cloudflare**.
+**Việt tại Hàn (VTH)** is a social and community platform for Vietnamese people living in Korea.
 
-Không cần máy chủ ứng dụng riêng, PostgreSQL bên ngoài hay tài khoản S3 ở nền tảng khác. Ứng dụng, cơ sở dữ liệu, tệp phương tiện, AI, vector tìm kiếm, chống bot và giới hạn tốc độ biên đều chạy trên mạng Cloudflare.
+Live site: **https://vth.kr**
 
-Trang chính: **[vth.kr](https://vth.kr)**
+The project started from the MIT-licensed [`koval01/red`](https://github.com/koval01/red) codebase and has since been substantially reworked for a different product direction: a Facebook/Instagram-inspired social layer combined with practical community features for Vietnamese residents in Korea.
 
-Được xây dựng end-to-end với [Cursor](https://cursor.com) (AI pair-programming), dưới sự định hướng của con người về kiến trúc và sản phẩm.
+> VTH is an independent project. It is not affiliated with Meta, Facebook, Instagram, Kakao, Zalo, Reddit, or Cloudflare.
 
-![Việt tại Hàn walkthrough](https://img.youtube.com/vi/mexvSvUr52c/maxresdefault.jpg)
+## Product direction
 
-**[Watch the walkthrough →](https://www.youtube.com/watch?v=mexvSvUr52c)**
+VTH is designed around people and relationships first, rather than around Reddit-style karma or anonymous forum mechanics.
 
-> **Mã nguồn + hướng dẫn triển khai.** Fork repository này rồi triển khai instance riêng trên Cloudflare.
+Core product areas include:
 
----
+- **Profiles** with public usernames and display names
+- **Follow, friend, block, and presence** relationships
+- **Direct messages and message requests**
+- **Notifications and browser push**
+- **Communities, posts, comments, and voting**
+- **Questions & answers**
+- **Marketplace**
+- **Local businesses / 업체 directory**
+- **Recommendations and discovery**
+- **Vietnamese, Korean, English, and Russian UI support**
 
-## Why this exists
+The current social model uses immutable `user.id` values internally. Public usernames are mutable handles and are not used as account identity.
 
-1. **Cloudflare as the whole backend** — Workers are versatile enough for a real social app: SSR UI, APIs, stateful coordination, SQL, object storage, embeddings, and abuse controls.
-2. **Modern AI-assisted engineering** — most of the implementation was written by an agent in Cursor; the result is meant to be readable, deployable, and honest about that workflow.
+## Authentication
 
-## Cloudflare stack
+VTH uses social-only authentication through Better Auth.
 
-| Product | Role in `Việt tại Hàn` |
+Supported providers:
+
+- Facebook
+- Kakao
+- Zalo
+
+A new user completes onboarding after social sign-in. Password login is not the primary account model.
+
+Provider accounts map to an immutable VTH user ID. Email, when available, is contact metadata rather than the canonical identity or an automatic account-merging key.
+
+## Messaging model
+
+For a sender `A` messaging recipient `B`:
+
+- if either side has blocked the other → messaging is prohibited
+- accepted friends → direct message
+- if **B follows A** → A may message B directly
+- otherwise → message request, subject to the recipient's request privacy setting
+
+Existing conversations remain tied to user IDs, not usernames.
+
+## Reputation
+
+VTH still has reputation-related data inherited from the original community architecture, but the product direction is to keep **reputation separate from core permissions**.
+
+A normal new user with zero reputation should still be able to use ordinary social and community features. Abuse prevention should rely on account state, moderation, rate limits, relationship rules, and behavioral signals rather than a single karma threshold.
+
+## Cloudflare architecture
+
+VTH is deployed primarily on Cloudflare.
+
+| Component | Role |
 | --- | --- |
-| **Workers** + **OpenNext** | Next.js app + custom edge entry (`src/worker.ts`) |
-| **D1** | Primary SQL database (users, posts, votes, DMs, …) |
-| **R2** | Media uploads |
-| **Durable Objects** | Per-post vote aggregation (`PostObject`) |
-| **KV** *(optional)* | Edge cache / challenge state (falls back to memory) |
-| **Vectorize** + **Workers AI** | Post embeddings, recommendations, translation |
-| **Workers Rate Limiting** | Cheap IP flood gates *before* Next/SSR |
-| **Turnstile** | Human checks on auth and write paths |
-| **Workers Logs** | Observability (`observability` in `wrangler.jsonc`) |
+| **Cloudflare Workers + OpenNext** | Next.js application and API runtime |
+| **D1** | Primary relational database |
+| **R2** | Media storage |
+| **Durable Objects** | Stateful coordination where required |
+| **Workers AI + Vectorize** | AI-assisted translation/recommendation features |
+| **Turnstile** | Human / abuse checks |
+| **Workers Rate Limiting** | Request flood protection |
+| **Workers Logs** | Production observability |
 
-```mermaid
-flowchart LR
-  Browser --> Worker["Worker / OpenNext"]
-  Worker --> D1[(D1)]
-  Worker --> R2[(R2)]
-  Worker --> DO["Durable Object\nPostObject"]
-  Worker --> KV[(KV)]
-  Worker --> AI["Workers AI"]
-  Worker --> VZ[Vectorize]
-  Worker --> TS[Turnstile]
+Main application stack:
+
+- Next.js 16
+- React 19
+- TypeScript
+- Better Auth
+- Kysely / D1
+- Tailwind CSS
+- OpenNext for Cloudflare
+- Vitest
+- Playwright
+
+## Repository layout
+
+```text
+src/app/          Next.js routes and API handlers
+src/components/   UI components
+src/lib/          application, social, auth, security, and data logic
+src/worker.ts     Cloudflare Worker entry
+migrations/       D1 schema migrations
+docs/             deployment and project notes
+public/           static assets and service worker
 ```
 
-## Features
+## Local development
 
-- Communities, posts, comments, votes, profiles
-- Auth ([Better Auth](https://www.better-auth.com) social-only Facebook/Zalo/Kakao sign-in, onboarding, and explicit account linking)
-- Search and AI-backed recommendations
-- Direct messages and notifications
-- Media uploads (R2)
-- Ads + post analytics (default off until consent and policy approval)
-- Consent controls, Pro entitlements, signed billing webhook, transaction/reputation ledgers
-- Achievements, reputation, badges, tags
-- Content translation via Workers AI
-- Sealed Protobuf API tunnel (`/i/api`) with bot / PoW challenges
-- Personal API keys
+Requirements:
 
-## Quick start (local)
-
-Prerequisites: **Node 22+**, a Cloudflare account (AI / Vectorize are remote; D1 works locally).
+- Node.js 22+
+- npm
+- Cloudflare account for remote Cloudflare services
 
 ```bash
 git clone https://github.com/officialjaykoo/viet-tai-han.git
 cd viet-tai-han
 npm ci
 cp .dev.vars.example .dev.vars
-
-npm run db:reset:local   # migrate + seed demo data
-npm run dev              # http://localhost:3000
+npm run db:reset:local
+npm run dev
 ```
 
-Local auth is social-only. Set at least one provider's ID and secret in `.dev.vars` before signing up; seeded demo credentials are not accepted.
+Then open:
 
-Turnstile test keys in `.dev.vars.example` always pass locally. Replace them with your own widget keys for production.
-
-The UI supports Vietnamese, Korean, English, and Russian. The default is English; an explicit cookie/account preference wins, then the browser `Accept-Language` header, then Cloudflare's country header. No language prompt is shown. Signed-in users can change the language under **Settings → Appearance**.
-
-### Useful scripts
-
-| Script | Purpose |
-| --- | --- |
-| `npm run dev` | Next.js + Cloudflare bindings via OpenNext for Dev |
-| `npm run preview` | OpenNext build + local Workers preview |
-| `npm run deploy` | Build and deploy the Worker |
-| `npm test` | Unit + Workers/integration tests |
-| `npm run test:e2e:chromium` | Playwright smoke (Chromium) |
-| `npm run db:migrate:local` | Apply D1 migrations locally |
-| `npm run vectors:create` | Create the Vectorize index (remote) |
-
-### Multilingual AI
-
-Post recommendations use Cloudflare Workers AI [`@cf/google/embeddinggemma-300m`](https://developers.cloudflare.com/workers-ai/models/embeddinggemma-300m/), a multilingual embedding model that keeps the existing 768-dimensional cosine Vectorize index. New vectors carry an `embeddingVersion` metadata value; create its metadata index before backfilling:
-
-```bash
-npx wrangler vectorize create-metadata-index vth-posts --property-name=embeddingVersion --type=string
+```text
+http://localhost:3000
 ```
 
-Content translation uses [`@cf/meta/m2m100-1.2b`](https://developers.cloudflare.com/workers-ai/models/m2m100-1.2b/). Vietnamese and Korean posts are translated for the other supported locale; English and Russian posts use Vietnamese as the default target. Translation and embedding jobs are backgrounded and fall back to the regular feed when Workers AI or Vectorize is unavailable.
+Social login requires the corresponding provider credentials in `.dev.vars`.
 
-### Monetization safety
-
-The monetization foundation is implemented without pretending that a payment provider is configured:
-
-- `ads_enabled` is seeded as `0`. An administrator may set it to `1` only after policy, consent, targeting scope, and anti-fraud review.
-- Analytics and ad-event storage are opt-in. Impression events require signed-in analytics consent, active campaign/window checks, per-user/day dedupe, and rate limits. Pro entitlements remove feed ads.
-- `POST /api/billing/webhook` accepts only a provider-neutral normalized event signed with HMAC-SHA256 in `X-VTH-Billing-Signature` (raw hex, or `sha256=<hex>`). It stores the payload hash and idempotently updates `pro_subscriptions`, `billing_events`, and `transaction_ledger`; raw provider payloads are not stored.
-- The webhook contract expects `BILLING_WEBHOOK_SECRET` and an adapter that maps the provider payload to an internal `userId`. Checkout, prices, refunds, tax handling, and provider credentials remain an operator task; no payment flow is enabled by default.
-
-
-## Deploy your own
-For the current `vth.kr` production setup, use the Korean runbook [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md). The target account, R2 subscription, `vth-media` bucket, D1, Vectorize, Turnstile, and Worker deployment are complete. Do not recreate resources unless you are provisioning a separate environment.
-
-
-1. Create Cloudflare resources:
-
-   ```bash
-   npx wrangler login
-   npx wrangler d1 create vth-db
-   npx wrangler r2 bucket create vth-media
-   npm run vectors:create   # Vectorize index vth-posts (768 dims, cosine)
-   npx wrangler vectorize create-metadata-index vth-posts --property-name=embeddingVersion --type=string
-   npx wrangler vectorize create-metadata-index vth-posts --property-name=authorId --type=string
-   # optional:
-   npx wrangler kv namespace create CACHE
-   npx wrangler kv namespace create CACHE --preview
-   ```
-
-2. Paste the returned IDs into `wrangler.jsonc` (`database_id`, and KV ids if used).
-
-3. Set `vars.BETTER_AUTH_URL` to the public origin, put the Turnstile **site** key in `vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and configure at least one of `FACEBOOK_CLIENT_ID`, `ZALO_APP_ID`, or `KAKAO_CLIENT_ID`. Set `VTH_AUTH_ORIGINS` only for additional comma-separated preview origins. For browser push, set the VAPID public key in `vars.VAPID_PUBLIC_KEY`.
-
-4. Register the OAuth callbacks with each provider:
-
-   - Facebook: `https://YOUR_ORIGIN/api/auth/callback/facebook`
-   - Zalo: `https://YOUR_ORIGIN/api/auth/oauth2/callback/zalo`
-   - Kakao: `https://YOUR_ORIGIN/api/auth/callback/kakao`
-
-5. Set secrets:
-
-   ```bash
-   wrangler secret put BETTER_AUTH_SECRET
-   wrangler secret put TURNSTILE_SECRET_KEY
-   wrangler secret put FACEBOOK_CLIENT_SECRET  # when Facebook is enabled
-   wrangler secret put ZALO_APP_SECRET          # when Zalo is enabled
-   wrangler secret put KAKAO_CLIENT_SECRET     # only when enabled in Kakao
-   wrangler secret put VAPID_PRIVATE_KEY       # when browser push is enabled
-   wrangler secret put VAPID_SUBJECT           # mailto: or https: contact URI
-   wrangler secret put BILLING_WEBHOOK_SECRET  # required only when a provider webhook is enabled
-   ```
-
-   All three VAPID values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`) are required to enable push. The site must run on HTTPS (localhost is allowed by browsers); subscriptions can be managed under Settings → Notifications.
-   Facebook and Zalo remain disabled unless both the provider ID and secret are present. Kakao requires `KAKAO_CLIENT_ID`; its client secret is optional unless enabled in Kakao Developers. Social sign-in is the only account entry point: a new identity completes onboarding with name, username, and language, while an optional contact email is stored separately and is never used as a sign-in or linking key. After signing in with any provider, link the others under Settings → Account → Connected accounts. Email/password and passkey authentication are disabled.
-   The billing webhook is not a checkout implementation. Configure a provider adapter, user mapping, prices, refunds, and tax policy before setting `ads_enabled=1` or accepting real payments.
-
-6. Apply remote migrations, then deploy:
-
-   ```bash
-   npx wrangler d1 migrations apply DB --remote
-   npm run deploy
-   ```
-
-7. `wrangler.jsonc` configures `vth.kr` as a Custom Domain; run the deploy after the zone is active and verify it under Workers → Domains & Routes. Use the dashboard Add → Custom Domain flow only if the automatic trigger update fails.
-
-### Production notes
-
-- **`NEXT_PUBLIC_*` is baked at build time.** Keep `.env.local` / build env aligned with the Turnstile site key in `wrangler.jsonc` before `npm run deploy`.
-- **Speed Brain** (zone Speed → Optimization) injects speculative prefeches that Cloudflare refuses for Worker routes (`cf-speculation-refused` → cosmetic Network-tab 503). Real navigations still return 200. Turn Speed Brain **off** for Worker apps if the noise bothers you.
-- Profile achievement sync is backgrounded for public views so Link-prefetch storms don’t burn Worker CPU.
-
-## Architecture notes
-
-- **Single Worker** — OpenNext handler and `PostObject` ship together from `src/worker.ts`.
-- **Edge rate limits first** — floods die before SSR/D1/AI can run.
-- **D1 + Kysely** — schema in `migrations/`; access via `src/lib/db.ts`.
-- **Security** — Turnstile, signed human cookies, challenge / PoW, sealed `/i/api` under `src/lib/security/` and `src/lib/internal-api/`.
-
-## Tests & CI
-
-GitHub Actions (`.github/workflows/ci.yml`) runs local D1 migrate/seed, typecheck, Vitest (unit + workers), and Playwright Chromium.
+## Useful commands
 
 ```bash
+npm run dev
+npm run preview
 npm test
-npm run test:e2e:install
 npm run test:e2e:chromium
+npm run db:migrate:local
+npm run deploy
 ```
 
-## Built with
+For the current `vth.kr` Cloudflare setup, see:
 
-- [Next.js](https://nextjs.org) · [OpenNext Cloudflare](https://opennext.js.org/cloudflare)
-- [Better Auth](https://www.better-auth.com) · [Kysely](https://kysely.dev) · [Tailwind CSS](https://tailwindcss.com)
-- [Wrangler](https://developers.cloudflare.com/workers/wrangler/) · [Vitest](https://vitest.dev) · [Playwright](https://playwright.dev)
-- [Cursor](https://cursor.com) — primary implementation workflow
+- [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md)
+
+Do not reuse production secrets or production resource IDs when creating a separate deployment.
+
+## Production secrets
+
+Never commit production credentials.
+
+Typical production secrets include:
+
+- `BETTER_AUTH_SECRET`
+- `TURNSTILE_SECRET_KEY`
+- `FACEBOOK_CLIENT_SECRET`
+- `KAKAO_CLIENT_SECRET` when enabled
+- `ZALO_APP_SECRET`
+- `VAPID_PRIVATE_KEY`
+- billing/webhook secrets
+- Cloudflare API credentials
+
+Use Cloudflare Worker secrets or another appropriate secret store. See [`SECURITY.md`](SECURITY.md).
+
+## Development status
+
+VTH is under active development and is being migrated away from several assumptions inherited from the original Reddit-style codebase.
+
+Areas receiving active review include:
+
+- relationship state transitions
+- block/privacy behavior
+- DM request/direct-message rules
+- notification reliability
+- idempotency and race conditions
+- Worker CPU/resource usage
+- mobile UX
+- abuse controls
+
+Bug reports and focused fixes are expected during this stage.
+
+## Contributing
+
+Small, focused changes are preferred. When modifying social behavior, test the full state transition rather than only the happy path—for example follow/unfollow, friend request/accept/remove, block/unblock, pending DM promotion, retries, and concurrent requests.
+
+Security issues should not be posted publicly. See [`SECURITY.md`](SECURITY.md).
+
+## Fork and attribution
+
+This repository is a fork of [`koval01/red`](https://github.com/koval01/red), originally released under the MIT License.
+
+VTH retains the applicable upstream MIT copyright notice while adding its own modifications and project documentation.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT License. See [`LICENSE`](LICENSE).
