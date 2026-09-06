@@ -1,12 +1,12 @@
 # About Việt tại Hàn
 
-**Việt tại Hàn (VTH)** is an independent social and community platform for Vietnamese people living in Korea.
+**Việt tại Hàn (VTH)** is a full-stack social and community application designed to run primarily on Cloudflare.
 
-Production site: **https://vth.kr**
+Production deployment: **https://vth.kr**
 
 ## What VTH is
 
-VTH combines social-network relationships with practical community tools:
+VTH combines a social graph with community and local-service features in one application:
 
 - public profiles and mutable `@username` handles
 - follows, friends, blocks, and presence
@@ -17,20 +17,26 @@ VTH combines social-network relationships with practical community tools:
 - marketplace listings
 - local-business discovery
 - personalized recommendations
-- multilingual UI for Vietnamese, Korean, English, and Russian
+- multilingual UI
 
-The product direction is closer to a Facebook/Instagram-style social graph than to the Reddit-style interaction model of the upstream codebase.
+The product model is closer to a Facebook/Instagram-style social layer than to the Reddit-style interaction model of the upstream codebase.
 
-## Who it is for
+## Software architecture
 
-The primary audience is Vietnamese residents in Korea who need one place to:
+VTH is implemented as a modern edge-first web application using:
 
-- ask practical questions
-- find people and communities
-- communicate privately
-- discover local services and businesses
-- buy and sell items
-- share useful local information
+- Next.js and React
+- TypeScript
+- Better Auth
+- Cloudflare Workers + OpenNext
+- D1 for relational data
+- R2 for media
+- Durable Objects where stateful coordination is useful
+- Workers AI and Vectorize for AI-assisted features
+- Turnstile and rate limiting for abuse controls
+- browser Web Push via VAPID
+
+The application keeps immutable internal user IDs separate from mutable public usernames. Social relationships, messaging, blocking, notifications, and moderation operate on internal IDs rather than public handles.
 
 ## Project lineage
 
@@ -62,9 +68,9 @@ Follow, friend, block, messaging, notifications, and related state transitions s
 
 The application is designed around Cloudflare Workers, D1, R2, Durable Objects, Turnstile, and related services rather than a traditional long-running application server.
 
-### Multilingual by default
+### Multilingual UI
 
-Vietnamese and Korean are central to the product, while English and Russian are also supported in the UI.
+The application supports multiple interface languages and is designed so localization is part of the product architecture rather than an afterthought.
 
 ## Development status
 
@@ -95,7 +101,7 @@ VTH is distributed under the MIT License. See [`LICENSE`](LICENSE).
 
 **Description**
 
-> Social and community platform for Vietnamese people in Korea — profiles, follows/friends, DMs, Q&A, marketplace and local businesses on Cloudflare.
+> Full-stack social and community platform with profiles, follows/friends, DMs, notifications, Q&A, marketplace, recommendations, and local-service discovery on Cloudflare.
 
 **Website**
 
@@ -103,4 +109,4 @@ VTH is distributed under the MIT License. See [`LICENSE`](LICENSE).
 
 **Suggested topics**
 
-`vietnamese` · `korea` · `social-network` · `community` · `nextjs` · `cloudflare-workers` · `cloudflare-d1` · `cloudflare-r2` · `typescript` · `better-auth`
+`social-network` · `community-platform` · `nextjs` · `cloudflare-workers` · `cloudflare-d1` · `cloudflare-r2` · `typescript` · `better-auth` · `web-push` · `open-next`
