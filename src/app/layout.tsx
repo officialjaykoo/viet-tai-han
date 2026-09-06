@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Geist_Mono, Manrope } from "next/font/google";
 
 import { ConsentBanner } from "@/components/consent/consent-banner";
@@ -81,7 +82,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     themeRaw === "light" || themeRaw === "dark" || themeRaw === "system"
       ? themeRaw
       : "system";
-
+  const { env } = await getCloudflareContext({ async: true });
+  const turnstileSiteKey = env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
   return (
     <html
       lang={locale}
@@ -90,6 +92,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <meta name="turnstile-site-key" content={turnstileSiteKey} />
       </head>
       <body className="mobile-nav-space flex min-h-dvh flex-col bg-background font-sans text-foreground">
         <ThemeProvider initialTheme={initialTheme}>
