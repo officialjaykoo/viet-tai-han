@@ -1,7 +1,7 @@
 import { accountAgeDays } from "@/lib/account-age";
 import type { Locale } from "@/lib/i18n/config";
 
-/** Thresholds: index 0 = level 1 */
+/** Display/progression metadata only; achievement levels never authorize actions. */
 export const LEVEL_THRESHOLDS = {
   poster: [1, 10, 50, 100, 500],
   commenter: [1, 10, 50, 100, 500],

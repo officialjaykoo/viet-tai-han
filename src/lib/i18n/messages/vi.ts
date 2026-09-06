@@ -405,7 +405,8 @@ export const vi: Messages = {
   messages: {
     title: "Tin nhắn",
     inbox: "Hộp thư",
-    description: "Trò chuyện riêng chỉ mở sau khi người kia chấp nhận.",
+    description:
+      "Trò chuyện riêng mở trực tiếp với các mối quan hệ phù hợp; cuộc trò chuyện mới khác có thể cần chấp nhận.",
     empty: "Chưa có cuộc trò chuyện",
     requests: "Yêu cầu",
     accept: "Chấp nhận",
@@ -415,10 +416,11 @@ export const vi: Messages = {
     loadError: "Không thể tải tin nhắn",
     newChat: "Tin nhắn mới",
     username: "Tên người dùng",
-    openerPlaceholder: "Gửi lời chào — người kia cần chấp nhận trước khi trò chuyện",
-    requestChat: "Gửi yêu cầu trò chuyện",
+    openerPlaceholder:
+      "Gửi lời chào — cuộc trò chuyện mở trực tiếp hoặc trở thành yêu cầu",
+    requestChat: "Gửi tin nhắn",
     requestHint:
-      "Cuộc trò chuyện mới cần được chấp nhận để giảm spam. Số lượng yêu cầu bị giới hạn.",
+      "Bạn bè và người theo dõi phù hợp sẽ mở trò chuyện trực tiếp; các cuộc trò chuyện mới khác bị giới hạn yêu cầu để chống spam.",
     chats: "Cuộc trò chuyện",
     noOpenChats: "Chưa có cuộc trò chuyện đang mở.",
     noMessagesYet: "Chưa có tin nhắn",

@@ -383,7 +383,6 @@ export async function voteOnComment(input: {
         targetType: "comment",
         targetId: input.commentId,
         action: input.action,
-        voterKarma: input.voterKarma,
         postIdForDiscovery: comment.post_id,
       });
 
@@ -400,7 +399,6 @@ export async function voteOnComment(input: {
     personalizedDisplayScore(millipoints, {
       value,
       weight: appliedWeight,
-      voterKarma: input.voterKarma,
     });
 
   if (existing?.value === value) {

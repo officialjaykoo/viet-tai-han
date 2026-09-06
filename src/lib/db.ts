@@ -95,7 +95,6 @@ interface FeedQueryRow {
   subreddit_title: string;
   viewer_vote: number | null;
   viewer_vote_weight: number | null;
-  viewer_vote_karma: number | null;
 }
 
 function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost {
@@ -111,7 +110,6 @@ function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost 
         : personalizedDisplayScore(row.score, {
             value: row.viewer_vote,
             weight: Number(row.viewer_vote_weight ?? 1),
-            voterKarma: Number(row.viewer_vote_karma ?? 0),
           }),
     commentCount: row.comment_count,
     createdAt: row.created_at,
@@ -232,8 +230,8 @@ export async function getFeedPosts(options: {
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
   const voteSelect = viewerUserId
-    ? `v.value AS viewer_vote, v.weight AS viewer_vote_weight, v.voter_karma_at_vote AS viewer_vote_karma`
-    : `NULL AS viewer_vote, NULL AS viewer_vote_weight, NULL AS viewer_vote_karma`;
+    ? `v.value AS viewer_vote, v.weight AS viewer_vote_weight`
+    : `NULL AS viewer_vote, NULL AS viewer_vote_weight`;
   const voteJoin = viewerUserId
     ? `LEFT JOIN votes v
          ON v.target_type = 'post'

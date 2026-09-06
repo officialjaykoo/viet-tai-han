@@ -9,6 +9,7 @@ import {
 import type { VoteAction } from "@/lib/types";
 
 const VELOCITY_WINDOW_MINUTES = 10;
+// Retained for admin audit metrics; it never affects vote weight.
 const LOW_KARMA_THRESHOLD = 20;
 
 export async function getVoterIntegrityContext(input: {
@@ -16,7 +17,6 @@ export async function getVoterIntegrityContext(input: {
   targetType: "post" | "comment";
   targetId: string;
   action: VoteAction;
-  voterKarma: number;
   /** For comments, discovery is weaker — treat as unknown browse. */
   postIdForDiscovery?: string;
 }): Promise<{
@@ -32,9 +32,7 @@ export async function getVoterIntegrityContext(input: {
 
   const burst = await db
     .prepare(
-      `SELECT
-         COUNT(*) AS total,
-         SUM(CASE WHEN voter_karma < ? THEN 1 ELSE 0 END) AS low_karma
+      `SELECT COUNT(*) AS total
        FROM vote_events
        WHERE target_type = ?
          AND target_id = ?
@@ -42,18 +40,15 @@ export async function getVoterIntegrityContext(input: {
          AND created_at >= ?`
     )
     .bind(
-      LOW_KARMA_THRESHOLD,
       input.targetType,
       input.targetId,
       value,
       windowStart
     )
-    .first<{ total: number; low_karma: number | null }>();
+    .first<{ total: number }>();
 
   const recentSameDirection = Number(burst?.total ?? 0);
-  const lowKarma = Number(burst?.low_karma ?? 0);
-  const recentLowKarmaShare =
-    recentSameDirection > 0 ? lowKarma / recentSameDirection : 0;
+
 
   const user = await db
     .prepare(`SELECT createdAt FROM "user" WHERE id = ?`)
@@ -96,11 +91,9 @@ export async function getVoterIntegrityContext(input: {
 
   const weight = effectiveVoteWeight({
     action: input.action,
-    voterKarma: input.voterKarma,
     discoverySource,
     hasPriorView,
     recentSameDirection,
-    recentLowKarmaShare,
     accountAgeHours,
     votesOnOtherTargets: Number(otherVotes?.c ?? 0),
   });

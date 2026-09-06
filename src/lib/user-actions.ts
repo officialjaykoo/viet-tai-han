@@ -129,6 +129,9 @@ export async function followUser(followerId: string, followingId: string) {
     .bind(followerId, followingId)
     .run();
 
+  const { promotePendingChatRequestsForPair } = await import("@/lib/messages");
+  await promotePendingChatRequestsForPair(followerId, followingId);
+
   void (async () => {
     const { notifyQuietly } = await import("@/lib/notifications");
     const { syncAchievementsQuietly } = await import("@/lib/achievements");

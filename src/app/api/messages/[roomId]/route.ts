@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { broadcastChatMessage } from "@/lib/chat-realtime";
 import { getChatMessages, sendChatMessage } from "@/lib/messages";
 
-import { requireCanMessage } from "@/lib/permissions";
+import { requireActiveUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
@@ -37,18 +37,10 @@ export async function POST(
       id: string;
       name?: string;
       status?: string | null;
-      karma?: number | null;
       username?: string | null;
       role?: string | null;
     };
-    await requireCanMessage({
-      id: user.id,
-      name: user.name ?? "",
-      status: user.status,
-      karma: user.karma,
-      username: user.username,
-      role: user.role,
-    });
+    await requireActiveUser(user);
 
     const { roomId } = await context.params;
     const body = (await readApiJson(request)) as { body?: string };

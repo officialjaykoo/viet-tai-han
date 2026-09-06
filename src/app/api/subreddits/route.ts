@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createSubreddit } from "@/lib/actions";
 import { listSubreddits } from "@/lib/content";
+import { requireActiveUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
@@ -22,20 +23,10 @@ export async function POST(request: NextRequest) {
     const user = session.user as {
       id: string;
       status?: string | null;
-      karma?: number | null;
-      role?: string | null;
       username?: string | null;
       name?: string;
     };
-    const { requireCanCreateCommunity } = await import("@/lib/permissions");
-    await requireCanCreateCommunity({
-      id: user.id,
-      name: user.name ?? "",
-      status: user.status,
-      karma: user.karma,
-      role: user.role,
-      username: user.username,
-    });
+    await requireActiveUser(user);
 
     const body = (await readApiJson(request)) as {
       name?: string;

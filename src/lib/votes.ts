@@ -52,13 +52,11 @@ async function readPostScore(postId: string) {
 function scoreForVoter(
   millipoints: number,
   action: VoteAction,
-  actor: VoteActor,
   appliedWeight: number
 ) {
   return personalizedDisplayScore(millipoints, {
     value: action === "upvote" ? 1 : -1,
     weight: appliedWeight,
-    voterKarma: actor.voterKarma,
   });
 }
 
@@ -114,7 +112,6 @@ export async function voteOnPost(
         targetType: "post",
         targetId: postId,
         action,
-        voterKarma: actor.voterKarma,
       });
 
   const weight = integrity.weight;
@@ -132,7 +129,6 @@ export async function voteOnPost(
       score: scoreForVoter(
         await readPostScore(postId),
         action,
-        actor,
         Number(existing.weight ?? 0)
       ),
       viewerVote: action,
@@ -231,7 +227,7 @@ export async function voteOnPost(
 
   return {
     postId,
-    score: scoreForVoter(await readPostScore(postId), action, actor, weight),
+    score: scoreForVoter(await readPostScore(postId), action, weight),
     viewerVote: action,
   };
 }

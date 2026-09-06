@@ -126,7 +126,6 @@ function mapFeedRow(
     subreddit_title: string;
     viewer_vote?: number | null;
     viewer_vote_weight?: number | null;
-    viewer_vote_karma?: number | null;
   },
   viewerUserId?: string | null
 ): FeedPost {
@@ -142,7 +141,6 @@ function mapFeedRow(
         : personalizedDisplayScore(row.score, {
             value: row.viewer_vote,
             weight: Number(row.viewer_vote_weight ?? 1),
-            voterKarma: Number(row.viewer_vote_karma ?? 0),
           }),
     commentCount: row.comment_count,
     createdAt: row.created_at,
@@ -263,8 +261,7 @@ export async function getPostDetail(
              ${AUTHOR_TAG_SELECT},
              s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
              v.value AS viewer_vote,
-             v.weight AS viewer_vote_weight,
-             v.voter_karma_at_vote AS viewer_vote_karma
+             v.weight AS viewer_vote_weight
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
@@ -287,8 +284,7 @@ export async function getPostDetail(
              ${AUTHOR_TAG_SELECT},
              s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
              NULL AS viewer_vote,
-             NULL AS viewer_vote_weight,
-             NULL AS viewer_vote_karma
+             NULL AS viewer_vote_weight
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
@@ -312,8 +308,7 @@ export async function getPostDetail(
              u.image AS author_image,
              ${COMMENT_AUTHOR_TAG_SELECT},
              v.value AS viewer_vote,
-             v.weight AS viewer_vote_weight,
-             v.voter_karma_at_vote AS viewer_vote_karma
+             v.weight AS viewer_vote_weight
            FROM comments c
            INNER JOIN "user" u ON u.id = c.author_id
            LEFT JOIN votes v
@@ -335,8 +330,7 @@ export async function getPostDetail(
              u.image AS author_image,
              ${COMMENT_AUTHOR_TAG_SELECT},
              NULL AS viewer_vote,
-             NULL AS viewer_vote_weight,
-             NULL AS viewer_vote_karma
+             NULL AS viewer_vote_weight
            FROM comments c
            INNER JOIN "user" u ON u.id = c.author_id
            WHERE c.post_id = ? AND c.is_removed = 0
@@ -377,7 +371,6 @@ export async function getPostDetail(
       author_has_veteran: number | null;
       viewer_vote: number | null;
       viewer_vote_weight: number | null;
-      viewer_vote_karma: number | null;
     };
     if (row.is_shadow_hidden) continue;
     const node: CommentNode = {
@@ -391,7 +384,6 @@ export async function getPostDetail(
           : personalizedDisplayScore(row.score, {
               value: row.viewer_vote,
               weight: Number(row.viewer_vote_weight ?? 1),
-              voterKarma: Number(row.viewer_vote_karma ?? 0),
             }),
       depth: row.depth,
       createdAt: row.created_at,

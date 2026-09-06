@@ -405,7 +405,8 @@ export const en = {
   messages: {
     title: "Messages",
     inbox: "Inbox",
-    description: "Private chats open only after the other person accepts.",
+    description:
+      "Private chats open directly for eligible relationships; other new chats may need approval.",
     empty: "No conversations yet",
     requests: "Requests",
     accept: "Accept",
@@ -415,10 +416,11 @@ export const en = {
     loadError: "Couldn't load messages",
     newChat: "New message",
     username: "Username",
-    openerPlaceholder: "Say hello — they must approve before chatting",
-    requestChat: "Request chat",
+    openerPlaceholder:
+      "Say hello — it opens directly when allowed, otherwise becomes a request",
+    requestChat: "Send message",
     requestHint:
-      "New chats need approval to reduce spam. Requests are rate-limited.",
+      "Friends and eligible follows open chats directly; other new chats are rate-limited requests.",
     chats: "Chats",
     noOpenChats: "No open chats yet.",
     noMessagesYet: "No messages yet",

@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listChatRooms,
   listIncomingRequests,
-  startChatRequest,
+  startConversation,
 } from "@/lib/messages";
-import { requireCanMessage } from "@/lib/permissions";
+import { requireActiveUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
@@ -33,18 +33,10 @@ export async function POST(request: NextRequest) {
       id: string;
       name?: string;
       status?: string | null;
-      karma?: number | null;
       username?: string | null;
       role?: string | null;
     };
-    await requireCanMessage({
-      id: user.id,
-      name: user.name ?? "",
-      status: user.status,
-      karma: user.karma,
-      username: user.username,
-      role: user.role,
-    });
+    await requireActiveUser(user);
 
     const body = (await readApiJson(request)) as {
       toUsername?: string;
@@ -54,12 +46,13 @@ export async function POST(request: NextRequest) {
       return await jsonLocalizedError("toUsername and body are required", 400);
     }
 
-    const result = await startChatRequest({
+    const result = await startConversation({
       fromUserId: user.id,
       toUsername: body.toUsername,
       openerBody: body.body,
       fromStatus: user.status,
     });
+
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

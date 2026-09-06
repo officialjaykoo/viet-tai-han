@@ -12,25 +12,15 @@ import {
 } from "@/lib/vote-weight";
 
 describe("voteWeight", () => {
-  it("gives upvotes more weight than downvotes at the same karma", () => {
-    expect(voteWeight("upvote", 100)).toBeGreaterThan(
-      voteWeight("downvote", 100)
-    );
+  it("keeps a fixed baseline with upvotes stronger than downvotes", () => {
+    expect(voteWeight("upvote")).toBe(100);
+    expect(voteWeight("downvote")).toBe(40);
+    expect(voteWeight("upvote")).toBeGreaterThan(voteWeight("downvote"));
   });
 
-  it("nearly mutes brand-new accounts", () => {
-    expect(voteWeight("upvote", 0)).toBeLessThanOrEqual(10);
-    expect(voteWeight("upvote", 0)).toBeLessThan(voteWeight("upvote", 500) / 5);
-  });
-
-  it("increases influence with voter karma", () => {
-    expect(voteWeight("upvote", 1000)).toBeGreaterThan(
-      voteWeight("upvote", 0)
-    );
-  });
-
-  it("never uses negative karma to boost weight", () => {
-    expect(voteWeight("upvote", -50)).toBe(voteWeight("upvote", 0));
+  it("does not make new or negative reputation mute a baseline vote", () => {
+    expect(voteWeight("upvote")).toBe(100);
+    expect(voteWeight("downvote")).toBe(40);
   });
 
   it("converts millipoints to display score", () => {
@@ -50,12 +40,10 @@ describe("score integrity", () => {
     const up = velocityFactor({
       action: "upvote",
       recentSameDirection: 20,
-      recentLowKarmaShare: 0.8,
     });
     const down = velocityFactor({
       action: "downvote",
       recentSameDirection: 20,
-      recentLowKarmaShare: 0.8,
     });
     expect(down).toBeLessThan(up);
     expect(up).toBeLessThan(1);
@@ -82,24 +70,42 @@ describe("score integrity", () => {
     expect(young).toBeLessThan(mature);
   });
 
+  it("keeps a new account vote meaningful while allowing contextual damping", () => {
+    const fresh = effectiveVoteWeight({
+      action: "upvote",
+      discoverySource: "unknown",
+      hasPriorView: false,
+      recentSameDirection: 0,
+      accountAgeHours: 0,
+      votesOnOtherTargets: 0,
+    });
+    expect(fresh).toBeGreaterThanOrEqual(15);
+    expect(
+      effectiveVoteWeight({
+        action: "upvote",
+        discoverySource: "unknown",
+        hasPriorView: false,
+        recentSameDirection: 20,
+        accountAgeHours: 0,
+        votesOnOtherTargets: 0,
+      })
+    ).toBeLessThan(fresh);
+  });
+
   it("reduces effective weight for inorganic upvote spikes", () => {
     const organic = effectiveVoteWeight({
       action: "upvote",
-      voterKarma: 200,
       discoverySource: "home",
       hasPriorView: true,
       recentSameDirection: 0,
-      recentLowKarmaShare: 0,
       accountAgeHours: 400,
       votesOnOtherTargets: 50,
     });
     const inorganic = effectiveVoteWeight({
       action: "upvote",
-      voterKarma: 5,
       discoverySource: "direct",
       hasPriorView: false,
       recentSameDirection: 25,
-      recentLowKarmaShare: 0.9,
       accountAgeHours: 2,
       votesOnOtherTargets: 0,
     });

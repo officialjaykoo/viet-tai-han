@@ -218,6 +218,9 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     .bind(requestId, userId)
     .run();
 
+  const { promotePendingChatRequestsForPair } = await import("@/lib/messages");
+  await promotePendingChatRequestsForPair(request.requester_id, userId);
+
   const actor = await db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
     .bind(userId)

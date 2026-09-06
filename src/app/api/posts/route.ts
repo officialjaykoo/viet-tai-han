@@ -19,6 +19,7 @@ import {
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
+import { requireActiveUser } from "@/lib/permissions";
 
 const SORTS = new Set<FeedSort>(["hot", "new", "top"]);
 const MODES = new Set<FeedMode>(["home", "popular", "community"]);
@@ -89,11 +90,9 @@ export async function POST(request: NextRequest) {
       status?: string | null;
       username?: string | null;
       name?: string | null;
-      karma?: number | null;
     };
 
-    const { requireCanCreatePost } = await import("@/lib/permissions");
-    await requireCanCreatePost(user);
+    await requireActiveUser(user);
 
     let subredditId: string;
 

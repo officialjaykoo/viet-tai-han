@@ -290,7 +290,7 @@ export function MessagesClient() {
     };
   }, [selectedRoom, loadRoom]);
 
-  function startRequest(e: React.FormEvent) {
+  function startConversation(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
@@ -306,12 +306,19 @@ export function MessagesClient() {
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(localizeError(payload?.error, "Couldn't send request"));
+        setError(localizeError(payload?.error, "Couldn't send message"));
         return;
       }
+      const result = (await res.json()) as {
+        conversationType?: "direct" | "request";
+        roomId?: string;
+      };
       setComposeUser("");
       setComposeBody("");
       setError(null);
+      if (result.conversationType === "direct" && result.roomId) {
+        router.push(`/messages?room=${encodeURIComponent(result.roomId)}`);
+      }
       loadInbox();
     });
   }
@@ -407,7 +414,7 @@ export function MessagesClient() {
           <h2 className="font-heading text-sm font-semibold tracking-wide uppercase text-muted-foreground">
             {t("messages.newChat")}
           </h2>
-          <form onSubmit={startRequest} className="space-y-2">
+          <form onSubmit={startConversation} className="space-y-2">
             <Input
               value={composeUser}
               onChange={(e) => setComposeUser(e.target.value)}
@@ -424,7 +431,7 @@ export function MessagesClient() {
               className="rounded-lg"
             />
             <Button type="submit" size="sm" disabled={pending} className="w-full">
-              {t("messages.requestChat")}
+              {t("messages.send")}
             </Button>
           </form>
           <p className="text-xs text-muted-foreground">

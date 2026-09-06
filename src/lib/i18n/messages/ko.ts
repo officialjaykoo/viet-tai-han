@@ -401,7 +401,8 @@ export const ko: Messages = {
   messages: {
     title: "메시지",
     inbox: "받은 메시지",
-    description: "상대방이 수락한 뒤에만 비공개 대화가 열립니다.",
+    description:
+      "친구나 허용된 팔로우 관계는 바로 열리고, 그 외 새 대화는 요청으로 처리될 수 있습니다.",
     empty: "아직 대화가 없습니다",
     requests: "요청",
     accept: "수락",
@@ -411,10 +412,11 @@ export const ko: Messages = {
     loadError: "메시지를 불러오지 못했습니다",
     newChat: "새 메시지",
     username: "사용자 이름",
-    openerPlaceholder: "인사를 보내세요 — 상대방이 수락해야 대화할 수 있습니다",
-    requestChat: "대화 요청",
+    openerPlaceholder:
+      "인사를 보내세요 — 바로 열리거나 대화 요청으로 전환됩니다",
+    requestChat: "메시지 보내기",
     requestHint:
-      "스팸을 줄이기 위해 새 대화는 승인이 필요하며, 요청 횟수가 제한됩니다.",
+      "친구·허용된 팔로우 관계는 바로 대화가 열리고, 그 외 새 대화는 스팸 방지를 위해 요청으로 처리되며 횟수가 제한됩니다.",
     chats: "대화",
     noOpenChats: "열린 대화가 아직 없습니다.",
     noMessagesYet: "아직 메시지가 없습니다",

@@ -294,26 +294,15 @@ export async function listBlockedUsers(userId: string) {
   }));
 }
 
-/** Whether recipient accepts a chat request from sender. */
+/** Whether recipient accepts a new chat request from sender. */
 export async function canReceiveChatRequest(input: {
   fromUserId: string;
   toUserId: string;
 }): Promise<boolean> {
-  const db = await getDb();
-  const to = await db
-    .prepare(`SELECT allowDms FROM "user" WHERE id = ?`)
-    .bind(input.toUserId)
-    .first<{ allowDms: string }>();
-  const allow = isAllowDms(to?.allowDms) ? to!.allowDms : "anyone";
-  if (allow === "nobody") return false;
-  if (allow === "anyone") return true;
-
-  const follow = await db
-    .prepare(
-      `SELECT 1 AS ok FROM user_follows
-       WHERE follower_id = ? AND following_id = ?`
-    )
-    .bind(input.toUserId, input.fromUserId)
-    .first();
-  return Boolean(follow);
+  const { getDmRelationship } = await import("@/lib/dm-relationships");
+  const relationship = await getDmRelationship({
+    senderId: input.fromUserId,
+    recipientId: input.toUserId,
+  });
+  return relationship.requestAllowed;
 }

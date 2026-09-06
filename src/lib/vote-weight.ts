@@ -22,18 +22,12 @@ const SOURCE_TRUST: Record<DiscoverySource, number> = {
 };
 
 /**
- * Base vote influence in millipoints (100 ≈ one classic point).
- * Low-karma accounts barely move the score; trusted accounts approach full weight.
+ * Fixed baseline vote influence in millipoints (100 ≈ one classic point).
+ * Reputation never changes a voter's base power; abuse controls apply only
+ * behavioral and account-context dampening in effectiveVoteWeight.
  */
-export function voteWeight(action: VoteAction, voterKarma: number): number {
-  const karma = Math.max(0, voterKarma);
-  // Harder full-weight: 0 → ~0.05, 80 → ~0.37, 250 → ~0.78, 1000+ → ~1
-  const trust = 1 - Math.exp(-karma / 160);
-  const magnitude = Math.max(1, Math.round(5 + 95 * trust));
-  if (action === "downvote") {
-    return Math.max(1, Math.round(magnitude * 0.4));
-  }
-  return magnitude;
+export function voteWeight(action: VoteAction): number {
+  return action === "downvote" ? 40 : 100;
 }
 
 export function displayScore(millipoints: number): number {
@@ -46,7 +40,6 @@ export function personalizedDisplayScore(
     | {
         value: number;
         weight: number;
-        voterKarma: number;
       }
     | null
     | undefined
@@ -55,7 +48,7 @@ export function personalizedDisplayScore(
     return displayScore(millipoints);
   }
   const action = viewer.value === 1 ? "upvote" : "downvote";
-  const claimed = voteWeight(action, viewer.voterKarma);
+  const claimed = voteWeight(action);
   return displayScore(millipoints + signedVoteContribution(action, claimed));
 }
 
@@ -97,17 +90,14 @@ export function noViewSourceTrust(): number {
 }
 
 /**
- * Velocity / brigade dampening.
- * burstScore ≈ same-direction votes in window, weighted toward low-karma voters.
- * Downvote floods use a steeper curve.
+ * Velocity / brigade dampening based on vote behavior.
+ * Downvote floods use a steeper curve; reputation is not an input.
  */
 export function velocityFactor(input: {
   action: VoteAction;
   recentSameDirection: number;
-  recentLowKarmaShare: number; // 0..1
 }): number {
-  const lowKarmaBoost = 1 + 1.5 * Math.min(1, Math.max(0, input.recentLowKarmaShare));
-  const burstScore = Math.max(0, input.recentSameDirection) * lowKarmaBoost;
+  const burstScore = Math.max(0, input.recentSameDirection);
   const steepness = input.action === "downvote" ? 0.55 : 0.35;
   return 1 / (1 + Math.log1p(burstScore) * steepness);
 }
@@ -125,36 +115,31 @@ export function accountTrustFactor(input: {
       : input.votesOnOtherTargets < 3
         ? 0.7
         : 1;
-  return Math.max(0.2, Math.min(1, 0.35 + 0.65 * ageFactor) * diversity);
+  // New accounts remain meaningful voters; burst/source factors still dampen.
+  return Math.max(0.5, Math.min(1, 0.35 + 0.65 * ageFactor) * diversity);
 }
 
 export function effectiveVoteWeight(input: {
   action: VoteAction;
-  voterKarma: number;
   discoverySource: DiscoverySource | null;
   hasPriorView: boolean;
   recentSameDirection: number;
-  recentLowKarmaShare: number;
   accountAgeHours: number;
   votesOnOtherTargets: number;
 }): number {
-  const base = voteWeight(input.action, input.voterKarma);
+  const base = voteWeight(input.action);
   const source = input.hasPriorView
     ? sourceTrustFactor(input.discoverySource)
     : noViewSourceTrust();
   const velocity = velocityFactor({
     action: input.action,
     recentSameDirection: input.recentSameDirection,
-    recentLowKarmaShare: input.recentLowKarmaShare,
   });
   const account = accountTrustFactor({
     accountAgeHours: input.accountAgeHours,
     votesOnOtherTargets: input.votesOnOtherTargets,
   });
-  return Math.max(
-    1,
-    Math.round(base * source * velocity * account)
-  );
+  return Math.max(1, Math.round(base * source * velocity * account));
 }
 
 /** Reddit-style log dampened hot score from millipoints + age hours. */

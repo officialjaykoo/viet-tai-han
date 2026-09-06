@@ -13,8 +13,8 @@ export const VETERAN_KARMA = 1000;
 export { accountAgeDays } from "@/lib/account-age";
 
 /**
- * Visible account tags: Admin, Mod, Veteran, NSFW.
- * Community Mod is shown when the author mods the current subreddit.
+ * Visible account tags only; reputation badges never grant access or bypass
+ * authentication, privacy, moderation, or abuse controls.
  */
 export function resolveAccountTags(input: {
   role?: string | null;
