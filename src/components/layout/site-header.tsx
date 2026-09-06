@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { signOut, useSession } from "@/lib/auth-client";
+import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
 const iconBtnClass =
@@ -58,7 +59,9 @@ export function SiteHeader() {
   const visibleSession = hydrated ? session : null;
   const username =
     (visibleSession?.user as { username?: string } | undefined)?.username ??
-    visibleSession?.user?.name;
+    null;
+  const displayName = username ?? visibleSession?.user?.name ?? "user";
+  const profileHref = getProfileHref(visibleSession?.user);
   const karma = (visibleSession?.user as { karma?: number } | undefined)?.karma;
   const isAdmin =
     (visibleSession?.user as { role?: string } | undefined)?.role === "admin";
@@ -141,7 +144,7 @@ export function SiteHeader() {
                   <span className="hidden items-center sm:inline-flex">
                     {signedIn ? (
                       <UserAvatar
-                        username={username}
+                        username={username ?? displayName}
                         image={image}
                         size="md"
                         className="pointer-events-none"
@@ -166,9 +169,7 @@ export function SiteHeader() {
                 <>
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="font-normal">
-                      <span className="block truncate text-sm font-medium text-foreground">
-                        @{username}
-                      </span>
+                      @{displayName}
                       {karma != null ? (
                         <span className="mt-0.5 block text-xs text-muted-foreground">
                           {t("nav.karma", { count: karma })}
@@ -252,9 +253,7 @@ export function SiteHeader() {
                   <DropdownMenuGroup>
                     <DropdownMenuItem
                       className="min-h-11"
-                      render={
-                        <Link href={username ? `/u/${username}` : "/"} />
-                      }
+                      render={<Link href={profileHref} />}
                     >
                       <UserRoundIcon />
                       {t("nav.profile")}

@@ -16,6 +16,7 @@ import {
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useScrollVisibility } from "@/components/layout/use-scroll-visibility";
 import { useSession } from "@/lib/auth-client";
+import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
 const itemClass =
@@ -34,7 +35,7 @@ export function MobileNav() {
   const username = hydrated
     ? (session?.user as { username?: string } | undefined)?.username ?? null
     : null;
-  const profileHref = username ? `/u/${username}` : "/login";
+  const profileHref = getProfileHref(hydrated ? session?.user : null);
   if (pathname === "/login" || pathname === "/signup") return null;
 
   function active(href: string) {

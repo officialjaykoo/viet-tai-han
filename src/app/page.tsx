@@ -24,6 +24,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getSession } from "@/lib/session";
+import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 import type { PaginatedFeed } from "@/lib/types";
 
@@ -76,10 +77,10 @@ export default async function HomePage({
   const { locale } = await getRequestLocale();
   const signedIn = Boolean(session?.user);
   const username = (session?.user as { username?: string } | undefined)
-    ?.username;
-  const profileHref = username
-    ? `/u/${encodeURIComponent(username)}`
-    : "/login";
+    ?.username ?? null;
+  const profileHref = getProfileHref(session?.user);
+  const profileLabel =
+    username ?? session?.user?.name ?? tLocale(locale, "nav.logIn");
   const image = session?.user?.image ?? null;
   const desktopLinks = [
     { href: "/", label: tLocale(locale, "nav.popular"), icon: FlameIcon },
@@ -168,13 +169,10 @@ export default async function HomePage({
                 className="mb-2 flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5 transition-colors hover:bg-card"
               >
                 <UserAvatar
-                  username={username}
-                  image={image}
-                  size="sm"
-                  alt={username ? `@${username}` : tLocale(locale, "nav.logIn")}
+                  alt={username ? `@${username}` : profileLabel}
                 />
                 <span className="truncate text-sm font-semibold">
-                  {username ? `@${username}` : tLocale(locale, "nav.logIn")}
+                  {username ? `@${username}` : profileLabel}
                 </span>
               </Link>
               <div className="mb-2 h-px bg-border/70" />

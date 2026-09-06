@@ -441,7 +441,7 @@ export async function getPostDetail(
 }
 
 export async function getPublicProfile(
-  username: string
+  identifier: string
 ): Promise<PublicProfile | null> {
   const db = await getDb();
   const row = await db
@@ -456,9 +456,10 @@ export async function getPublicProfile(
               EXISTS (
                 SELECT 1 FROM subreddit_moderators WHERE user_id = "user".id
               ) AS is_community_mod
-       FROM "user" WHERE username = ? COLLATE NOCASE`
+       FROM "user"
+       WHERE username = ? COLLATE NOCASE OR id = ?`
     )
-    .bind(username)
+    .bind(identifier, identifier)
     .first<{
       id: string;
       username: string | null;

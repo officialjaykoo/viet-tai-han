@@ -70,11 +70,11 @@ export default async function ProfilePage({
   params: Promise<{ username: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const { username } = await params;
+  const { username: identifier } = await params;
   const { tab: tabParam } = await searchParams;
   const tab = parseTab(tabParam);
 
-  const profile = await getPublicProfile(username);
+  const profile = await getPublicProfile(identifier);
   if (!profile || profile.status === "banned") notFound();
 
   const session = await getSession();
@@ -109,7 +109,7 @@ export default async function ProfilePage({
   }
 
   const [display, achievements, postsFeed, comments, friends] = await Promise.all([
-    getPublicProfile(username),
+    getPublicProfile(identifier),
     listUserAchievements(profile.id),
     getFeedPosts({
       authorId: profile.id,
