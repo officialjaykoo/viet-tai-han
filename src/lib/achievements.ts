@@ -4,6 +4,7 @@ import {
   resolveAgeBadge,
   resolveKarmaBadge,
 } from "@/lib/achievement-levels";
+import { runBackgroundTask } from "@/lib/background-task";
 import { getDb } from "@/lib/db";
 import {
   LAEFYE_SLUG,
@@ -345,6 +346,172 @@ export async function syncUserAchievements(userId: string) {
   return granted;
 }
 
+export type AchievementEvent =
+  | "post_created"
+  | "comment_created"
+  | "follow"
+  | "vote_cast"
+  | "community_created"
+  | "karma_changed"
+  | "nsfw_changed";
+
+async function syncAchievementEventNow(
+  userId: string,
+  event: AchievementEvent
+) {
+  const db = await getDb();
+  const grant = async (slug: string, level: number) => {
+    await upsertGrant(userId, slug, level);
+  };
+
+  if (event === "post_created") {
+    const row = await db
+      .prepare(
+        `SELECT
+           COUNT(*) AS postCount,
+           SUM(CASE WHEN url IS NOT NULL AND url != '' THEN 1 ELSE 0 END) AS linkPostCount,
+           SUM(CASE WHEN media_key IS NOT NULL THEN 1 ELSE 0 END) AS mediaPostCount
+         FROM posts
+         WHERE author_id = ? AND is_removed = 0`
+      )
+      .bind(userId)
+      .first<{
+        postCount: number;
+        linkPostCount: number;
+        mediaPostCount: number;
+      }>();
+    await grant("first_post", (row?.postCount ?? 0) >= 1 ? 1 : 0);
+    await grant(
+      "poster",
+      levelForValue(LEVEL_THRESHOLDS.poster, row?.postCount ?? 0)
+    );
+    await grant(
+      "link_poster",
+      levelForValue(LEVEL_THRESHOLDS.link_poster, row?.linkPostCount ?? 0)
+    );
+    await grant(
+      "media_maven",
+      levelForValue(LEVEL_THRESHOLDS.media_maven, row?.mediaPostCount ?? 0)
+    );
+    return;
+  }
+
+  if (event === "comment_created") {
+    const row = await db
+      .prepare(
+        `SELECT
+           COUNT(*) AS commentCount,
+           SUM(
+             CASE WHEN parent_id IS NOT NULL THEN 1 ELSE 0 END
+           ) AS replyCount
+         FROM comments
+         WHERE author_id = ? AND is_deleted = 0 AND is_removed = 0`
+      )
+      .bind(userId)
+      .first<{ commentCount: number; replyCount: number }>();
+    await grant("first_comment", (row?.commentCount ?? 0) >= 1 ? 1 : 0);
+    await grant(
+      "commenter",
+      levelForValue(LEVEL_THRESHOLDS.commenter, row?.commentCount ?? 0)
+    );
+    await grant(
+      "conversationalist",
+      levelForValue(LEVEL_THRESHOLDS.conversationalist, row?.replyCount ?? 0)
+    );
+    return;
+  }
+
+  if (event === "follow") {
+    const [followers, following] = await Promise.all([
+      db
+        .prepare(`SELECT COUNT(*) AS count FROM user_follows WHERE following_id = ?`)
+        .bind(userId)
+        .first<{ count: number }>(),
+      db
+        .prepare(`SELECT COUNT(*) AS count FROM user_follows WHERE follower_id = ?`)
+        .bind(userId)
+        .first<{ count: number }>(),
+    ]);
+    await grant(
+      "follower_magnet",
+      levelForValue(LEVEL_THRESHOLDS.follower_magnet, followers?.count ?? 0)
+    );
+    await grant(
+      "social_butterfly",
+      levelForValue(LEVEL_THRESHOLDS.social_butterfly, following?.count ?? 0)
+    );
+    return;
+  }
+
+  if (event === "vote_cast") {
+    const row = await db
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM votes WHERE user_id = ? AND value != 0`
+      )
+      .bind(userId)
+      .first<{ count: number }>();
+    await grant(
+      "voter",
+      levelForValue(LEVEL_THRESHOLDS.voter, row?.count ?? 0)
+    );
+    return;
+  }
+
+  if (event === "community_created") {
+    const row = await db
+      .prepare(`SELECT COUNT(*) AS count FROM subreddits WHERE created_by = ?`)
+      .bind(userId)
+      .first<{ count: number }>();
+    await grant("community_builder", (row?.count ?? 0) >= 1 ? 1 : 0);
+    await grant(
+      "community_leader",
+      levelForValue(LEVEL_THRESHOLDS.community_leader, row?.count ?? 0)
+    );
+    return;
+  }
+
+  const user = await db
+    .prepare(`SELECT karma, isNsfw FROM "user" WHERE id = ?`)
+    .bind(userId)
+    .first<{ karma: number; isNsfw: number }>();
+  if (!user) return;
+
+  if (event === "nsfw_changed") {
+    await grant("nsfw", user.isNsfw === 1 ? 1 : 0);
+    if (user.isNsfw !== 1) {
+      await db
+        .prepare(
+          `DELETE FROM user_achievements
+           WHERE user_id = ?
+             AND achievement_id = (
+               SELECT id FROM achievements WHERE slug = 'nsfw'
+             )`
+        )
+        .bind(userId)
+        .run();
+    }
+    return;
+  }
+
+  await grant(
+    "karma_climber",
+    levelForValue(LEVEL_THRESHOLDS.karma_climber, user.karma)
+  );
+  await grant("karma_100", user.karma >= 100 ? 1 : 0);
+  await grant("karma_1000", user.karma >= 1000 ? 1 : 0);
+  await grant("badge_karma", resolveKarmaBadge(user.karma).level);
+}
+
+export function syncAchievementsForEvent(
+  userId: string,
+  event: AchievementEvent
+) {
+  runBackgroundTask(`achievement:${event}`, () =>
+    syncAchievementEventNow(userId, event)
+  );
+}
+
 export async function setUserNsfw(userId: string, isNsfw: boolean) {
   const db = await getDb();
   await db
@@ -353,13 +520,11 @@ export async function setUserNsfw(userId: string, isNsfw: boolean) {
     )
     .bind(isNsfw ? 1 : 0, userId)
     .run();
-  await syncUserAchievements(userId);
+  syncAchievementsForEvent(userId, "nsfw_changed");
   return { isNsfw };
 }
 
-/** Fire-and-forget sync after karma / social events. */
+/** Full reconciliation for repair/admin paths; hot paths use event sync. */
 export function syncAchievementsQuietly(userId: string) {
-  void syncUserAchievements(userId).catch((error) => {
-    console.error("achievement sync failed", error);
-  });
+  runBackgroundTask("achievement:reconcile", () => syncUserAchievements(userId));
 }

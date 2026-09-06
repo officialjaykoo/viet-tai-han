@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createNotification,
+  listNotifications,
   markNotificationsRead,
 } from "@/lib/notifications";
 import {
@@ -15,7 +16,9 @@ import {
 } from "@/lib/messages";
 import {
   listChatMessageReports,
+  listChatRoomReports,
   reportChatMessage,
+  reportChatRoom,
   reviewChatMessageReport,
 } from "@/lib/dm-moderation";
 import { AuthError } from "@/lib/session";
@@ -29,6 +32,10 @@ async function usernameFor(userId: string): Promise<string> {
     .first<{ username: string }>();
   if (!row?.username) throw new Error("seed user has no username");
   return row.username;
+}
+
+async function flushBackgroundWork() {
+  await new Promise((resolve) => setTimeout(resolve, 25));
 }
 
 describe("messaging delivery (D1)", () => {
@@ -50,6 +57,15 @@ describe("messaging delivery (D1)", () => {
       userId: voterId,
       accept: true,
     });
+    await flushBackgroundWork();
+    const acceptedNotifications = await listNotifications(authorId);
+    expect(
+      acceptedNotifications.some(
+        (notification) =>
+          notification.kind === "chat_accepted" &&
+          notification.title.includes("accepted your message request")
+      )
+    ).toBe(true);
     await getChatMessages({ roomId: request.roomId, userId: voterId });
 
     const sent = await sendChatMessage({
@@ -98,6 +114,126 @@ describe("messaging delivery (D1)", () => {
         (message) => message.id === sent.id
       )
     ).toBe(false);
+  });
+
+  it("reports a bounded conversation context and validates membership", async () => {
+    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const outsiderId = `u_outsider_${crypto.randomUUID().slice(0, 8)}`;
+    await env.DB.prepare(
+      `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
+       VALUES (?, 'Outsider', ?, 1, ?, 40, 'user', 'active')`
+    )
+      .bind(
+        outsiderId,
+        `${outsiderId}@test.local`,
+        `outsider_${outsiderId.slice(-8)}`
+      )
+      .run();
+    const request = await startChatRequest({
+      fromUserId: authorId,
+      toUsername: await usernameFor(voterId),
+      openerBody: "Conversation context opener.",
+      fromStatus: "active",
+    });
+    await respondToChatRequest({
+      requestId: request.requestId,
+      userId: voterId,
+      accept: true,
+    });
+    await env.DB.prepare(
+      `UPDATE chat_messages
+       SET created_at = '2020-01-01 00:00:00.000'
+       WHERE room_id = ?`
+    )
+      .bind(request.roomId)
+      .run();
+
+    for (let index = 0; index < 35; index += 1) {
+      const createdAt = new Date(Date.UTC(2020, 0, 1, 0, index))
+        .toISOString()
+        .replace("T", " ")
+        .replace("Z", "");
+      await env.DB.prepare(
+        `INSERT INTO chat_messages (
+           id, room_id, sender_id, body, delivery_status, is_shadow_hidden,
+           created_at
+         ) VALUES (?, ?, ?, ?, 'delivered', 0, ?)`
+      )
+        .bind(
+          crypto.randomUUID(),
+          request.roomId,
+          authorId,
+          `Context message ${index}`,
+          createdAt
+        )
+        .run();
+    }
+    await reportChatRoom({
+      roomId: request.roomId,
+      reporterId: voterId,
+      reason: "harassment",
+      details: "Review the recent conversation.",
+    });
+    await env.DB.prepare(
+      `INSERT INTO chat_messages (
+         id, room_id, sender_id, body, delivery_status, is_shadow_hidden,
+         created_at
+       ) VALUES (?, ?, ?, 'Message after report', 'delivered', 0, '2099-01-01 00:00:00.000')`
+    )
+      .bind(crypto.randomUUID(), request.roomId, authorId)
+      .run();
+
+    const reports = await listChatRoomReports();
+    const report = reports.find((item) => item.roomId === request.roomId);
+    expect(report?.context).toHaveLength(30);
+    expect(report?.context.at(-1)?.body).toBe("Context message 34");
+    expect(report?.context.some((message) => message.body === "Message after report")).toBe(
+      false
+    );
+    expect(report?.reportedUsername).toContain("author_");
+
+    await expect(
+      reportChatRoom({
+        roomId: request.roomId,
+        reporterId: voterId,
+        reason: "harassment",
+      })
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      reportChatRoom({
+        roomId: request.roomId,
+        reporterId: outsiderId,
+        reason: "harassment",
+      })
+    ).rejects.toMatchObject({ status: 404 });
+
+    const stored = await env.DB.prepare(
+      `SELECT reporter_id, reported_user_id, context_until
+       FROM chat_room_reports WHERE id = ?`
+    )
+      .bind(report!.id)
+      .first<{
+        reporter_id: string;
+        reported_user_id: string;
+        context_until: string;
+      }>();
+    expect(stored).toMatchObject({
+      reporter_id: voterId,
+      reported_user_id: authorId,
+    });
+    expect(stored?.context_until).toBeTruthy();
+
+    await reportChatMessage({
+      roomId: request.roomId,
+      messageId: report!.context[0]!.id,
+      reporterId: voterId,
+      reason: "spam",
+    });
+    expect(
+      (await listChatMessageReports()).some(
+        (item) => item.messageId === report!.context[0]!.id
+      )
+    ).toBe(true);
   });
 
   it("allows only one concurrent request response", async () => {

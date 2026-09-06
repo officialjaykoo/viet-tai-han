@@ -4,7 +4,11 @@ import { describe, expect, it } from "vitest";
 import { resolvePublicProfile } from "@/lib/content";
 import { friendPairKey } from "@/lib/friends";
 import { completeOnboarding } from "@/lib/onboarding";
-import { changeUsername } from "@/lib/username-lifecycle";
+import {
+  changeUsername,
+  updateUserProfileAndUsername,
+} from "@/lib/username-lifecycle";
+
 
 async function insertUser(input: {
   id: string;
@@ -73,6 +77,64 @@ describe("username lifecycle", () => {
         preferredLanguage: "en",
       })
     ).resolves.toMatchObject({ onboardingComplete: true });
+  });
+  it("updates profile fields and username in one atomic operation", async () => {
+    const ownerId = `profile_update_${crypto.randomUUID()}`;
+    const oldUsername = `profile_old_${crypto.randomUUID().slice(0, 6)}`;
+    const newUsername = `profile_new_${crypto.randomUUID().slice(0, 6)}`;
+    await insertUser({ id: ownerId, username: oldUsername });
+
+
+    const updated = await updateUserProfileAndUsername({
+      userId: ownerId,
+      username: `@${newUsername.toUpperCase()}`,
+      name: "Updated display name",
+      bio: "Updated bio",
+      image: "/api/media/profile-image",
+    });
+    expect(updated).toMatchObject({
+      username: newUsername,
+      name: "Updated display name",
+      bio: "Updated bio",
+      image: "/api/media/profile-image",
+    });
+    const nameOnly = await updateUserProfileAndUsername({
+      userId: ownerId,
+      name: "Name only",
+    });
+    expect(nameOnly.name).toBe("Name only");
+    const bioOnly = await updateUserProfileAndUsername({
+      userId: ownerId,
+      bio: "Bio only",
+    });
+    expect(bioOnly.bio).toBe("Bio only");
+    const imageOnly = await updateUserProfileAndUsername({
+      userId: ownerId,
+      image: "/api/media/image-only",
+    });
+    expect(imageOnly.image).toBe("/api/media/image-only");
+    await expect(
+      updateUserProfileAndUsername({ userId: ownerId, username: "ab" })
+    ).rejects.toMatchObject({ status: 400 });
+
+
+    await expect(
+      updateUserProfileAndUsername({
+        userId: ownerId,
+        username: `@${oldUsername}`,
+        name: "Should not partially save",
+      })
+    ).rejects.toMatchObject({ status: 429 });
+
+    const unchanged = await env.DB.prepare(
+      `SELECT name, username FROM "user" WHERE id = ?`
+    )
+      .bind(ownerId)
+      .first<{ name: string; username: string }>();
+    expect(unchanged).toEqual({
+      name: "Name only",
+      username: newUsername,
+    });
   });
  
   it("allows only one concurrent owner of a new username", async () => {

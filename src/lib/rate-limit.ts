@@ -1,4 +1,5 @@
 import { getDb, getEnv } from "@/lib/db";
+import { syncAchievementsForEvent } from "@/lib/achievements";
 import { AuthError } from "@/lib/session";
 import { getSiteSetting } from "@/lib/settings";
 import { createPublicId } from "@/lib/id";
@@ -363,7 +364,5 @@ export async function adjustAuthorKarma(
     sourceType: "vote",
   });
 
-  void import("@/lib/achievements").then(({ syncAchievementsQuietly }) =>
-    syncAchievementsQuietly(authorId)
-  );
+  syncAchievementsForEvent(authorId, "karma_changed");
 }

@@ -142,6 +142,10 @@ export function SettingsClient({
   const [settings, setSettings] = useState(initialSettings);
   const [blocked, setBlocked] = useState(initialBlocked);
   const [pending, startTransition] = useTransition();
+  const [confirmingUsernameChange, setConfirmingUsernameChange] = useState(false);
+  const [now, setNow] = useState(0);
+
+
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(() =>
     initialIdentityError
@@ -202,55 +206,58 @@ export function SettingsClient({
     });
   }
 
-  function saveProfile() {
+  async function persistProfile() {
     flash(null, null);
-    startTransition(async () => {
-      const res = await apiFetch("/api/me/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          section: "profile",
-          name,
-          bio,
-          image,
-        }),
-      });
-      const data = (await res.json()) as {
-        settings?: UserSettings;
-        error?: string;
-      };
-      if (!res.ok) {
-        flash(null, localizeError(data.error, "Could not save profile"));
-        return;
-      }
-      if (data.settings) setSettings(data.settings);
-      flash(t("settings.profileSaved"), null);
-      router.refresh();
+    const res = await apiFetch("/api/me/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: normalizedUsernameInput,
+        name,
+        bio,
+        image,
+      }),
     });
+    const data = (await res.json()) as {
+      settings?: UserSettings;
+      error?: string;
+    };
+    if (!res.ok) {
+      flash(null, localizeError(data.error, t("settings.usernameSaveFailed")));
+      return;
+    }
+    if (data.settings) {
+      setSettings(data.settings);
+      setName(data.settings.name);
+      setBio(data.settings.bio ?? "");
+      setImage(data.settings.image);
+      setUsernameInput(data.settings.username ?? "");
+      await authClient.getSession();
+    }
+    flash(t("settings.profileSaved"), null);
   }
-  function saveUsername() {
-    flash(null, null);
-    startTransition(async () => {
-      const res = await apiFetch("/api/me/username", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: usernameInput }),
-      });
-      const data = (await res.json()) as {
-        settings?: UserSettings;
-        error?: string;
-      };
-      if (!res.ok) {
-        flash(null, localizeError(data.error, t("settings.usernameSaveFailed")));
-        return;
-      }
-      if (data.settings) {
-        setSettings(data.settings);
-        setUsernameInput(data.settings.username ?? "");
-      }
-      flash(t("settings.usernameSaved"), null);
-      router.refresh();
-    });
+
+  function saveProfile() {
+    const usernameChanged = normalizedUsernameInput !== username;
+    const nameChanged = name.trim().slice(0, 80) !== settings.name;
+    const bioChanged =
+      (bio.trim().slice(0, 300) || null) !== (settings.bio ?? null);
+    const imageChanged = image !== settings.image;
+
+    if (!usernameChanged && !nameChanged && !bioChanged && !imageChanged) {
+      flash(t("settings.profileSaved"), null);
+      return;
+    }
+    if (usernameChanged) {
+      setConfirmingUsernameChange(true);
+      return;
+    }
+    startTransition(persistProfile);
+  }
+
+  function confirmUsernameChange() {
+    setConfirmingUsernameChange(false);
+    startTransition(persistProfile);
   }
 
   function saveContactEmail() {
@@ -463,8 +470,16 @@ export function SettingsClient({
   }, [section]);
   useEffect(() => {
     if (section !== "account") return;
-    void loadIdentityMethods();
+    const loadId = window.setTimeout(() => {
+      void loadIdentityMethods();
+    }, 0);
+    return () => window.clearTimeout(loadId);
   }, [loadIdentityMethods, section]);
+  useEffect(() => {
+    const nowId = window.setTimeout(() => setNow(Date.now()), 0);
+    return () => window.clearTimeout(nowId);
+  }, []);
+
 
 
 
@@ -472,12 +487,13 @@ export function SettingsClient({
     settings.usernameChangedAt
   );
   const usernameChangeLocked = Boolean(
-    usernameCooldownEnds && usernameCooldownEnds.getTime() > Date.now()
+    usernameCooldownEnds && now > 0 && usernameCooldownEnds.getTime() > now
   );
   const normalizedUsernameInput = usernameInput
     .trim()
     .replace(/^@+/, "")
     .toLowerCase();
+  const usernameInputChanged = normalizedUsernameInput !== username;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
@@ -626,20 +642,6 @@ export function SettingsClient({
                     })
                   : t("settings.usernameChangeHint")}
               </p>
-              <Button
-                type="button"
-                disabled={
-                  pending ||
-                  usernameChangeLocked ||
-                  !normalizedUsernameInput ||
-                  normalizedUsernameInput === username
-                }
-                onClick={saveUsername}
-              >
-                {pending
-                  ? t("settings.saving")
-                  : t("settings.saveUsername")}
-              </Button>
             </Field>
 
             <Field label={t("settings.displayName")}>
@@ -663,7 +665,9 @@ export function SettingsClient({
 
             <Button
               type="button"
-              disabled={pending}
+              disabled={
+                pending || (usernameChangeLocked && usernameInputChanged)
+              }
               onClick={saveProfile}
               className="min-h-11"
             >
@@ -681,7 +685,7 @@ export function SettingsClient({
               <div className="rounded-xl border border-border/50 px-3 py-3">
                 <div className="flex items-start gap-3">
                   <SparklesIcon className="mt-0.5 size-5 text-[var(--brand)]" />
-                  <div className="min-w-0">
+                  <div>
                     <p className="text-sm font-medium">
                       {initialPro.active
                         ? t("settings.proActive")
@@ -1042,6 +1046,41 @@ export function SettingsClient({
             />
           </>
         ) : null}
+      {confirmingUsernameChange ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="username-change-title"
+        >
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-border/70 bg-card p-5 shadow-xl">
+            <div>
+              <h2 id="username-change-title" className="font-heading text-lg font-semibold">
+                {t("settings.usernameChangeWarning")}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t("settings.usernameChangeDetails", {
+                  oldUsername: username,
+                  newUsername: normalizedUsernameInput,
+                })}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmingUsernameChange(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button type="button" onClick={confirmUsernameChange}>
+                {t("settings.confirmUsernameChange")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       </div>
     </div>
   );

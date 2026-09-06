@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useRef, useState, useTransition, useCallback } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -137,12 +137,15 @@ export function MessagesClient() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [loaded, setLoaded] = useState(false);
-  const [reportingMessageId, setReportingMessageId] = useState<string | null>(
-    null
-  );
+  const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] =
     useState<ChatReportReason>("harassment");
   const [reportDetails, setReportDetails] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const [showNewMessages, setShowNewMessages] = useState(false);
+  const sendingReplyRef = useRef(false);
+  const shouldStickToBottomRef = useRef(true);
 
   useEffect(() => {
     // URL query changes intentionally seed the compose field.
@@ -194,17 +197,30 @@ export function MessagesClient() {
     loadInbox();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   useEffect(() => {
     // A room switch must not display the previous room while the new room loads.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages([]);
-    setReportingMessageId(null);
+    setReportOpen(false);
+    shouldStickToBottomRef.current = true;
+    setShowNewMessages(false);
     if (!selectedRoom) return;
 
     startTransition(() => {
       void loadRoom(selectedRoom);
     });
   }, [selectedRoom, loadRoom]);
+
+  useEffect(() => {
+    const messageList = messageListRef.current;
+    if (!selectedRoom || !messageList || messages.length === 0) return;
+    if (shouldStickToBottomRef.current) {
+      messageList.scrollTop = messageList.scrollHeight;
+    } else {
+      setShowNewMessages(true);
+    }
+  }, [messages.length, selectedRoom]);
 
   useEffect(() => {
     if (!selectedRoom) return;
@@ -293,6 +309,7 @@ export function MessagesClient() {
   function startConversation(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     startTransition(async () => {
       const res = await apiFetch("/api/messages", {
         method: "POST",
@@ -348,38 +365,43 @@ export function MessagesClient() {
 
   function sendReply(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedRoom || !reply.trim()) return;
+    if (sendingReplyRef.current || !selectedRoom || !reply.trim()) return;
+    sendingReplyRef.current = true;
     setError(null);
+    setNotice(null);
     startTransition(async () => {
-      const res = await apiFetch(`/api/messages/${selectedRoom}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: reply }),
-      });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        setError(localizeError(payload?.error, "Couldn't send"));
-        return;
+      try {
+        const res = await apiFetch(`/api/messages/${selectedRoom}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: reply }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          setError(localizeError(payload?.error, "Couldn't send"));
+          return;
+        }
+        const message = (await res.json()) as ChatMessage;
+        setMessages((prev) => mergeMessages(prev, [message]));
+        setReply("");
+        loadInbox();
+      } finally {
+        sendingReplyRef.current = false;
       }
-      const message = (await res.json()) as ChatMessage;
-      setMessages((prev) => mergeMessages(prev, [message]));
-      setReply("");
-      loadInbox();
     });
   }
-
   function submitReport(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedRoom || !reportingMessageId) return;
+    if (!selectedRoom) return;
     setError(null);
+    setNotice(null);
     startTransition(async () => {
       const res = await apiFetch(`/api/messages/${selectedRoom}/report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messageId: reportingMessageId,
           reason: reportReason,
           details: reportDetails,
         }),
@@ -388,12 +410,12 @@ export function MessagesClient() {
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(localizeError(payload?.error, "Couldn't report message"));
+        setError(localizeError(payload?.error, "Couldn't report conversation"));
         return;
       }
-      setReportingMessageId(null);
+      setReportOpen(false);
       setReportDetails("");
-      setError(null);
+      setNotice(t("post.reportSubmitted"));
     });
   }
 
@@ -410,34 +432,41 @@ export function MessagesClient() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
       <aside className="space-y-6">
-        <section className="space-y-3">
-          <h2 className="font-heading text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            {t("messages.newChat")}
-          </h2>
-          <form onSubmit={startConversation} className="space-y-2">
-            <Input
-              value={composeUser}
-              onChange={(e) => setComposeUser(e.target.value)}
-              placeholder={t("messages.username")}
-              required
-              className="rounded-lg"
-            />
-            <Textarea
-              value={composeBody}
-              onChange={(e) => setComposeBody(e.target.value)}
-              placeholder={t("messages.openerPlaceholder")}
-              rows={3}
-              required
-              className="rounded-lg"
-            />
-            <Button type="submit" size="sm" disabled={pending} className="w-full">
-              {t("messages.send")}
-            </Button>
-          </form>
-          <p className="text-xs text-muted-foreground">
-            {t("messages.requestHint")}
-          </p>
-        </section>
+        {!selectedRoom ? (
+          <section className="space-y-3">
+            <h2 className="font-heading text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+              {t("messages.newChat")}
+            </h2>
+            <form onSubmit={startConversation} className="space-y-2">
+              <Input
+                value={composeUser}
+                onChange={(e) => setComposeUser(e.target.value)}
+                placeholder={t("messages.username")}
+                required
+                className="rounded-lg"
+              />
+              <Textarea
+                value={composeBody}
+                onChange={(e) => setComposeBody(e.target.value)}
+                placeholder={t("messages.openerPlaceholder")}
+                rows={3}
+                required
+                className="rounded-lg"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                disabled={pending}
+                className="w-full"
+              >
+                {t("messages.send")}
+              </Button>
+            </form>
+            <p className="text-xs text-muted-foreground">
+              {t("messages.requestHint")}
+            </p>
+          </section>
+        ) : null}
 
         {requests.length > 0 ? (
           <section className="space-y-2">
@@ -541,102 +570,165 @@ export function MessagesClient() {
         </section>
       </aside>
 
-      <section className="flex min-h-[28rem] flex-col rounded-2xl border border-border/60 bg-card/70">
+      <section className="relative flex h-[calc(100dvh-8rem)] min-h-[28rem] max-h-[48rem] flex-col rounded-2xl border border-border/60 bg-card/70 lg:h-[calc(100dvh-10rem)] lg:max-h-[calc(100dvh-10rem)]">
         {activeRoom ? (
           <>
-            <header className="border-b border-border/50 px-4 py-3">
-              <p className="font-medium">@{activeRoom.peer.username}</p>
+            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
+              <p className="truncate font-medium">@{activeRoom.peer.username}</p>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                onClick={() => {
+                  setReportOpen(true);
+                  setError(null);
+                  setNotice(null);
+                }}
+              >
+                {t("messages.report")}
+              </Button>
             </header>
-            <div className="flex-1 space-y-3 overflow-auto px-4 py-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "space-y-1",
-                    message.isMine ? "ml-auto max-w-[85%]" : "max-w-[85%]"
-                  )}
-                >
+            <div
+              ref={messageListRef}
+              onScroll={(event) => {
+                const element = event.currentTarget;
+                const nearBottom =
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight <=
+                  96;
+                shouldStickToBottomRef.current = nearBottom;
+                if (nearBottom) setShowNewMessages(false);
+              }}
+              className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+            >
+              <div className="space-y-3">
+                {messages.map((message) => (
                   <div
+                    key={message.id}
                     className={cn(
-                      "rounded-2xl px-3 py-2 text-sm",
-                      message.isMine
-                        ? "bg-[color-mix(in_oklch,var(--brand)_18%,transparent)]"
-                        : "bg-muted"
+                      "space-y-1",
+                      message.isMine ? "ml-auto max-w-[85%]" : "max-w-[85%]"
                     )}
                   >
-                    {message.body}
+                    <div
+                      className={cn(
+                        "whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm",
+                        message.isMine
+                          ? "bg-[color-mix(in_oklch,var(--brand)_18%,transparent)]"
+                          : "bg-muted"
+                      )}
+                    >
+                      {message.body}
+                    </div>
                   </div>
-                  {!message.isMine && reportingMessageId !== message.id ? (
-                    <button
-                      type="button"
-                      className="px-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                      onClick={() => setReportingMessageId(message.id)}
-                    >
-                      {t("messages.report")}
-                    </button>
-                  ) : null}
-                  {reportingMessageId === message.id ? (
-                    <form
-                      onSubmit={submitReport}
-                      className="space-y-2 rounded-xl border border-border/60 bg-card p-2"
-                    >
-                      <select
-                        className="h-9 w-full rounded-lg border border-input bg-background px-2 text-xs"
-                        value={reportReason}
-                        onChange={(e) =>
-                          setReportReason(e.target.value as ChatReportReason)
-                        }
-                        aria-label={t("messages.reportReason")}
-                      >
-                        {CHAT_REPORT_REASONS.map((reason) => (
-                          <option key={reason} value={reason}>
-                            {reportReasonLabels[reason]}
-                          </option>
-                        ))}
-                      </select>
-                      <Textarea
-                        value={reportDetails}
-                        onChange={(e) => setReportDetails(e.target.value)}
-                        placeholder={t("messages.reportDetails")}
-                        rows={2}
-                        className="rounded-lg text-xs"
-                      />
-                      <div className="flex gap-2">
-                        <Button type="submit" size="xs" disabled={pending}>
-                          {t("messages.submitReport")}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          disabled={pending}
-                          onClick={() => {
-                            setReportingMessageId(null);
-                            setReportDetails("");
-                          }}
-                        >
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    </form>
-                  ) : null}
-                </div>
-              ))}
+                ))}
+              </div>
+              {showNewMessages ? (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  className="sticky bottom-2 left-1/2 -translate-x-1/2 shadow-sm"
+                  onClick={() => {
+                    const element = messageListRef.current;
+                    if (!element) return;
+                    element.scrollTop = element.scrollHeight;
+                    shouldStickToBottomRef.current = true;
+                    setShowNewMessages(false);
+                  }}
+                >
+                  {t("messages.newMessages")}
+                </Button>
+              ) : null}
             </div>
             <form
               onSubmit={sendReply}
-              className="flex gap-2 border-t border-border/50 p-3"
+              className="flex shrink-0 items-end gap-2 border-t border-border/50 p-3"
             >
-              <Input
+              <Textarea
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key !== "Enter" ||
+                    event.shiftKey ||
+                    event.nativeEvent.isComposing ||
+                    event.keyCode === 229
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }}
                 placeholder={t("messages.placeholder")}
-                className="rounded-lg"
+                rows={1}
+                className="max-h-32 min-h-10 flex-1 overflow-y-auto rounded-lg"
               />
               <Button type="submit" disabled={pending || !reply.trim()}>
                 {t("messages.send")}
               </Button>
             </form>
+            {reportOpen ? (
+              <div className="absolute inset-0 z-10 grid place-items-center bg-background/80 p-4 backdrop-blur-sm">
+                <form
+                  onSubmit={submitReport}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="conversation-report-title"
+                  className="w-full max-w-sm space-y-3 rounded-2xl border border-border bg-card p-4 shadow-xl"
+                >
+                  <div>
+                    <h2
+                      id="conversation-report-title"
+                      className="font-heading text-lg font-semibold"
+                    >
+                      {t("messages.reportConversation")}
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("messages.reportConversationPrompt")}
+                    </p>
+                  </div>
+                  <select
+                    className="h-10 w-full rounded-lg border border-input bg-background px-2 text-sm"
+                    value={reportReason}
+                    onChange={(e) =>
+                      setReportReason(e.target.value as ChatReportReason)
+                    }
+                    aria-label={t("messages.reportReason")}
+                  >
+                    {CHAT_REPORT_REASONS.map((reason) => (
+                      <option key={reason} value={reason}>
+                        {reportReasonLabels[reason]}
+                      </option>
+                    ))}
+                  </select>
+                  <Textarea
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    placeholder={t("messages.reportDetails")}
+                    rows={3}
+                    className="rounded-lg text-sm"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() => {
+                        setReportOpen(false);
+                        setReportDetails("");
+                      }}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                    <Button type="submit" variant="destructive" disabled={pending}>
+                      {t("messages.submitReport")}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            ) : null}
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
@@ -645,6 +737,11 @@ export function MessagesClient() {
         )}
       </section>
 
+      {notice ? (
+        <p className="text-sm text-emerald-700 lg:col-span-2" role="status">
+          {notice}
+        </p>
+      ) : null}
       {error ? (
         <p className="text-sm text-destructive lg:col-span-2" role="alert">
           {error}

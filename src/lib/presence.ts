@@ -83,19 +83,28 @@ export async function listOnlineUsers(
     );
   }
   bindings.push(safeLimit);
+  const followingSelect = hasViewer
+    ? "CASE WHEN follow.follower_id IS NOT NULL THEN 1 ELSE 0 END AS following"
+    : "0 AS following";
+  const friendStatusSelect = hasViewer
+    ? `CASE
+         WHEN f.status = 'accepted' THEN 'friends'
+         WHEN f.status = 'pending' AND f.requester_id = ? THEN 'outgoing'
+         WHEN f.status = 'pending' AND f.addressee_id = ? THEN 'incoming'
+         ELSE 'none'
+       END AS friend_status`
+    : "'none' AS friend_status";
+  const friendRequestSelect = hasViewer
+    ? "CASE WHEN f.status = 'pending' THEN f.id ELSE NULL END AS friend_request_id"
+    : "NULL AS friend_request_id";
+
 
   const { results } = await db
     .prepare(
       `SELECT u.id, u.username, u.name, u.image, p.last_seen_at,
-              CASE WHEN follow.follower_id IS NOT NULL THEN 1 ELSE 0 END AS following,
-              CASE
-                WHEN f.status = 'accepted' THEN 'friends'
-                WHEN f.status = 'pending' AND f.requester_id = ? THEN 'outgoing'
-                WHEN f.status = 'pending' AND f.addressee_id = ? THEN 'incoming'
-                ELSE 'none'
-              END AS friend_status,
-              CASE WHEN f.status = 'pending' THEN f.id ELSE NULL END
-                AS friend_request_id
+              ${followingSelect},
+              ${friendStatusSelect},
+              ${friendRequestSelect}
        FROM user_presence p
        INNER JOIN "user" u ON u.id = p.user_id
        ${relationshipJoins}

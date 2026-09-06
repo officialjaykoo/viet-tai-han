@@ -9,7 +9,10 @@ import {
   warnUser,
 } from "@/lib/admin";
 import { reviewBusinessVerification } from "@/lib/businesses";
-import { reviewChatMessageReport } from "@/lib/dm-moderation";
+import {
+  reviewChatMessageReport,
+  reviewChatRoomReport,
+} from "@/lib/dm-moderation";
 import { reviewListingReport } from "@/lib/marketplace";
 import { listSiteSettings, setSiteSetting } from "@/lib/settings";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
@@ -155,6 +158,22 @@ export async function POST(request: NextRequest) {
           reviewerId: actor.id,
           status: body.reportStatus,
           removeMessage: body.removeMessage,
+          resolutionNote: body.resolutionNote,
+        });
+        return NextResponse.json(result);
+      }
+      case "review_chat_room_report": {
+        if (
+          !body.reportId ||
+          !body.reportStatus ||
+          !["reviewed", "dismissed"].includes(body.reportStatus)
+        ) {
+          return await jsonLocalizedError("Missing chat report fields", 400);
+        }
+        const result = await reviewChatRoomReport({
+          reportId: body.reportId,
+          reviewerId: actor.id,
+          status: body.reportStatus,
           resolutionNote: body.resolutionNote,
         });
         return NextResponse.json(result);

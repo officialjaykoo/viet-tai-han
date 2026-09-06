@@ -1,3 +1,7 @@
+import { notifyQuietly } from "@/lib/notifications";
+
+import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
+import { syncAchievementsForEvent } from "@/lib/achievements";
 import { getDb } from "@/lib/db";
 import { getFriendRelation } from "@/lib/friends";
 import { createPublicId } from "@/lib/id";
@@ -58,33 +62,31 @@ export async function blockUser(blockerId: string, blockedId: string) {
     .first<{ id: string }>();
   if (!user) throw new AuthError("User not found", 404);
 
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)`
-    )
-    .bind(blockerId, blockedId)
-    .run();
-
-  // Mutual unfollow when blocking
-  await db
-    .prepare(
-      `DELETE FROM user_follows
-       WHERE (follower_id = ? AND following_id = ?)
-          OR (follower_id = ? AND following_id = ?)`
-    )
-    .bind(blockerId, blockedId, blockedId, blockerId)
-    .run();
-  await db
-    .prepare(
-      `DELETE FROM user_friendships
-       WHERE (requester_id = ? AND addressee_id = ?)
-          OR (requester_id = ? AND addressee_id = ?)`
-    )
-    .bind(blockerId, blockedId, blockedId, blockerId)
-    .run();
+  await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO user_blocks (blocker_id, blocked_id)
+         VALUES (?, ?)`
+      )
+      .bind(blockerId, blockedId),
+    db
+      .prepare(
+        `DELETE FROM user_follows
+         WHERE (follower_id = ? AND following_id = ?)
+            OR (follower_id = ? AND following_id = ?)`
+      )
+      .bind(blockerId, blockedId, blockedId, blockerId),
+    db
+      .prepare(
+        `DELETE FROM user_friendships
+         WHERE pair_key = ?`
+      )
+      .bind([blockerId, blockedId].sort().join(":")),
+  ]);
 
   return { blocked: true as const };
 }
+
 
 export async function unblockUser(blockerId: string, blockedId: string) {
   const db = await getDb();
@@ -122,34 +124,58 @@ export async function followUser(followerId: string, followingId: string) {
     throw new AuthError("Can't follow this user", 403);
   }
 
-  await db
+  const inserted = await db
     .prepare(
-      `INSERT OR IGNORE INTO user_follows (follower_id, following_id) VALUES (?, ?)`
+      `INSERT OR IGNORE INTO user_follows (follower_id, following_id)
+       SELECT ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+       )`
     )
-    .bind(followerId, followingId)
+    .bind(
+      followerId,
+      followingId,
+      followerId,
+      followingId,
+      followingId,
+      followerId
+    )
     .run();
+  if (Number(inserted.meta.changes ?? 0) !== 1) {
+    const stillBlocked = await db
+      .prepare(
+        `SELECT 1 AS ok FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)`
+      )
+      .bind(followerId, followingId, followingId, followerId)
+      .first();
+    if (stillBlocked) throw new AuthError("Can't follow this user", 403);
+    return { following: true as const };
+  }
 
   const { promotePendingChatRequestsForPair } = await import("@/lib/messages");
-  await promotePendingChatRequestsForPair(followerId, followingId);
+  await promotePendingChatRequestsForPair(
+    followerId,
+    followingId,
+    "recipient_followed_sender"
+  );
+  syncAchievementsForEvent(followerId, "follow");
+  syncAchievementsForEvent(followingId, "follow");
 
-  void (async () => {
-    const { notifyQuietly } = await import("@/lib/notifications");
-    const { syncAchievementsQuietly } = await import("@/lib/achievements");
-    syncAchievementsQuietly(followerId);
-    syncAchievementsQuietly(followingId);
-    const actor = await db
-      .prepare(`SELECT username FROM "user" WHERE id = ?`)
-      .bind(followerId)
-      .first<{ username: string | null }>();
-    const label = actor?.username ? `u/${actor.username}` : "Someone";
-    notifyQuietly({
-      userId: followingId,
-      actorId: followerId,
-      kind: "follow",
-      title: `${label} followed you`,
-      href: actor?.username ? `/u/${actor.username}` : null,
-    });
-  })();
+  const actor = await db
+    .prepare(`SELECT username FROM "user" WHERE id = ?`)
+    .bind(followerId)
+    .first<{ username: string | null }>();
+  notifyQuietly({
+    userId: followingId,
+    actorId: followerId,
+    kind: "follow",
+    title: `${formatUserHandle(actor?.username)} followed you`,
+    href: getUsernameProfileHref(actor?.username),
+  });
 
   return { following: true as const };
 }
@@ -239,14 +265,16 @@ export async function getProfileRelation(
   if (!viewerId || viewerId === profileUserId) {
     return {
       following: false,
-      blocked: false,
+      blockedByMe: false,
+      blockedByThem: false,
+      blockedEitherDirection: false,
       friendStatus: "none" as const,
       friendRequestId: null,
       isSelf: viewerId === profileUserId,
     };
   }
   const db = await getDb();
-  const [follow, block, friend] = await Promise.all([
+  const [follow, blocks, friend] = await Promise.all([
     db
       .prepare(
         `SELECT 1 AS ok FROM user_follows
@@ -256,16 +284,27 @@ export async function getProfileRelation(
       .first(),
     db
       .prepare(
-        `SELECT 1 AS ok FROM user_blocks
-         WHERE blocker_id = ? AND blocked_id = ?`
+        `SELECT
+           EXISTS (
+             SELECT 1 FROM user_blocks
+             WHERE blocker_id = ? AND blocked_id = ?
+           ) AS blocked_by_me,
+           EXISTS (
+             SELECT 1 FROM user_blocks
+             WHERE blocker_id = ? AND blocked_id = ?
+           ) AS blocked_by_them`
       )
-      .bind(viewerId, profileUserId)
-      .first(),
+      .bind(viewerId, profileUserId, profileUserId, viewerId)
+      .first<{ blocked_by_me: number; blocked_by_them: number }>(),
     getFriendRelation(viewerId, profileUserId),
   ]);
+  const blockedByMe = Boolean(blocks?.blocked_by_me);
+  const blockedByThem = Boolean(blocks?.blocked_by_them);
   return {
     following: Boolean(follow),
-    blocked: Boolean(block),
+    blockedByMe,
+    blockedByThem,
+    blockedEitherDirection: blockedByMe || blockedByThem,
     friendStatus: friend.status,
     friendRequestId: friend.requestId,
     isSelf: false,

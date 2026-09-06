@@ -1,15 +1,22 @@
 import { getDb } from "@/lib/db";
+import { runBackgroundTask } from "@/lib/background-task";
 import {
   getDmRelationship,
   type DmRelationship,
 } from "@/lib/dm-relationships";
-import { canNotifyChat } from "@/lib/notifications";
+import { canNotifyChat, notifyQuietly } from "@/lib/notifications";
+import { formatUserHandle } from "@/lib/profile-url";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import { queuePushDelivery } from "@/lib/push";
 import { enforceCreateRateLimit } from "@/lib/rate-limit";
 import { AuthError } from "@/lib/session";
 import { incrementUnread, refreshUnreadCounts } from "@/lib/unread";
+
+export type ChatPromotionReason =
+  | "request_accepted"
+  | "friendship"
+  | "recipient_followed_sender";
 
 function isUniqueConstraint(error: unknown): boolean {
   return error instanceof Error && /unique|constraint/i.test(error.message);
@@ -168,6 +175,14 @@ function assertRelationshipCanMessage(
   }
 }
 
+function promotionReasonForRelationship(
+  relationship: DmRelationship
+): ChatPromotionReason {
+  return relationship.friends
+    ? "friendship"
+    : "recipient_followed_sender";
+}
+
 async function notifyChatRequest(input: {
   db: D1Database;
   recipientId: string;
@@ -178,13 +193,11 @@ async function notifyChatRequest(input: {
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
     .bind(input.senderId)
     .first<{ username: string | null }>();
-  const label = actor?.username ? `u/${actor.username}` : "Someone";
-  const { notifyQuietly } = await import("@/lib/notifications");
   notifyQuietly({
     userId: input.recipientId,
     actorId: input.senderId,
     kind: "chat_request",
-    title: `${label} wants to message you`,
+    title: `${formatUserHandle(actor?.username)} wants to message you`,
     body: input.body.slice(0, 140),
     href: "/messages",
   });
@@ -195,18 +208,22 @@ async function notifyChatAccepted(input: {
   recipientId: string;
   accepterId: string;
   roomId: string;
+  reason: ChatPromotionReason;
 }) {
   const actor = await input.db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
     .bind(input.accepterId)
     .first<{ username: string | null }>();
-  const label = actor?.username ? `u/${actor.username}` : "Someone";
-  const { notifyQuietly } = await import("@/lib/notifications");
+  const label = formatUserHandle(actor?.username);
+  const title =
+    input.reason === "request_accepted"
+      ? `${label} accepted your message request`
+      : `You can now message ${label} directly`;
   notifyQuietly({
     userId: input.recipientId,
     actorId: input.accepterId,
     kind: "chat_accepted",
-    title: `${label} accepted your message request`,
+    title,
     href: `/messages?room=${input.roomId}`,
   });
 }
@@ -219,13 +236,13 @@ async function notifyDeliveredChatMessage(input: {
   body: string;
 }) {
   await incrementUnread(input.recipientId, "messages");
-  void (async () => {
+  runBackgroundTask("chat_push_notification", async () => {
     if (!(await canNotifyChat(input.recipientId))) return;
     const actor = await input.db
       .prepare(`SELECT username FROM "user" WHERE id = ?`)
       .bind(input.senderId)
       .first<{ username: string | null }>();
-    const label = actor?.username ? `u/${actor.username}` : "Someone";
+    const label = formatUserHandle(actor?.username);
     queuePushDelivery({
       userId: input.recipientId,
       payload: {
@@ -235,8 +252,6 @@ async function notifyDeliveredChatMessage(input: {
         tag: `chat-${input.roomId}`,
       },
     });
-  })().catch((error) => {
-    console.error("chat push notification failed", error);
   });
 }
 
@@ -292,7 +307,8 @@ async function promotePendingRequest(
     room_id: string;
     from_user_id: string;
     to_user_id: string;
-  }
+  },
+  reason: ChatPromotionReason
 ) {
   const pendingMessages = await db
     .prepare(
@@ -306,14 +322,22 @@ async function promotePendingRequest(
     .bind(request.room_id, request.from_user_id)
     .first<{ count: number }>();
 
-  const updated = await db.batch([
-    db
-      .prepare(
-        `UPDATE chat_requests
-         SET status = 'accepted', responded_at = datetime('now')
-         WHERE id = ? AND status = 'pending'`
-      )
-      .bind(request.id),
+  const requestUpdate = await db
+    .prepare(
+      `UPDATE chat_requests
+       SET status = 'accepted', responded_at = datetime('now')
+       WHERE id = ? AND status = 'pending'
+         AND NOT EXISTS (
+           SELECT 1 FROM user_blocks
+           WHERE (blocker_id = from_user_id AND blocked_id = to_user_id)
+              OR (blocker_id = to_user_id AND blocked_id = from_user_id)
+         )`
+    )
+    .bind(request.id)
+    .run();
+  if (Number(requestUpdate.meta.changes ?? 0) !== 1) return false;
+
+  await db.batch([
     db
       .prepare(
         `UPDATE chat_room_members
@@ -331,7 +355,6 @@ async function promotePendingRequest(
       .bind(request.room_id),
   ]);
 
-  if (!updated[0]?.meta.changes) return false;
 
   const count = Number(pendingMessages?.count ?? 0);
   if (count > 0) {
@@ -342,13 +365,15 @@ async function promotePendingRequest(
     recipientId: request.from_user_id,
     accepterId: request.to_user_id,
     roomId: request.room_id,
+    reason,
   });
   return true;
 }
 
 async function promotePendingRequestsForRoom(
   db: D1Database,
-  roomId: string
+  roomId: string,
+  reason: ChatPromotionReason
 ) {
   const { results } = await db
     .prepare(
@@ -371,7 +396,7 @@ async function promotePendingRequestsForRoom(
       recipientId: request.to_user_id,
     });
     if (!relationship.directAllowed) continue;
-    if (await promotePendingRequest(db, request)) promoted += 1;
+    if (await promotePendingRequest(db, request, reason)) promoted += 1;
   }
   return promoted;
 }
@@ -379,7 +404,8 @@ async function promotePendingRequestsForRoom(
 /** Promote pending requests when a follow/friend relationship becomes direct. */
 export async function promotePendingChatRequestsForPair(
   firstUserId: string,
-  secondUserId: string
+  secondUserId: string,
+  reason: ChatPromotionReason
 ) {
   const db = await getDb();
   const room = await db
@@ -387,7 +413,7 @@ export async function promotePendingChatRequestsForPair(
     .bind(pairKey(firstUserId, secondUserId))
     .first<{ id: string }>();
   if (!room) return 0;
-  return promotePendingRequestsForRoom(db, room.id);
+  return promotePendingRequestsForRoom(db, room.id, reason);
 }
 
 async function createChatRequest(context: ConversationStartContext) {
@@ -512,12 +538,14 @@ async function createChatRequest(context: ConversationStartContext) {
     .run();
 
   if (!shadow) {
-    void notifyChatRequest({
-      db: context.db,
-      recipientId: context.toUser.id,
-      senderId: context.input.fromUserId,
-      body: context.body,
-    });
+    runBackgroundTask("chat_request_notification", () =>
+      notifyChatRequest({
+        db: context.db,
+        recipientId: context.toUser.id,
+        senderId: context.input.fromUserId,
+        body: context.body,
+      })
+    );
   }
 
   return {
@@ -595,7 +623,11 @@ async function startDirectConversation(
       )
       .bind(roomId, context.input.fromUserId, context.toUser.id)
       .run();
-    await promotePendingRequestsForRoom(context.db, roomId);
+    await promotePendingRequestsForRoom(
+      context.db,
+      roomId,
+      promotionReasonForRelationship(context.relationship)
+    );
   }
 
   const shadow =
@@ -738,8 +770,13 @@ export async function respondToChatRequest(input: {
 
   if (input.accept) {
     await assertNotBlocked(request.from_user_id, request.to_user_id);
-    const promoted = await promotePendingRequest(db, request);
+    const promoted = await promotePendingRequest(
+      db,
+      request,
+      "request_accepted"
+    );
     if (!promoted) {
+      await assertNotBlocked(request.from_user_id, request.to_user_id);
       throw new AuthError("Request already handled", 409);
     }
     return { roomId: request.room_id, status: "accepted" as const };

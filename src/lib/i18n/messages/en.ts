@@ -426,6 +426,9 @@ export const en = {
     noMessagesYet: "No messages yet",
     selectChat: "Select a chat or request a new conversation.",
     unreadCount: "Messages, {count} unread",
+    newMessages: "New messages ↓",
+    reportConversation: "Report conversation",
+    reportConversationPrompt: "Are you sure you want to report this conversation?",
     report: "Report",
     reportReason: "Report reason",
     reportDetails: "Add details (optional)",
@@ -565,6 +568,11 @@ export const en = {
       "Your public handle can be changed once every 90 days.",
     usernameChangeCooldown:
       "You can change your username again after {date}.",
+    usernameChangeWarning:
+      "Changing your username locks it for another 90 days.",
+    usernameChangeDetails: "Existing: @{oldUsername}\nNew: @{newUsername}",
+    confirmUsernameChange: "Change and save",
+
     saveUsername: "Save username",
     usernameSaved: "Username updated",
     usernameSaveFailed: "Could not save username",
@@ -736,6 +744,7 @@ export const en = {
     noListingReports: "No open marketplace reports.",
     chatReports: "DM reports",
     noChatReports: "No open DM reports.",
+    chatReportContext: "Recent conversation context",
     businessVerification: "Business verification",
     noBusinessVerifications: "No business verification requests are pending.",
     verificationEvidence: "Evidence",

@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { syncAchievementsForEvent } from "@/lib/achievements";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import {
@@ -92,9 +93,7 @@ export async function createPost(input: {
   }
 
   await bumpUserActivity(input.userId, input.subredditId, 3);
-  void import("@/lib/achievements").then(({ syncUserAchievements }) =>
-    syncUserAchievements(input.userId)
-  );
+  syncAchievementsForEvent(input.userId, "post_created");
 
   if (!shadow && subreddit?.name) {
     void import("@/lib/embeddings").then(({ indexPostEmbedding }) =>
@@ -210,9 +209,7 @@ export async function createComment(input: {
   }
 
   await bumpUserActivity(input.userId, post.subreddit_id, 1);
-  void import("@/lib/achievements").then(({ syncUserAchievements }) =>
-    syncUserAchievements(input.userId)
-  );
+  syncAchievementsForEvent(input.userId, "comment_created");
 
   if (!shadow) {
     void import("@/lib/translation").then(({ scheduleCommentTranslation }) =>
@@ -499,9 +496,7 @@ export async function voteOnComment(input: {
     }
   }
 
-  void import("@/lib/achievements").then(({ syncAchievementsQuietly }) => {
-    syncAchievementsQuietly(input.userId);
-  });
+  syncAchievementsForEvent(input.userId, "vote_cast");
 
   const updated = await db
     .prepare(`SELECT score FROM comments WHERE id = ?`)
@@ -727,9 +722,7 @@ export async function createSubreddit(input: {
     .bind(id, input.userId)
     .run();
 
-  void import("@/lib/achievements").then(({ syncUserAchievements }) =>
-    syncUserAchievements(input.userId)
-  );
+  syncAchievementsForEvent(input.userId, "community_created");
 
   return { id, name };
 }

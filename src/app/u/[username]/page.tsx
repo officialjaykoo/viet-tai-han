@@ -1,5 +1,5 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Suspense, type ReactNode } from "react";
+
 import { notFound, redirect } from "next/navigation";
 
 import { PostCard } from "@/components/feed/post-card";
@@ -12,7 +12,8 @@ import {
   ProfileTabs,
   type ProfileTab,
 } from "@/components/user/profile-tabs";
-import { listUserAchievements, syncUserAchievements } from "@/lib/achievements";
+import { listUserAchievements } from "@/lib/achievements";
+
 import {
   listUserComments,
   resolvePublicProfile,
@@ -64,6 +65,9 @@ function buildOverview(
   return items.slice(0, limit);
 }
 
+function logProfileStage(msg: string) {
+  console.info(JSON.stringify({ msg }));
+}
 export default async function ProfilePage({
   params,
   searchParams,
@@ -71,11 +75,13 @@ export default async function ProfilePage({
   params: Promise<{ username: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  console.info(JSON.stringify({ msg: "profile_render_start" }));
   const { username: identifier } = await params;
   const { tab: tabParam } = await searchParams;
   const tab = parseTab(tabParam);
 
   const lookup = await resolvePublicProfile(identifier);
+  logProfileStage("profile_lookup_done");
   if (!lookup || lookup.profile.status === "banned") notFound();
   if (lookup.redirectUsername) {
     const query = tabParam ? `?tab=${encodeURIComponent(tabParam)}` : "";
@@ -89,31 +95,6 @@ export default async function ProfilePage({
   const isOwner = session?.user?.id === profile.id;
   const relation = await getProfileRelation(session?.user?.id, profile.id);
 
-  // Achievement sync is a heavy multi-subquery write. Awaiting it on every
-  // public profile (and Next.js Link prefetch of /u/*) caused Worker CPU
-  // exhaustion → intermittent 503s. Owners still sync inline; visitors sync
-  // in the background via waitUntil.
-  if (isOwner) {
-    await syncUserAchievements(profile.id);
-  } else {
-    try {
-      const { ctx } = await getCloudflareContext({ async: true });
-      ctx?.waitUntil?.(
-        syncUserAchievements(profile.id).catch((error) => {
-          console.error(
-            JSON.stringify({
-              level: "error",
-              msg: "achievement_sync_failed",
-              userId: profile.id,
-              error: error instanceof Error ? error.message : String(error),
-            })
-          );
-        })
-      );
-    } catch {
-      // Non-Workers contexts (unit tests): skip background sync.
-    }
-  }
 
   const [achievements, postsFeed, comments, friends] = await Promise.all([
     listUserAchievements(profile.id),
@@ -127,6 +108,7 @@ export default async function ProfilePage({
     listUserComments(profile.id, 30),
     listFriends(profile.id),
   ]);
+  logProfileStage("profile_data_done");
   const user = profile;
   const posts = postsFeed.posts;
   const overview = buildOverview(posts, comments);

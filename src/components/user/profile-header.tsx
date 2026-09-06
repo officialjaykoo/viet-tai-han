@@ -15,6 +15,7 @@ import {
 import type { PublicProfile } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
+import { getUsernameProfileHref } from "@/lib/profile-url";
 
 function formatKarma(n: number, locale: string): string {
   if (Math.abs(n) >= 10_000) {
@@ -32,7 +33,9 @@ export async function ProfileHeader({
   isOwner: boolean;
   relation: {
     following: boolean;
-    blocked: boolean;
+    blockedByMe: boolean;
+    blockedByThem: boolean;
+    blockedEitherDirection: boolean;
     friendStatus: "none" | "outgoing" | "incoming" | "friends";
     friendRequestId: string | null;
   };
@@ -67,7 +70,7 @@ export async function ProfileHeader({
           ) : (
             <div className="rounded-full bg-background p-1 ring-1 ring-border/60">
               <Link
-                href={`/u/${encodeURIComponent(username)}`}
+                href={getUsernameProfileHref(username) ?? "/"}
                 aria-label={`@${username}`}
                 className="block rounded-full"
               >
@@ -91,8 +94,9 @@ export async function ProfileHeader({
             ) : (
               <ProfileActions
                 username={username}
+                initiallyBlockedByMe={relation.blockedByMe}
+                initiallyBlockedByThem={relation.blockedByThem}
                 initiallyFollowing={relation.following}
-                initiallyBlocked={relation.blocked}
                 initiallyFriendStatus={relation.friendStatus}
                 initiallyFriendRequestId={relation.friendRequestId}
               />

@@ -1,9 +1,10 @@
 import { getDb } from "@/lib/db";
+import { runBackgroundTask } from "@/lib/background-task";
+
 import { queuePushDelivery } from "@/lib/push";
 import {
   decrementUnread,
   getUnreadCounts,
-  incrementUnread,
 } from "@/lib/unread";
 import { AuthError } from "@/lib/session";
 
@@ -93,25 +94,34 @@ export async function createNotification(input: {
   }
 
   const id = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO notifications (
-         id, user_id, actor_id, kind, title, body, href, post_id, comment_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      id,
-      input.userId,
-      input.actorId ?? null,
-      input.kind,
-      input.title.slice(0, 200),
-      input.body?.slice(0, 500) ?? null,
-      input.href?.slice(0, 400) ?? null,
-      input.postId ?? null,
-      input.commentId ?? null
-    )
-    .run();
-  await incrementUnread(input.userId, "notifications");
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO notifications (
+           id, user_id, actor_id, kind, title, body, href, post_id, comment_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        input.userId,
+        input.actorId ?? null,
+        input.kind,
+        input.title.slice(0, 200),
+        input.body?.slice(0, 500) ?? null,
+        input.href?.slice(0, 400) ?? null,
+        input.postId ?? null,
+        input.commentId ?? null
+      ),
+    db
+      .prepare(
+        `INSERT INTO unread_fanout (user_id, notification_count, updated_at)
+         VALUES (?, 1, datetime('now'))
+         ON CONFLICT(user_id) DO UPDATE SET
+           notification_count = notification_count + 1,
+           updated_at = datetime('now')`
+      )
+      .bind(input.userId),
+  ]);
   queuePushDelivery({
     userId: input.userId,
     payload: {
@@ -232,11 +242,9 @@ export async function markNotificationsRead(input: {
   return { ok: true };
 }
 
-/** Best-effort notify — never fails the primary action. */
+/** Best-effort notify with Worker lifecycle completion tracking. */
 export function notifyQuietly(
   input: Parameters<typeof createNotification>[0]
 ) {
-  void createNotification(input).catch((error) => {
-    console.error("notification failed", error);
-  });
+  runBackgroundTask("notification", () => createNotification(input));
 }

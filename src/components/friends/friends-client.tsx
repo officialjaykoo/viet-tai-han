@@ -16,6 +16,7 @@ import { RelativeTime } from "@/components/time/relative-time";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { apiFetch } from "@/lib/api-client";
+import { getUsernameProfileHref } from "@/lib/profile-url";
 
 type FriendPerson = {
   id: string;
@@ -41,7 +42,7 @@ type FriendResponse = {
 };
 
 function personHref(username: string) {
-  return `/u/${encodeURIComponent(username)}`;
+  return getUsernameProfileHref(username) ?? "/";
 }
 
 function PersonCard({

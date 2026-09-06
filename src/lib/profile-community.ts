@@ -1,3 +1,4 @@
+import { formatUserHandle } from "@/lib/profile-url";
 import { getDb } from "@/lib/db";
 import { profileCommunityName } from "@/lib/profile-community-name";
 import { AuthError } from "@/lib/session";
@@ -34,7 +35,7 @@ export async function ensureProfileCommunity(input: {
   }
 
   const id = crypto.randomUUID();
-  const title = `u/${input.username}`;
+  const title = formatUserHandle(input.username);
   await db
     .prepare(
       `INSERT INTO subreddits (id, name, title, description, created_by, subscriber_count)

@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 import { createPublicId } from "@/lib/id";
 import { notifyQuietly } from "@/lib/notifications";
+import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
 import { AuthError } from "@/lib/session";
 
 export type FriendStatus = "none" | "outgoing" | "incoming" | "friends";
@@ -155,38 +156,93 @@ export async function sendFriendRequest(
   }
 
   const requestId = current?.id ?? createPublicId();
+  let changed = 0;
   if (current) {
-    await db
+    const result = await db
       .prepare(
         `UPDATE user_friendships
          SET requester_id = ?, addressee_id = ?, status = 'pending',
              created_at = datetime('now'), updated_at = datetime('now')
-         WHERE id = ?`
+         WHERE id = ? AND status = 'declined'
+           AND NOT EXISTS (
+             SELECT 1 FROM user_blocks
+             WHERE (blocker_id = ? AND blocked_id = ?)
+                OR (blocker_id = ? AND blocked_id = ?)
+           )`
       )
-      .bind(requesterId, addresseeId, requestId)
+      .bind(
+        requesterId,
+        addresseeId,
+        requestId,
+        requesterId,
+        addresseeId,
+        addresseeId,
+        requesterId
+      )
       .run();
+    changed = Number(result.meta.changes ?? 0);
   } else {
-    await db
+    const result = await db
       .prepare(
-        `INSERT INTO user_friendships (
+        `INSERT OR IGNORE INTO user_friendships (
            id, pair_key, requester_id, addressee_id, status
-         ) VALUES (?, ?, ?, ?, 'pending')`
+         )
+         SELECT ?, ?, ?, ?, 'pending'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM user_blocks
+           WHERE (blocker_id = ? AND blocked_id = ?)
+              OR (blocker_id = ? AND blocked_id = ?)
+         )`
       )
-      .bind(requestId, pairKey, requesterId, addresseeId)
+      .bind(
+        requestId,
+        pairKey,
+        requesterId,
+        addresseeId,
+        requesterId,
+        addresseeId,
+        addresseeId,
+        requesterId
+      )
       .run();
+    changed = Number(result.meta.changes ?? 0);
+  }
+
+  if (changed !== 1) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS ok FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)`
+      )
+      .bind(requesterId, addresseeId, addresseeId, requesterId)
+      .first();
+    if (blocked) throw new AuthError("Can't connect with this user", 403);
+    const latest = await getFriendshipByPair(db, pairKey);
+    if (latest?.status === "accepted") {
+      return { friendStatus: "friends" as const, requestId: null };
+    }
+    if (latest?.status === "pending") {
+      return {
+        friendStatus: (latest.requester_id === requesterId
+          ? "outgoing"
+          : "incoming") as FriendStatus,
+        requestId: latest.id,
+      };
+    }
+    throw new AuthError("Friend request could not be created", 409);
   }
 
   const requester = await db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
     .bind(requesterId)
     .first<{ username: string | null }>();
-  const label = requester?.username ? `u/${requester.username}` : "Someone";
   notifyQuietly({
     userId: addresseeId,
     actorId: requesterId,
     kind: "friend_request",
-    title: `${label} sent you a friend request`,
-    href: "/friends",
+    title: `${formatUserHandle(requester?.username)} sent you a friend request`,
+    href: getUsernameProfileHref(requester?.username) ?? "/friends",
   });
 
   return {
@@ -201,37 +257,85 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     .prepare(
       `SELECT id, requester_id, addressee_id, status, created_at
        FROM user_friendships
-       WHERE id = ? AND addressee_id = ? AND status = 'pending'`
+       WHERE id = ? AND addressee_id = ?`
     )
     .bind(requestId, userId)
     .first<FriendshipRow>();
-  if (!request) {
+  if (!request || request.status === "declined") {
     throw new AuthError("Friend request not found", 404);
   }
+  if (request.status === "accepted") {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS ok FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)`
+      )
+      .bind(request.requester_id, userId, userId, request.requester_id)
+      .first();
+    if (blocked) throw new AuthError("Can't connect with this user", 403);
+    const friend = await getFriendListItem(db, request.requester_id, request.created_at);
+    return { friendStatus: "friends" as const, requestId: null, friend };
+  }
 
-  await db
+  const result = await db
     .prepare(
       `UPDATE user_friendships
        SET status = 'accepted', updated_at = datetime('now')
-       WHERE id = ? AND addressee_id = ? AND status = 'pending'`
+       WHERE id = ? AND addressee_id = ? AND status = 'pending'
+         AND NOT EXISTS (
+           SELECT 1 FROM user_blocks
+           WHERE (blocker_id = requester_id AND blocked_id = addressee_id)
+              OR (blocker_id = addressee_id AND blocked_id = requester_id)
+         )`
     )
     .bind(requestId, userId)
     .run();
+  if (Number(result.meta.changes ?? 0) !== 1) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS ok FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)`
+      )
+      .bind(request.requester_id, userId, userId, request.requester_id)
+      .first();
+    if (blocked) throw new AuthError("Can't connect with this user", 403);
+    const latest = await db
+      .prepare(
+        `SELECT id, requester_id, addressee_id, status, created_at
+         FROM user_friendships WHERE id = ?`
+      )
+      .bind(requestId)
+      .first<FriendshipRow>();
+    if (latest?.status === "accepted") {
+      const friend = await getFriendListItem(
+        db,
+        request.requester_id,
+        latest.created_at
+      );
+      return { friendStatus: "friends" as const, requestId: null, friend };
+    }
+    throw new AuthError("Friend request is no longer available", 409);
+  }
 
   const { promotePendingChatRequestsForPair } = await import("@/lib/messages");
-  await promotePendingChatRequestsForPair(request.requester_id, userId);
+  await promotePendingChatRequestsForPair(
+    request.requester_id,
+    userId,
+    "friendship"
+  );
 
   const actor = await db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
     .bind(userId)
     .first<{ username: string | null }>();
-  const label = actor?.username ? `u/${actor.username}` : "Someone";
   notifyQuietly({
     userId: request.requester_id,
     actorId: userId,
     kind: "friend_accepted",
-    title: `${label} accepted your friend request`,
-    href: "/friends",
+    title: `${formatUserHandle(actor?.username)} accepted your friend request`,
+    href: getUsernameProfileHref(actor?.username) ?? "/friends",
   });
 
   const friend = await getFriendListItem(db, request.requester_id, request.created_at);
@@ -241,6 +345,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     friend,
   };
 }
+
 
 export async function declineFriendRequest(userId: string, requestId: string) {
   const db = await getDb();

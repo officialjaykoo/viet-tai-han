@@ -20,6 +20,7 @@ import {
   acceptFriendRequest,
   sendFriendRequest,
 } from "@/lib/friends";
+import { listNotifications } from "@/lib/notifications";
 import { voteOnPost } from "@/lib/votes";
 
 async function insertUser(
@@ -59,6 +60,10 @@ async function start(senderId: string, recipientUsername: string, body = "Hello"
     openerBody: body,
     fromStatus: "active",
   });
+}
+
+async function flushBackgroundWork() {
+  await new Promise((resolve) => setTimeout(resolve, 25));
 }
 
 describe("DM relationship policy (D1)", () => {
@@ -185,6 +190,15 @@ describe("DM relationship policy (D1)", () => {
     expect(request.requestId).toBeTruthy();
 
     await followUser(pair.recipientId, pair.senderId);
+    await flushBackgroundWork();
+    const followNotifications = await listNotifications(pair.senderId);
+    expect(
+      followNotifications.some(
+        (notification) =>
+          notification.kind === "chat_accepted" &&
+          notification.title.includes("You can now message @")
+      )
+    ).toBe(true);
 
     const accepted = await env.DB
       .prepare(`SELECT status FROM chat_requests WHERE id = ?`)
@@ -254,8 +268,38 @@ describe("DM relationship policy (D1)", () => {
     expect(Number(roomStillActive?.count)).toBe(2);
   });
 
+  it("uses the automatic message for friendship promotion", async () => {
+    const pair = ids("friend-promotion", 0);
+    await Promise.all([
+      insertUser(pair.senderId, pair.senderUsername),
+      insertUser(pair.recipientId, pair.recipientUsername),
+    ]);
+    const request = await start(pair.senderId, pair.recipientUsername);
+    const friendRequest = await sendFriendRequest(
+      pair.senderId,
+      pair.recipientId
+    );
+    await acceptFriendRequest(pair.recipientId, friendRequest.requestId!);
+
+    await flushBackgroundWork();
+    const notifications = await listNotifications(pair.senderId);
+    expect(
+      notifications.some(
+        (notification) =>
+          notification.kind === "chat_accepted" &&
+          notification.title ===
+            `You can now message @${pair.recipientUsername} directly`
+      )
+    ).toBe(true);
+    expect(
+      await env.DB.prepare(
+        `SELECT status FROM chat_requests WHERE id = ?`
+      )
+        .bind(request.requestId)
+        .first<{ status: string }>()
+    ).toEqual({ status: "accepted" });
+  });
   it("hides and rejects pending requests after a block", async () => {
-    const suffix = crypto.randomUUID().slice(0, 8);
     const pair = ids("blocked-request", 0);
     await Promise.all([
       insertUser(pair.senderId, pair.senderUsername),

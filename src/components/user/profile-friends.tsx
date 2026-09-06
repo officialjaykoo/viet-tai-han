@@ -3,9 +3,10 @@ import { UsersRoundIcon } from "lucide-react";
 
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { FriendListItem } from "@/lib/friends";
+import { getUsernameProfileHref } from "@/lib/profile-url";
 
 function personHref(username: string) {
-  return `/u/${encodeURIComponent(username)}`;
+  return getUsernameProfileHref(username) ?? "/";
 }
 
 export function ProfileFriends({

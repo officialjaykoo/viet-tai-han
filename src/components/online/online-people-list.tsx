@@ -8,9 +8,10 @@ import { ProfileActions } from "@/components/user/profile-actions";
 import { apiFetch } from "@/lib/api-client";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { OnlineUser } from "@/lib/presence";
+import { getUsernameProfileHref } from "@/lib/profile-url";
 
 function personHref(username: string) {
-  return `/u/${encodeURIComponent(username)}`;
+  return getUsernameProfileHref(username) ?? "/";
 }
 
 export function OnlinePeopleList({
@@ -97,7 +98,8 @@ export function OnlinePeopleList({
               <ProfileActions
                 username={user.username}
                 initiallyFollowing={user.following}
-                initiallyBlocked={false}
+                initiallyBlockedByMe={false}
+                initiallyBlockedByThem={false}
                 initiallyFriendStatus={user.friendStatus}
                 initiallyFriendRequestId={user.friendRequestId}
                 compact

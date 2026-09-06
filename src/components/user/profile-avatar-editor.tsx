@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import {
   CameraIcon,
@@ -21,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
 import { apiFetch } from "@/lib/api-client";
+import { authClient } from "@/lib/auth-client";
+
 
 const AVATAR_ACCEPT = "image/jpeg,image/png,image/webp";
 
@@ -33,7 +34,6 @@ export function ProfileAvatarEditor({
   image: string | null;
   compact?: boolean;
 }) {
-  const router = useRouter();
   const { t } = useI18n();
   const localizeError = useLocalizedError();
   const [preview, setPreview] = useState(image);
@@ -54,10 +54,10 @@ export function ProfileAvatarEditor({
   }
 
   async function persistImage(next: string | null) {
-    const res = await apiFetch("/api/me/settings", {
+    const res = await apiFetch("/api/me/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ section: "profile", image: next }),
+      body: JSON.stringify({ image: next }),
     });
     const data = (await res.json().catch(() => null)) as {
       error?: string;
@@ -66,7 +66,7 @@ export function ProfileAvatarEditor({
       throw new Error(data?.error ?? "Could not save avatar");
     }
     setPreview(next);
-    router.refresh();
+    await authClient.getSession();
   }
 
   function runImageUpdate(next: string | null) {

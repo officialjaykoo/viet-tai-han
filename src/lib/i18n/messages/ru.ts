@@ -426,6 +426,9 @@ export const ru: Messages = {
     noMessagesYet: "Сообщений пока нет",
     selectChat: "Выберите чат или запросите новую переписку.",
     unreadCount: "Сообщения, непрочитанных: {count}",
+    newMessages: "Новые сообщения ↓",
+    reportConversation: "Пожаловаться на переписку",
+    reportConversationPrompt: "Пожаловаться на эту переписку?",
     report: "Пожаловаться",
     reportReason: "Причина жалобы",
     reportDetails: "Добавьте подробности (необязательно)",
@@ -565,6 +568,10 @@ export const ru: Messages = {
       "Публичное имя пользователя можно менять раз в 90 дней.",
     usernameChangeCooldown:
       "Снова изменить имя пользователя можно после {date}.",
+    usernameChangeWarning:
+      "После изменения имя пользователя нельзя менять ещё 90 дней.",
+    usernameChangeDetails: "Старое: @{oldUsername}\nНовое: @{newUsername}",
+    confirmUsernameChange: "Изменить и сохранить",
     saveUsername: "Сохранить имя пользователя",
     usernameSaved: "Имя пользователя обновлено",
     usernameSaveFailed: "Не удалось сохранить имя пользователя",
@@ -739,6 +746,7 @@ export const ru: Messages = {
     noBusinessVerifications: "Нет ожидающих запросов на проверку бизнеса.",
     chatReports: "Жалобы на личные сообщения",
     noChatReports: "Открытых жалоб на личные сообщения нет.",
+    chatReportContext: "Недавний контекст переписки",
     verificationEvidence: "Подтверждающие материалы",
     approveVerification: "Одобрить проверку",
     rejectVerification: "Отклонить проверку",

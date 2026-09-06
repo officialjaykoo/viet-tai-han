@@ -58,17 +58,22 @@ test.describe("cross-platform smoke", () => {
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain("showNotification");
 
-    const scope = await page.evaluate(async () => {
+    const workerState = await page.evaluate(async () => {
       if (!("serviceWorker" in navigator)) return null;
       const registration = await navigator.serviceWorker.register("/sw.js", {
         scope: "/",
       });
       await registration.update();
+      const readyRegistration = await navigator.serviceWorker.ready;
+      const state = readyRegistration.active?.state ?? null;
       const registeredScope = registration.scope;
       await registration.unregister();
-      return registeredScope;
+      return { scope: registeredScope, state };
     });
-    expect(scope ? new URL(scope).pathname : null).toBe("/");
+    expect(workerState?.scope ? new URL(workerState.scope).pathname : null).toBe(
+      "/"
+    );
+    expect(workerState?.state).toBe("activated");
   });
 
 

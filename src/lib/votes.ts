@@ -1,4 +1,5 @@
 import { getDb, getEnv } from "@/lib/db";
+import { syncAchievementsForEvent } from "@/lib/achievements";
 import {
   getVoterIntegrityContext,
   recordVoteEvent,
@@ -210,12 +211,10 @@ export async function voteOnPost(
 
   await bumpUserActivity(actor.userId, postMeta.subreddit_id, 1);
 
-  void import("@/lib/achievements").then(({ syncAchievementsQuietly }) => {
-    syncAchievementsQuietly(actor.userId);
-    if (postMeta.author_id !== actor.userId) {
-      syncAchievementsQuietly(postMeta.author_id);
-    }
-  });
+  syncAchievementsForEvent(actor.userId, "vote_cast");
+  if (postMeta.author_id !== actor.userId) {
+    syncAchievementsForEvent(postMeta.author_id, "karma_changed");
+  }
 
   try {
     const env = await getEnv();

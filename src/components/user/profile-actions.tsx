@@ -17,6 +17,7 @@ import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
+import { getUsernameProfileHref } from "@/lib/profile-url";
 
 type FriendStatus = "none" | "outgoing" | "incoming" | "friends";
 type Action =
@@ -38,7 +39,8 @@ type FriendResponse = {
 type ProfileActionsProps = {
   username: string;
   initiallyFollowing: boolean;
-  initiallyBlocked: boolean;
+  initiallyBlockedByMe: boolean;
+  initiallyBlockedByThem: boolean;
   initiallyFriendStatus: FriendStatus;
   initiallyFriendRequestId: string | null;
   showMessage?: boolean;
@@ -49,7 +51,8 @@ type ProfileActionsProps = {
 export function ProfileActions({
   username,
   initiallyFollowing,
-  initiallyBlocked,
+  initiallyBlockedByMe,
+  initiallyBlockedByThem,
   initiallyFriendStatus,
   initiallyFriendRequestId,
   showMessage = true,
@@ -60,13 +63,15 @@ export function ProfileActions({
   const { t } = useI18n();
   const localizeError = useLocalizedError();
   const [following, setFollowing] = useState(initiallyFollowing);
-  const [blocked, setBlocked] = useState(initiallyBlocked);
+  const [blockedByMe, setBlockedByMe] = useState(initiallyBlockedByMe);
+  const [blockedByThem] = useState(initiallyBlockedByThem);
   const [friendStatus, setFriendStatus] = useState(initiallyFriendStatus);
   const [friendRequestId, setFriendRequestId] = useState(
     initiallyFriendRequestId
   );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const blockedEitherDirection = blockedByMe || blockedByThem;
   const buttonClass = compact
     ? "min-h-8 gap-1 px-2 text-xs"
     : "min-h-11 gap-1.5 sm:min-h-8";
@@ -91,7 +96,11 @@ export function ProfileActions({
         body: JSON.stringify(body),
       });
       if (res.status === 401) {
-        router.push(`/login?next=${encodeURIComponent(`/u/${username}`)}`);
+        router.push(
+          `/login?next=${encodeURIComponent(
+            getUsernameProfileHref(username) ?? "/"
+          )}`
+        );
         return;
       }
       const payload = (await res.json().catch(() => null)) as
@@ -105,12 +114,12 @@ export function ProfileActions({
       if (action === "follow") setFollowing(true);
       if (action === "unfollow") setFollowing(false);
       if (action === "block") {
-        setBlocked(true);
+        setBlockedByMe(true);
         setFollowing(false);
         setFriendStatus("none");
         setFriendRequestId(null);
       }
-      if (action === "unblock") setBlocked(false);
+      if (action === "unblock") setBlockedByMe(false);
       if (action === "friend_request") {
         setFriendStatus(payload?.friendStatus ?? "outgoing");
         setFriendRequestId(payload?.requestId ?? null);
@@ -133,7 +142,7 @@ export function ProfileActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {showMessage && !blocked ? (
+      {showMessage && !blockedEitherDirection ? (
         <Link
           href={`/messages?to=${encodeURIComponent(username)}`}
           className={cn(
@@ -145,7 +154,7 @@ export function ProfileActions({
           {t("profile.message")}
         </Link>
       ) : null}
-      {!blocked ? (
+      {!blockedEitherDirection ? (
         <>
           {friendStatus === "incoming" ? (
             <>
@@ -210,7 +219,7 @@ export function ProfileActions({
           )}
         </>
       ) : null}
-      {!blocked ? (
+      {!blockedEitherDirection ? (
         <Button
           type="button"
           size="sm"
@@ -224,17 +233,19 @@ export function ProfileActions({
           {following ? t("profile.unfollow") : t("profile.follow")}
         </Button>
       ) : null}
-      {showBlock ? (
+      {showBlock && !blockedByThem ? (
         <Button
           type="button"
           size="sm"
-          variant={blocked ? "secondary" : "outline"}
+          variant={blockedByMe ? "secondary" : "outline"}
           className={buttonClass}
           disabled={pending}
-          onClick={() => run(blocked ? "unblock" : "block")}
+          onClick={() => run(blockedByMe ? "unblock" : "block")}
         >
-          {blocked ? null : <UserRoundXIcon className="size-4" aria-hidden />}
-          {blocked ? t("settings.unblock") : t("profile.block")}
+          {blockedByMe ? null : (
+            <UserRoundXIcon className="size-4" aria-hidden />
+          )}
+          {blockedByMe ? t("settings.unblock") : t("profile.block")}
         </Button>
       ) : null}
       {error ? (

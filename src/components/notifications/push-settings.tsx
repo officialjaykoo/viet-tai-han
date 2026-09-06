@@ -17,6 +17,42 @@ function decodeVapidKey(value: string): Uint8Array {
 }
 type BrowserPushState = "unknown" | "supported" | "unsupported" | "denied";
 
+class PushServiceWorkerError extends Error {
+  constructor() {
+    super("Service worker failed to activate");
+    this.name = "PushServiceWorkerError";
+  }
+}
+
+async function waitForActiveServiceWorker(
+  registration: ServiceWorkerRegistration
+): Promise<ServiceWorkerRegistration> {
+  const readyRegistration = navigator.serviceWorker.ready.then(
+    (currentRegistration) => {
+      if (!currentRegistration.active) throw new PushServiceWorkerError();
+      return currentRegistration;
+    }
+  );
+  if (registration.active) return readyRegistration;
+
+  const worker = registration.installing ?? registration.waiting;
+  if (!worker || worker.state === "redundant") {
+    throw new PushServiceWorkerError();
+  }
+
+  const { promise: activationFailure, reject } =
+    Promise.withResolvers<never>();
+  const onStateChange = () => {
+    if (worker.state === "redundant") reject(new PushServiceWorkerError());
+  };
+  worker.addEventListener("statechange", onStateChange);
+  onStateChange();
+
+  return Promise.race([readyRegistration, activationFailure]).finally(() => {
+    worker.removeEventListener("statechange", onStateChange);
+  });
+}
+
 function detectBrowserPushState(): BrowserPushState {
   if (
     typeof window === "undefined" ||
@@ -84,13 +120,20 @@ export function PushSettings({
         setError(t("notifications.pushPermissionDenied"));
         return;
       }
-      const registration = await navigator.serviceWorker.register("/sw.js", {
-        scope: "/",
-      });
-      const existing = await registration.pushManager.getSubscription();
+      let registration: ServiceWorkerRegistration;
+      try {
+        registration = await navigator.serviceWorker.register("/sw.js", {
+          scope: "/",
+        });
+      } catch {
+        throw new PushServiceWorkerError();
+      }
+      const activeRegistration =
+        await waitForActiveServiceWorker(registration);
+      const existing = await activeRegistration.pushManager.getSubscription();
       const subscription =
         existing ??
-        (await registration.pushManager.subscribe({
+        (await activeRegistration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: decodeVapidKey(publicKey) as BufferSource,
         }));
@@ -106,9 +149,11 @@ export function PushSettings({
       setSubscribed(true);
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : t("notifications.pushFailed")
+        cause instanceof PushServiceWorkerError || cause instanceof DOMException
+          ? t("notifications.pushFailed")
+          : cause instanceof Error
+            ? cause.message
+            : t("notifications.pushFailed")
       );
     } finally {
       setBusy(false);

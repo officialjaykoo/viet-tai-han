@@ -426,6 +426,9 @@ export const vi: Messages = {
     noMessagesYet: "Chưa có tin nhắn",
     selectChat: "Chọn một cuộc trò chuyện hoặc gửi yêu cầu mới.",
     unreadCount: "Tin nhắn, {count} chưa đọc",
+    newMessages: "Tin nhắn mới ↓",
+    reportConversation: "Báo cáo cuộc trò chuyện",
+    reportConversationPrompt: "Bạn có muốn báo cáo cuộc trò chuyện này không?",
     report: "Báo cáo",
     reportReason: "Lý do báo cáo",
     reportDetails: "Thêm chi tiết (không bắt buộc)",
@@ -564,6 +567,10 @@ export const vi: Messages = {
       "Tên người dùng công khai có thể đổi một lần mỗi 90 ngày.",
     usernameChangeCooldown:
       "Bạn có thể đổi tên người dùng lần nữa sau {date}.",
+    usernameChangeWarning:
+      "Sau khi đổi, bạn không thể đổi tên người dùng trong 90 ngày.",
+    usernameChangeDetails: "Tên cũ: @{oldUsername}\nTên mới: @{newUsername}",
+    confirmUsernameChange: "Đổi và lưu",
     saveUsername: "Lưu tên người dùng",
     usernameSaved: "Đã cập nhật tên người dùng",
     usernameSaveFailed: "Không thể lưu tên người dùng",
@@ -734,6 +741,7 @@ export const vi: Messages = {
     listingReports: "Báo cáo tin đăng",
     noListingReports: "Không có báo cáo tin đăng đang chờ.",
     chatReports: "Báo cáo tin nhắn",
+    chatReportContext: "Ngữ cảnh cuộc trò chuyện gần đây",
     noChatReports: "Không có báo cáo tin nhắn đang chờ.",
     businessVerification: "Xác minh doanh nghiệp",
     noBusinessVerifications: "Không có yêu cầu xác minh doanh nghiệp đang chờ.",

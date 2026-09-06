@@ -1,6 +1,9 @@
 import { getDb } from "@/lib/db";
 import { listAdCampaigns } from "@/lib/ads";
-import { listChatMessageReports } from "@/lib/dm-moderation";
+import {
+  listChatMessageReports,
+  listChatRoomReports,
+} from "@/lib/dm-moderation";
 import { listBurstPosts } from "@/lib/score-integrity";
 import { listBusinessVerificationQueue } from "@/lib/businesses";
 import { listListingReportQueue } from "@/lib/marketplace";
@@ -247,7 +250,11 @@ export async function getAdminOverview() {
          (SELECT COUNT(*) FROM businesses WHERE status != 'removed') AS businesses,
          (SELECT COUNT(*) FROM business_verification_requests WHERE status = 'pending') AS pending_business_verifications,
          (SELECT COUNT(*) FROM listing_reports WHERE status = 'open') AS open_listing_reports,
-         (SELECT COUNT(*) FROM chat_message_reports WHERE status = 'open') AS open_chat_reports,
+         (
+           SELECT COUNT(*) FROM chat_message_reports WHERE status = 'open'
+         ) + (
+           SELECT COUNT(*) FROM chat_room_reports WHERE status = 'open'
+         ) AS open_chat_reports,
          (SELECT COUNT(*) FROM "user" WHERE status = 'banned') AS banned,
          (SELECT COUNT(*) FROM "user" WHERE status = 'shadowbanned') AS shadowbanned,
          (SELECT COUNT(*) FROM banned_words) AS banned_words`
@@ -304,13 +311,15 @@ export async function getAdminOverview() {
     adCampaigns,
     listingReports,
     businessVerifications,
-    chatReports,
+    chatMessageReports,
+    chatRoomReports,
   ] = await Promise.all([
     listBurstPosts(15),
     listAdCampaigns(),
     listListingReportQueue("open"),
     listBusinessVerificationQueue("pending"),
     listChatMessageReports("open"),
+    listChatRoomReports("open"),
   ]);
 
   return {
@@ -335,7 +344,9 @@ export async function getAdminOverview() {
     burstPosts,
     businessVerifications,
     adCampaigns,
-    chatReports,
+    chatReports: [...chatRoomReports, ...chatMessageReports].sort(
+      (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)
+    ),
     listingReports,
   };
 }

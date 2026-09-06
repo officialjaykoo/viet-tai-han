@@ -62,6 +62,7 @@ type ListingReport = {
   createdAt: string;
 };
 type ChatMessageReport = {
+  reportType: "message";
   id: string;
   messageId: string;
   roomId: string;
@@ -76,6 +77,27 @@ type ChatMessageReport = {
   status: string;
   createdAt: string;
 };
+type ChatRoomReport = {
+  reportType: "conversation";
+  id: string;
+  roomId: string;
+  reporterUsername: string | null;
+  reportedUsername: string | null;
+  reason: string;
+  details: string | null;
+  contextUntil: string;
+  status: string;
+  createdAt: string;
+  context: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    isShadowHidden: boolean;
+    isModerationHidden: boolean;
+    senderUsername: string | null;
+  }>;
+};
+type ChatReport = ChatMessageReport | ChatRoomReport;
 
 type BusinessVerification = {
   id: string;
@@ -99,7 +121,7 @@ export function AdminPanel({
     settings: Setting[];
     recentActions: Array<Record<string, unknown>>;
     adCampaigns?: AdCampaign[];
-    chatReports?: ChatMessageReport[];
+    chatReports?: ChatReport[];
     burstPosts?: BurstPost[];
     businessVerifications?: BusinessVerification[];
     listingReports?: ListingReport[];
@@ -474,69 +496,134 @@ export function AdminPanel({
                 key={report.id}
                 className="space-y-3 rounded-xl border border-border/60 p-3 text-sm"
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-medium">
-                    @{report.senderUsername ?? "unknown"} → @
-                    {report.peerUsername ?? "unknown"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(report.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  @{report.reporterUsername ?? "unknown"} ·{" "}
-                  {t("admin.reportReason")}:{" "}
-                  {chatReportReasonLabels[report.reason] ?? report.reason} ·{" "}
-                  {t("admin.reportDetails")}: {report.details || "—"}
-                </p>
-                <blockquote className="whitespace-pre-wrap rounded-lg bg-muted/40 p-2">
-                  {report.messageBody}
-                </blockquote>
-                <div className="flex flex-wrap gap-1">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() =>
-                      run("review_chat_message_report", {
-                        reportId: report.id,
-                        reportStatus: "reviewed",
-                      })
-                    }
-                  >
-                    {t("admin.reviewReport")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() =>
-                      run("review_chat_message_report", {
-                        reportId: report.id,
-                        reportStatus: "dismissed",
-                      })
-                    }
-                  >
-                    {t("admin.dismissReport")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    disabled={pending}
-                    onClick={() =>
-                      run("review_chat_message_report", {
-                        reportId: report.id,
-                        reportStatus: "reviewed",
-                        removeMessage: true,
-                      })
-                    }
-                  >
-                    {t("admin.removeMessage")}
-                  </Button>
-                </div>
+                {report.reportType === "conversation" ? (
+                  <>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="font-medium">
+                        {t("messages.reportConversation")}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(report.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      @{report.reporterUsername ?? "unknown"} → @
+                      {report.reportedUsername ?? "unknown"} ·{" "}
+                      {t("admin.reportReason")}:{" "}
+                      {chatReportReasonLabels[report.reason] ?? report.reason} ·{" "}
+                      {t("admin.reportDetails")}: {report.details || "—"}
+                    </p>
+                    <div className="space-y-1 rounded-lg bg-muted/40 p-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {t("admin.chatReportContext")}
+                      </p>
+                      {report.context.map((message) => (
+                        <p key={message.id} className="whitespace-pre-wrap">
+                          <span className="font-medium">
+                            @{message.senderUsername ?? "unknown"}:
+                          </span>{" "}
+                          {message.body}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() =>
+                          run("review_chat_room_report", {
+                            reportId: report.id,
+                            reportStatus: "reviewed",
+                          })
+                        }
+                      >
+                        {t("admin.reviewReport")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() =>
+                          run("review_chat_room_report", {
+                            reportId: report.id,
+                            reportStatus: "dismissed",
+                          })
+                        }
+                      >
+                        {t("admin.dismissReport")}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="font-medium">
+                        @{report.senderUsername ?? "unknown"} → @
+                        {report.peerUsername ?? "unknown"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(report.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      @{report.reporterUsername ?? "unknown"} ·{" "}
+                      {t("admin.reportReason")}:{" "}
+                      {chatReportReasonLabels[report.reason] ?? report.reason} ·{" "}
+                      {t("admin.reportDetails")}: {report.details || "—"}
+                    </p>
+                    <blockquote className="whitespace-pre-wrap rounded-lg bg-muted/40 p-2">
+                      {report.messageBody}
+                    </blockquote>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() =>
+                          run("review_chat_message_report", {
+                            reportId: report.id,
+                            reportStatus: "reviewed",
+                          })
+                        }
+                      >
+                        {t("admin.reviewReport")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() =>
+                          run("review_chat_message_report", {
+                            reportId: report.id,
+                            reportStatus: "dismissed",
+                          })
+                        }
+                      >
+                        {t("admin.dismissReport")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={pending}
+                        onClick={() =>
+                          run("review_chat_message_report", {
+                            reportId: report.id,
+                            reportStatus: "reviewed",
+                            removeMessage: true,
+                          })
+                        }
+                      >
+                        {t("admin.removeMessage")}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </li>
             ))}
           </ul>
