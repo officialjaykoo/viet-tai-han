@@ -8,7 +8,7 @@ import { getEnv } from "@/lib/db";
  * We layer a short isolate-local Map in front for sub-ms hits within a Worker.
  *
  * Use for: site_settings, banned_words, ad placement picks, public feed snapshots.
- * Do NOT use for: vote tallies, balances, anything needing strong consistency.
+ * Do NOT use for: like tallies, balances, anything needing strong consistency.
  */
 
 type MemoryEntry = {

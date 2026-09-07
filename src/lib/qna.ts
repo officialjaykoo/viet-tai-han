@@ -2,7 +2,11 @@ import { getDb } from "@/lib/db";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import { enforceCreateRateLimit } from "@/lib/rate-limit";
+import { normalizeRequestId } from "@/lib/idempotency";
 import { AuthError } from "@/lib/session";
+function isUniqueConstraint(error: unknown): boolean {
+  return error instanceof Error && /unique|constraint/i.test(error.message);
+}
 
 export type QuestionAuthor = {
   id: string;
@@ -219,13 +223,13 @@ export async function getQuestionDetail(
     answers: (results ?? []).map((row) => mapAnswer(row, viewerUserId)),
   };
 }
-
 export async function createQuestion(input: {
   userId: string;
   userStatus?: string | null;
   subredditName: string;
   title: string;
   body: string;
+  requestId?: string | null;
 }) {
   const title = input.title.trim();
   const body = input.body.trim();
@@ -235,6 +239,15 @@ export async function createQuestion(input: {
   if (body.length < 10 || body.length > 10_000) {
     throw new AuthError("Question must be 10–10000 characters", 400);
   }
+  const requestId = normalizeRequestId(input.requestId);
+  const db = await getDb();
+  if (requestId) {
+    const existing = await db
+      .prepare(`SELECT id FROM questions WHERE author_id = ? AND request_id = ?`)
+      .bind(input.userId, requestId)
+      .first<{ id: string }>();
+    if (existing) return { id: existing.id };
+  }
 
   await enforceCreateRateLimit(input.userId, "question");
 
@@ -243,7 +256,6 @@ export async function createQuestion(input: {
     throw new AuthError("This content isn't allowed", 400);
   }
 
-  const db = await getDb();
   const community = await db
     .prepare(
       `SELECT id FROM subreddits
@@ -255,14 +267,27 @@ export async function createQuestion(input: {
 
   const id = createPublicId();
   const shadow = moderation.shadow || input.userStatus === "shadowbanned" ? 1 : 0;
-  await db
-    .prepare(
-      `INSERT INTO questions (
-         id, subreddit_id, author_id, title, body, is_shadow_hidden
-       ) VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(id, community.id, input.userId, title, body, shadow)
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO questions (
+           id, subreddit_id, author_id, title, body, is_shadow_hidden, request_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(id, community.id, input.userId, title, body, shadow, requestId)
+      .run();
+  } catch (error) {
+    if (isUniqueConstraint(error) && requestId) {
+      const existing = await db
+        .prepare(
+          `SELECT id FROM questions WHERE author_id = ? AND request_id = ?`
+        )
+        .bind(input.userId, requestId)
+        .first<{ id: string }>();
+      if (existing) return { id: existing.id };
+    }
+    throw error;
+  }
 
   return { id };
 }
@@ -272,15 +297,26 @@ export async function createAnswer(input: {
   userStatus?: string | null;
   questionId: string;
   body: string;
+  requestId?: string | null;
 }) {
   const body = input.body.trim();
   if (body.length < 2 || body.length > 10_000) {
     throw new AuthError("Answer must be 2–10000 characters", 400);
   }
+  const requestId = normalizeRequestId(input.requestId);
+  const db = await getDb();
+  if (requestId) {
+    const existing = await db
+      .prepare(
+        `SELECT id FROM answers WHERE author_id = ? AND request_id = ?`
+      )
+      .bind(input.userId, requestId)
+      .first<{ id: string }>();
+    if (existing) return { id: existing.id };
+  }
 
   await enforceCreateRateLimit(input.userId, "answer");
 
-  const db = await getDb();
   const question = await db
     .prepare(
       `SELECT id, is_locked, is_removed, is_shadow_hidden
@@ -306,26 +342,39 @@ export async function createAnswer(input: {
 
   const id = createPublicId();
   const shadow = moderation.shadow || input.userStatus === "shadowbanned" ? 1 : 0;
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO answers (
-           id, question_id, author_id, body, is_shadow_hidden
-         ) VALUES (?, ?, ?, ?, ?)`
-      )
-      .bind(id, input.questionId, input.userId, body, shadow),
-    ...(shadow
-      ? []
-      : [
-          db
-            .prepare(
-              `UPDATE questions
-               SET answer_count = answer_count + 1, updated_at = datetime('now')
-               WHERE id = ?`
-            )
-            .bind(input.questionId),
-        ]),
-  ]);
+  try {
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO answers (
+             id, question_id, author_id, body, is_shadow_hidden, request_id
+           ) VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .bind(id, input.questionId, input.userId, body, shadow, requestId),
+      ...(shadow
+        ? []
+        : [
+            db
+              .prepare(
+                `UPDATE questions
+                 SET answer_count = answer_count + 1, updated_at = datetime('now')
+                 WHERE id = ?`
+              )
+              .bind(input.questionId),
+          ]),
+    ]);
+  } catch (error) {
+    if (isUniqueConstraint(error) && requestId) {
+      const existing = await db
+        .prepare(
+          `SELECT id FROM answers WHERE author_id = ? AND request_id = ?`
+        )
+        .bind(input.userId, requestId)
+        .first<{ id: string }>();
+      if (existing) return { id: existing.id };
+    }
+    throw error;
+  }
 
   return { id };
 }

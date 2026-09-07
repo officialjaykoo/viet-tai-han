@@ -14,7 +14,7 @@ export default function DeploymentPage() {
       <DocHeader
         eyebrow="Operations"
         title="Deployment"
-        description="VTH deploys as a Cloudflare Worker with application bindings for D1, R2, Durable Objects, AI, Vectorize, and related services."
+        description="VTH deploys as a Cloudflare Worker with application bindings for D1, R2, Durable Objects, Workers AI, and related services."
       />
 
       <Section title="Build and deploy">
@@ -23,12 +23,19 @@ export default function DeploymentPage() {
       </Section>
 
       <Section title="Database migrations">
-        <p>Apply required D1 migrations before deploying application code that depends on the new schema.</p>
-        <Code>{`npx wrangler d1 migrations list vth-db --remote\nnpx wrangler d1 migrations apply vth-db --remote`}</Code>
+        <p>
+          Apply required D1 migrations before deploying application code that depends on the new schema. For production, create and retain a backup, inspect the pending migration list, and apply migrations as an operator-run step:
+        </p>
+        <Code>{`npx wrangler d1 export vth-db --remote --output="backup-YYYYMMDD-HHmm.sql"
+npx wrangler d1 migrations list vth-db --remote
+npx wrangler d1 migrations apply vth-db --remote`}</Code>
+        <Note>
+          This application does not run production D1 migrations automatically. Do not run <code className="font-mono text-foreground">seed.sql</code> against production.
+        </Note>
       </Section>
 
       <Section title="Bindings">
-        <p>The Worker configuration defines the application database, media bucket, Durable Objects, AI, Vectorize, rate limit bindings, environment variables, and custom domains.</p>
+        <p>The Worker configuration defines the application database, media bucket, Durable Objects, Workers AI, rate limit bindings, environment variables, and custom domains.</p>
       </Section>
 
       <Section title="Environments">

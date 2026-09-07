@@ -25,6 +25,7 @@ export function CommentComposer({ postId }: { postId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
+  const requestIdRef = useRef<string | null>(null);
   const bot = useBotGuard();
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
@@ -36,6 +37,8 @@ export function CommentComposer({ postId }: { postId: string }) {
     setError(null);
 
     startTransition(async () => {
+      const requestId = requestIdRef.current ?? crypto.randomUUID();
+      requestIdRef.current = requestId;
       const check = await passBotCheck(bot, turnstileToken);
       if (!check.ok) {
         setError(localizeError(check.error, t("common.error")));
@@ -45,7 +48,7 @@ export function CommentComposer({ postId }: { postId: string }) {
       const res = await apiFetch(`/api/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bot.attachToPayload({ body })),
+        body: JSON.stringify(bot.attachToPayload({ body, requestId })),
       });
       if (res.status === 401) {
         router.push(`/login?next=${encodeURIComponent(`/post/${postId}`)}`);
@@ -59,6 +62,7 @@ export function CommentComposer({ postId }: { postId: string }) {
         return;
       }
       setBody("");
+      requestIdRef.current = null;
       turnstileReset.current?.reset();
       router.refresh();
     });

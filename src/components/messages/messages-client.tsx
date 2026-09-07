@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -40,17 +40,31 @@ type RequestItem = {
 
 type ChatMessage = {
   id: string;
+  clientMessageId: string | null;
   body: string;
   createdAt: string;
   isMine: boolean;
   senderUsername: string | null;
 };
 
-type RealtimeMessageEvent = {
-  type: "message";
-  roomId: string;
-  message: ChatMessage;
+type ChatHistoryPage = {
+  messages: ChatMessage[];
+  hasMoreBefore: boolean;
+  nextBeforeCursor: string | null;
+  hasMoreAfter: boolean;
+  nextAfterCursor: string | null;
 };
+
+type RealtimeMessageEvent =
+  | {
+      type: "ready";
+      roomId: string;
+    }
+  | {
+      type: "message";
+      roomId: string;
+      message: ChatMessage;
+    };
 
 function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
   if (!value || typeof value !== "object") return null;
@@ -59,9 +73,12 @@ function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
     roomId?: unknown;
     message?: unknown;
   };
+  if (typeof event.roomId !== "string") return null;
+  if (event.type === "ready") {
+    return { type: "ready", roomId: event.roomId };
+  }
   if (
     event.type !== "message" ||
-    typeof event.roomId !== "string" ||
     !event.message ||
     typeof event.message !== "object"
   ) {
@@ -74,6 +91,9 @@ function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
     typeof message.body !== "string" ||
     typeof message.createdAt !== "string" ||
     typeof message.isMine !== "boolean" ||
+    (message.clientMessageId !== undefined &&
+      message.clientMessageId !== null &&
+      typeof message.clientMessageId !== "string") ||
     (typeof message.senderUsername !== "string" &&
       message.senderUsername !== null)
   ) {
@@ -85,12 +105,21 @@ function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
     roomId: event.roomId,
     message: {
       id: message.id,
+      clientMessageId: message.clientMessageId ?? null,
       body: message.body,
       createdAt: message.createdAt,
       isMine: message.isMine,
       senderUsername: message.senderUsername,
     },
   };
+}
+
+function compareChatMessages(a: ChatMessage, b: ChatMessage): number {
+  if (a.createdAt < b.createdAt) return -1;
+  if (a.createdAt > b.createdAt) return 1;
+  if (a.id < b.id) return -1;
+  if (a.id > b.id) return 1;
+  return 0;
 }
 
 function mergeMessages(
@@ -100,9 +129,7 @@ function mergeMessages(
   const byId = new Map<string, ChatMessage>();
   for (const message of current) byId.set(message.id, message);
   for (const message of incoming) byId.set(message.id, message);
-  return [...byId.values()].sort(
-    (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)
-  );
+  return [...byId.values()].sort(compareChatMessages);
 }
 type ChatReportReason =
   | "spam"
@@ -143,6 +170,18 @@ export function MessagesClient() {
   const [reportDetails, setReportDetails] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
+  const composeClientMessageIdRef = useRef<string | null>(null);
+  const replyClientMessageIdRef = useRef<string | null>(null);
+  const beforeCursorRef = useRef<string | null>(null);
+  const afterCursorRef = useRef<string | null>(null);
+  const loadingOlderRef = useRef(false);
+  const preservingPrependRef = useRef(false);
+  const catchUpInFlightRef = useRef(false);
+  const socketReadyRoomRef = useRef<string | null>(null);
+  const activeRoomRef = useRef<string | null>(selectedRoom);
+  const [hasMoreBefore, setHasMoreBefore] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
   const sendingReplyRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
@@ -153,7 +192,7 @@ export function MessagesClient() {
     if (toParam) setComposeUser(toParam);
   }, [toParam]);
 
-  function loadInbox() {
+  const loadInbox = useCallback(() => {
     startTransition(async () => {
       const res = await apiFetch("/api/messages");
       if (res.status === 401) {
@@ -172,55 +211,182 @@ export function MessagesClient() {
       setRequests(data.requests);
       setLoaded(true);
     });
-  }
+  }, [localizeError, router]);
 
-  const loadRoom = useCallback(
+  const catchUpRoom = useCallback(
     async (roomId: string) => {
-      const res = await apiFetch(`/api/messages/${roomId}`);
+      if (
+        activeRoomRef.current !== roomId ||
+        !afterCursorRef.current ||
+        catchUpInFlightRef.current
+      ) {
+        return;
+      }
+      catchUpInFlightRef.current = true;
+      try {
+        let cursor = afterCursorRef.current;
+        while (cursor && activeRoomRef.current === roomId) {
+          const res = await apiFetch(
+            `/api/messages/${roomId}?after=${encodeURIComponent(cursor)}`
+          );
+          if (!res.ok) return;
+          const page = (await res.json()) as ChatHistoryPage;
+          if (page.messages.length === 0) return;
+          setMessages((current) => mergeMessages(current, page.messages));
+          if (!page.nextAfterCursor) return;
+          cursor = page.nextAfterCursor;
+          afterCursorRef.current = cursor;
+          if (!page.hasMoreAfter) break;
+        }
+        if (activeRoomRef.current === roomId) {
+          loadInbox();
+        }
+      } catch {
+        // D1 catch-up is retried by the next reconnect/ready cycle.
+      } finally {
+        catchUpInFlightRef.current = false;
+      }
+    },
+    [loadInbox]
+  );
+  const loadOlderMessages = useCallback(async () => {
+    const roomId = activeRoomRef.current;
+    const cursor = beforeCursorRef.current;
+    const element = messageListRef.current;
+    if (!roomId || !cursor || !element || loadingOlderRef.current) return;
+
+    loadingOlderRef.current = true;
+    const previousHeight = element.scrollHeight;
+    const previousTop = element.scrollTop;
+    try {
+      const res = await apiFetch(
+        `/api/messages/${roomId}?before=${encodeURIComponent(cursor)}`
+      );
       if (!res.ok) {
         setError(localizeError("Couldn't load chat"));
         return;
       }
-      const data = (await res.json()) as { messages: ChatMessage[] };
-      setMessages((current) => mergeMessages(current, data.messages));
-      setRooms((current) =>
-        current.map((room) =>
-          room.id === roomId ? { ...room, unreadCount: 0 } : room
-        )
-      );
-      announceUnreadChanged();
+      const page = (await res.json()) as ChatHistoryPage;
+      if (activeRoomRef.current !== roomId) return;
+      beforeCursorRef.current = page.nextBeforeCursor;
+      setHasMoreBefore(page.hasMoreBefore);
+      preservingPrependRef.current = true;
+      setMessages((current) => mergeMessages(page.messages, current));
+      window.requestAnimationFrame(() => {
+        const currentElement = messageListRef.current;
+        if (!currentElement || activeRoomRef.current !== roomId) return;
+        currentElement.scrollTop =
+          previousTop + currentElement.scrollHeight - previousHeight;
+      });
+    } catch {
+      if (activeRoomRef.current === roomId) {
+        setError(localizeError("Couldn't load chat"));
+      }
+    } finally {
+      loadingOlderRef.current = false;
+    }
+  }, [localizeError]);
+
+  const loadRoom = useCallback(
+    async (roomId: string) => {
+      try {
+        const res = await apiFetch(`/api/messages/${roomId}`);
+        if (!res.ok) {
+          setError(localizeError("Couldn't load chat"));
+          return;
+        }
+        const page = (await res.json()) as ChatHistoryPage;
+        if (activeRoomRef.current !== roomId) return;
+        beforeCursorRef.current = page.nextBeforeCursor;
+        afterCursorRef.current = page.nextAfterCursor;
+        setHasMoreBefore(page.hasMoreBefore);
+        setMessages((current) => mergeMessages(current, page.messages));
+        if (socketReadyRoomRef.current === roomId) {
+          void catchUpRoom(roomId);
+        }
+      } catch {
+        if (activeRoomRef.current === roomId) {
+          setError(localizeError("Couldn't load chat"));
+        }
+      }
     },
-    [localizeError]
+    [catchUpRoom, localizeError]
   );
 
   useEffect(() => {
     loadInbox();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadInbox]);
 
   useEffect(() => {
+    activeRoomRef.current = selectedRoom;
+    isNearBottomRef.current = true;
     // A room switch must not display the previous room while the new room loads.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages([]);
-    setReportOpen(false);
-    shouldStickToBottomRef.current = true;
+    replyClientMessageIdRef.current = null;
+    beforeCursorRef.current = null;
+    afterCursorRef.current = null;
+    socketReadyRoomRef.current = null;
+    preservingPrependRef.current = false;
+    setHasMoreBefore(false);
     setShowNewMessages(false);
+    setIsNearBottom(true);
+    shouldStickToBottomRef.current = true;
     if (!selectedRoom) return;
 
-    startTransition(() => {
-      void loadRoom(selectedRoom);
-    });
+    void loadRoom(selectedRoom);
   }, [selectedRoom, loadRoom]);
 
   useEffect(() => {
     const messageList = messageListRef.current;
     if (!selectedRoom || !messageList || messages.length === 0) return;
+    if (preservingPrependRef.current) {
+      preservingPrependRef.current = false;
+      return;
+    }
     if (shouldStickToBottomRef.current) {
       messageList.scrollTop = messageList.scrollHeight;
     } else {
       setShowNewMessages(true);
     }
   }, [messages.length, selectedRoom]);
+
+  const markChatRead = useCallback(
+    async (roomId: string, messageId: string) => {
+      try {
+        const res = await apiFetch(`/api/messages/${roomId}/read`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId }),
+        });
+        if (!res.ok) return;
+        const result = (await res.json()) as { updated?: boolean };
+        if (result.updated) {
+          loadInbox();
+          announceUnreadChanged();
+        }
+      } catch {
+        // The next explicit read or inbox refresh reconciles the boundary.
+      }
+    },
+    [loadInbox]
+  );
+
+  useEffect(() => {
+    if (
+      !selectedRoom ||
+      !isNearBottom ||
+      document.visibilityState !== "visible" ||
+      messages.length === 0
+    ) {
+      return;
+    }
+    const lastMessage = messages[messages.length - 1];
+    const timer = window.setTimeout(() => {
+      void markChatRead(selectedRoom, lastMessage.id);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [isNearBottom, messages, markChatRead, selectedRoom]);
 
   useEffect(() => {
     if (!selectedRoom) return;
@@ -232,21 +398,33 @@ export function MessagesClient() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const endpoint = `${protocol}//${window.location.host}/api/messages/realtime?room=${encodeURIComponent(selectedRoom)}`;
 
+    const canConnect = () =>
+      active &&
+      document.visibilityState === "visible" &&
+      navigator.onLine !== false;
+
     const scheduleReconnect = () => {
-      if (!active || reconnectTimer !== null) return;
-      const delay = Math.min(
+      if (!canConnect() || reconnectTimer !== null) return;
+      const baseDelay = Math.min(
         1_000 * 2 ** Math.min(reconnectAttempt, 4),
         10_000
       );
+      const jitter = Math.floor(Math.random() * Math.max(250, baseDelay / 4));
       reconnectAttempt += 1;
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null;
         connect();
-      }, delay);
+      }, baseDelay + jitter);
     };
 
     const connect = () => {
-      if (!active) return;
+      if (
+        !canConnect() ||
+        socket?.readyState === WebSocket.OPEN ||
+        socket?.readyState === WebSocket.CONNECTING
+      ) {
+        return;
+      }
       try {
         socket = new WebSocket(endpoint);
       } catch {
@@ -255,7 +433,7 @@ export function MessagesClient() {
       }
 
       socket.onopen = () => {
-        reconnectAttempt = 0;
+        // Reset only after the DO sends ready; an open-but-stalled socket must back off.
       };
       socket.onmessage = (event) => {
         if (!active || typeof event.data !== "string") return;
@@ -267,12 +445,14 @@ export function MessagesClient() {
         }
         const live = parseRealtimeMessage(payload);
         if (!live || live.roomId !== selectedRoom) return;
+        if (live.type === "ready") {
+          socketReadyRoomRef.current = selectedRoom;
+          reconnectAttempt = 0;
+          void catchUpRoom(selectedRoom);
+          return;
+        }
 
-        setMessages((current) =>
-          current.some((message) => message.id === live.message.id)
-            ? current
-            : mergeMessages(current, [live.message])
-        );
+        setMessages((current) => mergeMessages(current, [live.message]));
         setRooms((current) =>
           current.map((room) =>
             room.id === live.roomId
@@ -280,43 +460,81 @@ export function MessagesClient() {
                   ...room,
                   lastBody: live.message.body,
                   lastMessageAt: live.message.createdAt,
-                  unreadCount: 0,
+                  unreadCount:
+                    live.message.isMine || isNearBottomRef.current
+                      ? room.unreadCount
+                      : room.unreadCount + 1,
                 }
               : room
           )
         );
-        // This event-driven read marks the new message as seen; it is not polling.
-        void loadRoom(selectedRoom);
       };
       socket.onerror = () => {
         socket?.close();
       };
       socket.onclose = () => {
+        socket = null;
+        if (socketReadyRoomRef.current === selectedRoom) {
+          socketReadyRoomRef.current = null;
+        }
         scheduleReconnect();
       };
     };
 
+    const reconnectNow = () => {
+      if (!canConnect()) return;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      reconnectAttempt = 0;
+      connect();
+    };
+    const handleOnline = () => reconnectNow();
+    const handleOffline = () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      socket?.close(1000, "offline");
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        reconnectNow();
+      } else {
+        handleOffline();
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
     connect();
     return () => {
       active = false;
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);
       }
       socket?.close(1000, "room changed");
     };
-  }, [selectedRoom, loadRoom]);
+  }, [selectedRoom, catchUpRoom]);
 
   function startConversation(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
     startTransition(async () => {
+      const clientMessageId =
+        composeClientMessageIdRef.current ?? crypto.randomUUID();
+      composeClientMessageIdRef.current = clientMessageId;
       const res = await apiFetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           toUsername: composeUser,
           body: composeBody,
+          clientMessageId,
         }),
       });
       if (!res.ok) {
@@ -332,6 +550,7 @@ export function MessagesClient() {
       };
       setComposeUser("");
       setComposeBody("");
+      composeClientMessageIdRef.current = null;
       setError(null);
       if (result.conversationType === "direct" && result.roomId) {
         router.push(`/messages?room=${encodeURIComponent(result.roomId)}`);
@@ -365,16 +584,17 @@ export function MessagesClient() {
 
   function sendReply(e: React.FormEvent) {
     e.preventDefault();
-    if (sendingReplyRef.current || !selectedRoom || !reply.trim()) return;
+    if (!selectedRoom || !reply.trim() || sendingReplyRef.current) return;
     sendingReplyRef.current = true;
-    setError(null);
-    setNotice(null);
     startTransition(async () => {
       try {
+        const clientMessageId =
+          replyClientMessageIdRef.current ?? crypto.randomUUID();
+        replyClientMessageIdRef.current = clientMessageId;
         const res = await apiFetch(`/api/messages/${selectedRoom}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: reply }),
+          body: JSON.stringify({ body: reply, clientMessageId }),
         });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as {
@@ -386,6 +606,7 @@ export function MessagesClient() {
         const message = (await res.json()) as ChatMessage;
         setMessages((prev) => mergeMessages(prev, [message]));
         setReply("");
+        replyClientMessageIdRef.current = null;
         loadInbox();
       } finally {
         sendingReplyRef.current = false;
@@ -598,7 +819,13 @@ export function MessagesClient() {
                     element.clientHeight <=
                   96;
                 shouldStickToBottomRef.current = nearBottom;
-                if (nearBottom) setShowNewMessages(false);
+                isNearBottomRef.current = nearBottom;
+                setIsNearBottom(nearBottom);
+                if (nearBottom) {
+                  setShowNewMessages(false);
+                } else if (element.scrollTop <= 48 && hasMoreBefore) {
+                  void loadOlderMessages();
+                }
               }}
               className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
             >
@@ -635,6 +862,8 @@ export function MessagesClient() {
                     if (!element) return;
                     element.scrollTop = element.scrollHeight;
                     shouldStickToBottomRef.current = true;
+                    isNearBottomRef.current = true;
+                    setIsNearBottom(true);
                     setShowNewMessages(false);
                   }}
                 >

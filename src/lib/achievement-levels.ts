@@ -10,7 +10,6 @@ export const LEVEL_THRESHOLDS = {
   follower_magnet: [1, 10, 50, 100],
   social_butterfly: [1, 10, 50],
   popular_post: [10, 50, 100, 500, 1_000],
-  voter: [10, 100, 500, 1_000],
   cake_day: [1, 2, 3, 5, 7, 10, 12, 15, 20, 25], // years
   conversationalist: [1, 10, 50, 100],
   link_poster: [1, 10, 50],

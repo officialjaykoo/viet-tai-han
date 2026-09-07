@@ -14,7 +14,7 @@ function sample(over: Partial<AdCampaign> = {}): AdCampaign {
     weight: 1,
     startsAt: null,
     endsAt: null,
-    createdBy: "user_alice",
+    createdBy: "7Kp3nZ8QaM2wX5Rc",
     createdAt: "2026-01-01T00:00:00.000Z",
     ...over,
   };

@@ -143,8 +143,8 @@ export default async function SearchPage({
                             ? `@${post.subredditName.slice(2)}`
                             : post.subredditName}{" "}
                           · @{post.authorUsername} ·{" "}
-                          {tLocale(locale, "search.points", {
-                            count: post.score,
+                          {tLocale(locale, "search.likes", {
+                            count: post.likeCount,
                           })}{" "}
                           · {post.commentCount}{" "}
                           {tLocale(locale, "feed.comments")}

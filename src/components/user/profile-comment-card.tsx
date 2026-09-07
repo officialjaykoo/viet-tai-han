@@ -46,7 +46,7 @@ export function ProfileCommentCard({
       </p>
       <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
         <span className="tabular-nums">
-          {tLocale(locale, "search.points", { count: comment.score })}
+          {tLocale(locale, "search.likes", { count: comment.likeCount })}
         </span>
         <Link
           href={href}

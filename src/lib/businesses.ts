@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import { enforceCreateRateLimit } from "@/lib/rate-limit";
+import { normalizeRequestId } from "@/lib/idempotency";
 import {
   BOOKING_STATUSES,
   BUSINESS_STATUSES,
@@ -11,6 +12,9 @@ import {
   type BusinessVerificationStatus,
 } from "@/lib/business-constants";
 import { AuthError } from "@/lib/session";
+function isUniqueConstraint(error: unknown): boolean {
+  return error instanceof Error && /unique|constraint/i.test(error.message);
+}
 
 export type BusinessOwner = {
   id: string;
@@ -512,13 +516,23 @@ export async function createBusiness(input: {
   longitude?: number | string | null;
   openingHours?: string | null;
   services?: ServiceInput[];
+  requestId?: string | null;
 }) {
   const normalized = normalizeBusinessInput(input);
+  const requestId = normalizeRequestId(input.requestId);
+  const db = await getDb();
+  if (requestId) {
+    const existing = await db
+      .prepare(
+        `SELECT id, slug FROM businesses WHERE owner_id = ? AND request_id = ?`
+      )
+      .bind(input.ownerId, requestId)
+      .first<{ id: string; slug: string }>();
+    if (existing) return existing;
+  }
   await enforceCreateRateLimit(input.ownerId, "business");
   const moderation = await moderateText(`${normalized.name}\n${normalized.description}`);
   if (moderation.blocked) throw new AuthError("This content isn't allowed", 400);
-
-  const db = await getDb();
   const owner = await db
     .prepare(`SELECT id FROM "user" WHERE id = ? AND status != 'banned'`)
     .bind(input.ownerId)
@@ -533,8 +547,9 @@ export async function createBusiness(input: {
       .prepare(
         `INSERT INTO businesses (
            id, owner_id, slug, name, description, category, address, location,
-           phone, website_url, latitude, longitude, opening_hours, is_shadow_hidden
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           phone, website_url, latitude, longitude, opening_hours,
+           is_shadow_hidden, request_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -550,7 +565,8 @@ export async function createBusiness(input: {
         normalized.latitude,
         normalized.longitude,
         normalized.openingHours,
-        shadow
+        shadow,
+        requestId
       ),
     ...normalized.services.map((service) =>
       db
@@ -569,7 +585,20 @@ export async function createBusiness(input: {
         )
     ),
   ];
-  await db.batch(statements);
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    if (error instanceof Error && /unique|constraint/i.test(error.message) && requestId) {
+      const existing = await db
+        .prepare(
+          `SELECT id, slug FROM businesses WHERE owner_id = ? AND request_id = ?`
+        )
+        .bind(input.ownerId, requestId)
+        .first<{ id: string; slug: string }>();
+      if (existing) return existing;
+    }
+    throw error;
+  }
   return { id, slug };
 }
 
@@ -796,7 +825,9 @@ export async function reviewBusinessVerification(input: {
   const db = await getDb();
   const request = await db
     .prepare(
-      `SELECT id, business_id, status FROM business_verification_requests WHERE id = ?`
+      `SELECT id, business_id, status
+       FROM business_verification_requests
+       WHERE id = ?`
     )
     .bind(input.requestId)
     .first<{ id: string; business_id: string; status: string }>();
@@ -804,6 +835,7 @@ export async function reviewBusinessVerification(input: {
   if (request.status !== "pending") {
     throw new AuthError("Verification request already handled", 409);
   }
+
   await db.batch([
     db
       .prepare(
@@ -818,7 +850,10 @@ export async function reviewBusinessVerification(input: {
          SET verification_status = ?, updated_at = datetime('now')
          WHERE id = ?`
       )
-      .bind(input.status === "approved" ? "verified" : "rejected", request.business_id),
+      .bind(
+        input.status === "approved" ? "verified" : "rejected",
+        request.business_id
+      ),
   ]);
   return {
     status: input.status,
@@ -833,8 +868,28 @@ export async function createBusinessBooking(input: {
   startAt: string;
   durationMinutes?: number;
   note?: string | null;
+  requestId?: string | null;
 }) {
   const db = await getDb();
+  const requestId = normalizeRequestId(input.requestId);
+  if (requestId) {
+    const existing = await db
+      .prepare(
+        `SELECT bkg.id, b.slug, bkg.status
+         FROM business_bookings bkg
+         INNER JOIN businesses b ON b.id = bkg.business_id
+         WHERE bkg.requester_id = ? AND bkg.request_id = ?`
+      )
+      .bind(input.requesterId, requestId)
+      .first<{ id: string; slug: string; status: BookingStatus }>();
+    if (existing) {
+      return {
+        id: existing.id,
+        businessSlug: existing.slug,
+        status: existing.status,
+      };
+    }
+  }
   const business = await db
     .prepare(
       `SELECT id, slug, name, owner_id, status, verification_status
@@ -907,8 +962,8 @@ export async function createBusinessBooking(input: {
       .prepare(
         `INSERT INTO business_bookings (
            id, business_id, service_id, requester_id, start_at,
-           duration_minutes, note
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+           duration_minutes, note, request_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -917,11 +972,33 @@ export async function createBusinessBooking(input: {
         input.requesterId,
         startAt,
         durationMinutes,
-        note
+        note,
+        requestId
       )
       .run();
-  } catch {
-    throw new AuthError("You already requested this time", 409);
+  } catch (error) {
+    if (isUniqueConstraint(error)) {
+      if (requestId) {
+        const existing = await db
+          .prepare(
+            `SELECT b.slug, bkg.id, bkg.status
+             FROM business_bookings bkg
+             INNER JOIN businesses b ON b.id = bkg.business_id
+             WHERE bkg.requester_id = ? AND bkg.request_id = ?`
+          )
+          .bind(input.requesterId, requestId)
+          .first<{ slug: string; id: string; status: BookingStatus }>();
+        if (existing) {
+          return {
+            id: existing.id,
+            businessSlug: existing.slug,
+            status: existing.status,
+          };
+        }
+      }
+      throw new AuthError("You already requested this time", 409);
+    }
+    throw error;
   }
   return { id, businessSlug: business.slug, status: "requested" as const };
 }

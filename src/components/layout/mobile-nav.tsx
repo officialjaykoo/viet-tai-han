@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
-import { useScrollVisibility } from "@/components/layout/use-scroll-visibility";
 import { useSession } from "@/lib/auth-client";
 import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
@@ -27,14 +26,10 @@ export function MobileNav() {
   const { t } = useI18n();
   const { data: session } = useSession();
   const [hydrated, setHydrated] = useState(false);
-  const chromeVisible = useScrollVisibility();
   useEffect(() => {
     const hydrationId = window.setTimeout(() => setHydrated(true), 0);
     return () => window.clearTimeout(hydrationId);
   }, []);
-  const username = hydrated
-    ? (session?.user as { username?: string } | undefined)?.username ?? null
-    : null;
   const profileHref = getProfileHref(hydrated ? session?.user : null);
   if (pathname === "/login" || pathname === "/signup") return null;
 
@@ -57,11 +52,9 @@ export function MobileNav() {
 
   return (
     <nav
+      data-testid="mobile-nav"
       aria-label={t("nav.menu")}
-      className={cn(
-        "safe-pb-nav fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-[color-mix(in_oklch,var(--background)_90%,transparent)] backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none sm:hidden",
-        !chromeVisible && "pointer-events-none translate-y-full"
-      )}
+      className="safe-pb-nav fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-[color-mix(in_oklch,var(--background)_90%,transparent)] backdrop-blur-md sm:hidden"
     >
       <div className="mx-auto flex h-16 w-full max-w-3xl items-stretch gap-1 px-2">
         {items.map(({ href, label, icon: Icon }) => {

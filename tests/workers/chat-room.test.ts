@@ -62,6 +62,9 @@ describe("ChatRoom", () => {
     const recipient = await connect(roomId, recipientId);
     expect(JSON.parse(await sender.ready)).toEqual({ type: "ready", roomId });
     expect(JSON.parse(await recipient.ready)).toEqual({ type: "ready", roomId });
+    const heartbeat = messageFrom(sender.socket);
+    sender.socket.send("ping");
+    expect(await heartbeat).toBe("pong");
     const senderMessage = messageFrom(sender.socket);
     const recipientMessage = messageFrom(recipient.socket);
 
@@ -76,6 +79,7 @@ describe("ChatRoom", () => {
         body: JSON.stringify({
           roomId,
           id: `message_${suffix}`,
+          clientMessageId: `client_${suffix}`,
           body: "Hello in real time",
           createdAt: "2026-08-14T00:00:00.000Z",
           senderId,
@@ -91,8 +95,7 @@ describe("ChatRoom", () => {
       roomId,
       message: {
         body: "Hello in real time",
-        isMine: true,
-        senderUsername: senderId,
+        clientMessageId: `client_${suffix}`,
       },
     });
     expect(JSON.parse(await recipientMessage)).toMatchObject({
@@ -100,8 +103,7 @@ describe("ChatRoom", () => {
       roomId,
       message: {
         body: "Hello in real time",
-        isMine: false,
-        senderUsername: senderId,
+        clientMessageId: `client_${suffix}`,
       },
     });
 

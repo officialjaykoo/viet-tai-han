@@ -11,11 +11,9 @@
 interface CloudflareEnv {
 	DB: D1Database;
 	CACHE?: KVNamespace;
-	POST_OBJECT: DurableObjectNamespace;
 	CHAT_ROOM: DurableObjectNamespace;
 	MEDIA_BUCKET: R2Bucket;
 	AI: Ai;
-	VECTORIZE: VectorizeIndex;
 	ASSETS: Fetcher;
 	EDGE_IP_RATE_LIMITER: RateLimit;
 	TUNNEL_IP_RATE_LIMITER: RateLimit;

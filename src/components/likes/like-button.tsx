@@ -4,26 +4,24 @@ import { HeartIcon } from "lucide-react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { Button } from "@/components/ui/button";
-import type { VoteMutation, ViewerVote } from "@/lib/types";
+import type { LikeMutation } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-
-export function VoteControls({
+export function LikeButton({
   likeCount,
-  viewerVote,
+  liked,
   pending,
   layout = "horizontal",
-  onVote,
+  onToggle,
 }: {
   likeCount: number;
-  viewerVote: ViewerVote;
+  liked: boolean;
   pending?: boolean;
   layout?: "vertical" | "horizontal";
-  onVote: (action: VoteMutation) => void;
+  onToggle: (action: LikeMutation) => void;
 }) {
   const { t } = useI18n();
   const vertical = layout === "vertical";
-  const liked = viewerVote === "upvote";
 
   return (
     <div
@@ -34,16 +32,16 @@ export function VoteControls({
           : "w-full min-w-0 flex-1 flex-row"
       )}
       role="group"
-      aria-label={t("vote.group")}
+      aria-label={t("like.group")}
     >
       <Button
         type="button"
         variant="ghost"
         size={vertical ? "icon-sm" : "default"}
-        aria-label={t("vote.like")}
+        aria-label={t("like.action")}
         aria-pressed={liked}
         disabled={pending}
-        onClick={() => onVote(liked ? "remove" : "upvote")}
+        onClick={() => onToggle(liked ? "unlike" : "like")}
         className={cn(
           vertical
             ? "touch-target text-muted-foreground hover:text-[var(--brand)]"
@@ -55,11 +53,11 @@ export function VoteControls({
         <HeartIcon className={cn("size-5", liked && "fill-current")} aria-hidden />
         {!vertical ? (
           <span className="truncate text-xs font-semibold">
-            {t("vote.like")} {likeCount}
+            {t("like.action")} {likeCount}
           </span>
         ) : (
           <span className="sr-only">
-            {t("vote.like")} {likeCount}
+            {t("like.action")} {likeCount}
           </span>
         )}
       </Button>

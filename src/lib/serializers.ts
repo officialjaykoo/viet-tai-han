@@ -5,7 +5,6 @@ import type {
   FeedItem,
   FeedPost,
   PaginatedFeed,
-  ViewerVote,
 } from "@/lib/types";
 
 /** Public author — no internal user UUID. */
@@ -31,12 +30,11 @@ export type PublicComment = {
   postId: string;
   parentId: string | null;
   body: string;
-  score: number;
   likeCount: number;
+  liked: boolean;
   depth: number;
   createdAt: string;
   isDeleted: boolean;
-  viewerVote: ViewerVote;
   translation: FeedPost["translation"];
   author: PublicAuthor;
   children: PublicComment[];
@@ -47,16 +45,16 @@ export type PublicPostDetail = PublicFeedPost & {
   comments: PublicComment[];
 };
 
-export type PublicVoteResult = {
+export type PublicLikeResult = {
   postId: string;
-  score: number;
-  viewerVote: ViewerVote;
+  likeCount: number;
+  liked: boolean;
 };
 
-export type PublicCommentVoteResult = {
+export type PublicCommentLikeResult = {
   commentId: string;
-  score: number;
-  viewerVote: ViewerVote;
+  likeCount: number;
+  liked: boolean;
 };
 
 function publicAuthor(
@@ -92,11 +90,10 @@ export function serializeFeedPost(
     body: post.body,
     url: post.url,
     mediaKey: post.mediaKey,
-    score: post.score,
     likeCount: post.likeCount,
+    liked: post.liked,
     commentCount: post.commentCount,
     createdAt: post.createdAt,
-    viewerVote: post.viewerVote,
     translation: post.translation,
     author: publicAuthor(post.author, viewerUserId),
     subreddit: {
@@ -139,12 +136,11 @@ export function serializeComment(
     postId: comment.postId,
     parentId: comment.parentId,
     body: comment.body,
-    score: comment.score,
     likeCount: comment.likeCount,
+    liked: comment.liked,
     depth: comment.depth,
     createdAt: comment.createdAt,
     isDeleted: comment.isDeleted,
-    viewerVote: comment.viewerVote,
     translation: comment.translation,
     author: publicAuthor(
       {
@@ -175,29 +171,30 @@ export function serializePostDetail(
   };
 }
 
-export function serializeVoteResult(result: {
+export function serializeLikeResult(result: {
   postId: string;
-  score: number;
-  viewerVote: ViewerVote;
-}): PublicVoteResult {
+  likeCount: number;
+  liked: boolean;
+}): PublicLikeResult {
   return {
     postId: result.postId,
-    score: result.score,
-    viewerVote: result.viewerVote,
+    likeCount: result.likeCount,
+    liked: result.liked,
   };
 }
 
-export function serializeCommentVoteResult(result: {
+export function serializeCommentLikeResult(result: {
   commentId: string;
-  score: number;
-  viewerVote: ViewerVote;
-}): PublicCommentVoteResult {
+  likeCount: number;
+  liked: boolean;
+}): PublicCommentLikeResult {
   return {
     commentId: result.commentId,
-    score: result.score,
-    viewerVote: result.viewerVote,
+    likeCount: result.likeCount,
+    liked: result.liked,
   };
 }
+
 
 /** Community payload without creator UUID. */
 export function serializeCommunity(sub: {

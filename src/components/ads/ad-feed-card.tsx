@@ -33,16 +33,6 @@ export function AdFeedCard({ ad }: { ad: FeedAdItem }) {
           "motion-safe:hover:shadow-md [@media(hover:hover)_and_(pointer:fine)]:motion-safe:hover:-translate-y-0.5"
         )}
       >
-        <div className="flex gap-1 sm:gap-2">
-          {/* Decorative score column — mirrors organic posts */}
-          <div
-            className="flex w-10 shrink-0 flex-col items-center gap-0.5 pt-3 text-xs text-muted-foreground sm:w-12"
-            aria-hidden
-          >
-            <span className="text-[10px] leading-none">▲</span>
-            <span className="tabular-nums font-medium">·</span>
-            <span className="text-[10px] leading-none">▼</span>
-          </div>
 
           <div className="min-w-0 flex-1 overflow-hidden">
             <CardHeader className="gap-1 px-3 pt-3 pb-0">
@@ -99,7 +89,6 @@ export function AdFeedCard({ ad }: { ad: FeedAdItem }) {
               </TunneledOutboundLink>
             </CardFooter>
           </div>
-        </div>
       </Card>
     </article>
   );

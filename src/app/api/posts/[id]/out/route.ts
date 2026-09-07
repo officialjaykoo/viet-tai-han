@@ -13,6 +13,7 @@ export async function GET(
     const { id } = await context.params;
     const session = await getSession();
     const sessionKey =
+      request.cookies.get("vth_view_session")?.value ??
       request.cookies.get("red_view_session")?.value ??
       request.headers.get("x-forwarded-for") ??
       null;

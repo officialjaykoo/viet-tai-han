@@ -33,6 +33,7 @@ export function BusinessForm({ initial }: { initial?: BusinessDetail }) {
   const router = useRouter();
   const { t } = useI18n();
   const localizeError = useLocalizedError();
+  const bot = useBotGuard();
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
@@ -59,7 +60,7 @@ export function BusinessForm({ initial }: { initial?: BusinessDetail }) {
   const [pending, startTransition] = useTransition();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
-  const bot = useBotGuard();
+  const requestIdRef = useRef<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -84,6 +85,9 @@ export function BusinessForm({ initial }: { initial?: BusinessDetail }) {
         setError(localizeError(check.error, t("common.error")));
         return;
       }
+      const requestId =
+        requestIdRef.current ?? (initial ? null : crypto.randomUUID());
+      if (requestId) requestIdRef.current = requestId;
       const payload = bot.attachToPayload({
         name,
         description,
@@ -103,15 +107,22 @@ export function BusinessForm({ initial }: { initial?: BusinessDetail }) {
             price: service.price.trim() || null,
             durationMinutes: Number(service.durationMinutes),
           })),
+        requestId,
       });
-      const endpoint = initial ? `/api/businesses/${initial.id}` : "/api/businesses";
+      const endpoint = initial
+        ? `/api/businesses/${initial.id}`
+        : "/api/businesses";
       const res = await apiFetch(endpoint, {
         method: initial ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (res.status === 401) {
-        router.push(`/login?next=${encodeURIComponent(initial ? `/businesses/${initial.slug}/edit` : "/businesses/new")}`);
+        router.push(
+          `/login?next=${encodeURIComponent(
+            initial ? `/businesses/${initial.slug}/edit` : "/businesses/new"
+          )}`
+        );
         return;
       }
       if (!res.ok) {
@@ -122,6 +133,7 @@ export function BusinessForm({ initial }: { initial?: BusinessDetail }) {
         return;
       }
       const result = (await res.json()) as { slug: string };
+      requestIdRef.current = null;
       router.push(`/businesses/${result.slug}`);
       router.refresh();
     });

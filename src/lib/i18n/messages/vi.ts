@@ -148,9 +148,7 @@ export const vi: Messages = {
     rangeAll: "Toàn bộ thời gian",
     views: "Lượt xem",
     unique: "Người xem riêng biệt",
-    score: "Điểm",
-    upvotes: "Ủng hộ",
-    downvotes: "Không ủng hộ",
+    likes: "Lượt thích",
     linkClicks: "Lượt nhấp đường dẫn",
     linkCtr: "CTR đường dẫn",
     viewsByHour: "Lượt xem theo giờ",
@@ -731,7 +729,7 @@ export const vi: Messages = {
     accounts: "Tài khoản",
     communities: "Cộng đồng",
     membersCount: "{count} thành viên",
-    points: "{count} điểm",
+    likes: "{count} lượt thích",
   },
   admin: {
     title: "Quản trị",
@@ -761,7 +759,6 @@ export const vi: Messages = {
     warnUser: "Cảnh báo người dùng",
     users: "Người dùng",
     recommendations: "Đề xuất",
-    voteBurst: "Tín hiệu tăng vote (1 giờ)",
     campaignName: "Tên chiến dịch",
     adCopyOptional: "Nội dung quảng cáo (không bắt buộc)",
     feedInline: "Trong bảng tin",
@@ -780,11 +777,6 @@ export const vi: Messages = {
     userId: "ID người dùng",
     lowKarma: "điểm uy tín thấp",
     weakSource: "nguồn yếu",
-    backfillEmbeddings: "Bổ sung vector cho bài đăng",
-    indexedPosts: "Đã lập chỉ mục {count} bài đăng",
-    failedPosts: "{count} lỗi",
-    embeddingHint:
-      "Lập chỉ mục bài đăng gần đây bằng Cloudflare Vectorize và Workers AI để mục Dành cho bạn xếp hạng theo độ tương đồng.",
     backfillTranslations: "Bổ sung bản dịch nội dung",
     translationBackfillResult:
       "Đã xử lý {posts} bài đăng và {comments} bình luận",
@@ -808,10 +800,8 @@ export const vi: Messages = {
     noRecentActivity: "Chưa có hoạt động gần đây.",
     events: "sự kiện",
   },
-  vote: {
-    like: "Thích",
-    upvote: "Thích",
-    downvote: "Không thích",
+  like: {
+    action: "Thích",
     group: "Thích",
   },
   common: {

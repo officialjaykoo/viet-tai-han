@@ -16,7 +16,11 @@ import {
   reviewChatRoomReport,
 } from "@/lib/dm-moderation";
 import { reviewListingReport } from "@/lib/marketplace";
-import { setSiteSetting } from "@/lib/settings";
+import {
+  setSiteSetting,
+  setSiteSettings,
+  SiteSettingValidationError,
+} from "@/lib/settings";
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
@@ -55,6 +59,7 @@ export async function POST(request: NextRequest) {
       reason?: string;
       key?: string;
       value?: string;
+      values?: Record<string, string>;
       limit?: number;
       action?: "ban" | "unban" | "shadowban" | "unshadowban";
       reportId?: string;
@@ -226,13 +231,6 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json(result);
       }
-      case "backfill_embeddings": {
-        const { backfillPostEmbeddings } = await import("@/lib/embeddings");
-        const result = await backfillPostEmbeddings(
-          typeof body.limit === "number" ? body.limit : 100
-        );
-        return NextResponse.json(result);
-      }
       case "backfill_translations": {
         const { backfillContentTranslations } = await import("@/lib/translation");
         const result = await backfillContentTranslations(
@@ -241,19 +239,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result);
       }
       case "set_setting": {
-        if (
-          typeof body.key !== "string" ||
-          !/^[a-z0-9_]{2,80}$/.test(body.key) ||
-          typeof body.value !== "string" ||
-          body.value.length > 500
-        ) {
-          return await jsonLocalizedError("Invalid setting", 400);
+        if (body.values !== undefined) {
+          if (
+            !body.values ||
+            typeof body.values !== "object" ||
+            Array.isArray(body.values)
+          ) {
+            return await jsonLocalizedError("Invalid settings", 400);
+          }
+          await setSiteSettings(
+            Object.entries(body.values).map(([key, value]) => ({ key, value })),
+            actor.id
+          );
+          if (
+            typeof body.key !== "string" ||
+            typeof body.value !== "string"
+          ) {
+            return await jsonLocalizedError("Invalid setting", 400);
+          }
+          await setSiteSetting(body.key, body.value, actor.id);
         }
-        const value = body.value.trim();
-        if (body.key === "ads_enabled" && !["0", "1"].includes(value)) {
-          return await jsonLocalizedError("ads_enabled must be 0 or 1", 400);
-        }
-        await setSiteSetting(body.key, value, actor.id);
         return NextResponse.json({ ok: true });
       }
       case "list_ads": {
@@ -321,6 +326,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof AuthError) {
       return await jsonAuthError(error);
+    }
+    if (error instanceof SiteSettingValidationError) {
+      return await jsonLocalizedError(error.message, error.status);
     }
     console.error("POST /api/admin failed", error);
     return await jsonLocalizedError("Admin action failed", 500);

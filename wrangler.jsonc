@@ -26,10 +26,6 @@
 	"durable_objects": {
 		"bindings": [
 			{
-				"name": "POST_OBJECT",
-				"class_name": "PostObject"
-			},
-			{
 				"name": "CHAT_ROOM",
 				"class_name": "ChatRoom"
 			}
@@ -43,6 +39,10 @@
 		{
 			"tag": "v2",
 			"new_sqlite_classes": ["ChatRoom"]
+		},
+		{
+			"tag": "v3",
+			"deleted_classes": ["PostObject"]
 		}
 	],
 	"r2_buckets": [
@@ -54,12 +54,6 @@
 	"ai": {
 		"binding": "AI"
 	},
-	"vectorize": [
-		{
-			"binding": "VECTORIZE",
-			"index_name": "vth-posts"
-		}
-	],
 	"vars": {
 		"BETTER_AUTH_URL": "https://vth.kr",
 		"NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAEoYhTGuKEC24mJc",

@@ -26,7 +26,7 @@ export default function ArchitecturePage() {
             ["Media", "Cloudflare R2"],
             ["Stateful coordination", "Durable Objects"],
             ["Authentication", "Better Auth"],
-            ["AI", "Workers AI + Vectorize"],
+            ["AI", "Workers AI for translation"],
             ["Testing", "Vitest + Playwright"],
           ].map(([name, value]) => (
             <div key={name} className="rounded-xl border border-border p-4">

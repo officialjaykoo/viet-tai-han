@@ -7,9 +7,10 @@ import {
   listListings,
   serializeListingSummary,
 } from "@/lib/marketplace";
-import { jsonLocalizedError } from "@/lib/public-error";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
 import { readApiJson } from "@/lib/security/guard";
+import { jsonLocalizedError } from "@/lib/public-error";
 import {
   AuthError,
   getSession,
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
       body?: string;
       price?: string | null;
       location?: string;
+      requestId?: string;
     };
     if (
       !body.kind ||
@@ -96,6 +98,7 @@ export async function POST(request: NextRequest) {
       body: body.body,
       price: body.price,
       location: body.location,
+      requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

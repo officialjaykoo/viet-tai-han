@@ -12,7 +12,7 @@ VTH combines a social graph with community and local-service features in one app
 - follows, friends, blocks, and presence
 - direct messages and message requests
 - notifications and browser push
-- communities, posts, comments, and voting
+- communities, posts, comments, and likes
 - questions and answers
 - marketplace listings
 - local-business discovery
@@ -30,9 +30,8 @@ VTH is implemented as a modern edge-first web application using:
 - Better Auth
 - Cloudflare Workers + OpenNext
 - D1 for relational data
-- R2 for media
 - Durable Objects where stateful coordination is useful
-- Workers AI and Vectorize for AI-assisted features
+- Workers AI for translation only
 - Turnstile and rate limiting for abuse controls
 - browser Web Push via VAPID
 
@@ -55,6 +54,7 @@ Internal relationships use immutable `user.id` values. Public usernames are hand
 ### Social relationships over karma gates
 
 Reputation can be useful as a community signal, but it should not become the universal authorization mechanism for normal users.
+Post and comment likes are separate engagement records and do not change reputation.
 
 ### Explicit privacy rules
 

@@ -59,6 +59,16 @@ function redirectPath(response: Response): string {
 
 
 describe("identity providers", () => {
+
+  it("generates 16-character Base62 IDs only for users", async () => {
+    const auth = createAuth(env.DB);
+    const context = await auth.$context;
+    const userId = context.generateId({ model: "user" });
+    const sessionId = context.generateId({ model: "session" });
+
+    expect(userId).toMatch(/^[0-9A-Za-z]{16}$/);
+    expect(sessionId).toMatch(/^[0-9A-Za-z]{32}$/);
+  });
   it("assigns a temporary username to OAuth users without one", async () => {
     const auth = createAuth(env.DB);
     const context = await auth.$context;

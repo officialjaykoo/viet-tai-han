@@ -2,7 +2,6 @@
  * Custom OpenNext worker entry.
  * Edge rate limits run BEFORE OpenNext/Next so flood traffic dies cheaply
  * (no SSR, D1, or AI) and cannot inflate bills.
- * PostObject lives in this same Worker (no separate DO script).
  * @see https://opennext.js.org/cloudflare/howtos/custom-worker
  * @see https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
  */
@@ -10,8 +9,8 @@
 import { createAuth } from "./lib/auth";
 import { guardWorkerRequest } from "./lib/worker-ingress";
 
-export { ChatRoom } from "./workers/ChatRoom";
-export { PostObject } from "./workers/PostObject";
+import { ChatRoom } from "./workers/ChatRoom";
+export { ChatRoom };
 
 // `.open-next/worker.js` is produced by `opennextjs-cloudflare build`
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- generated before build

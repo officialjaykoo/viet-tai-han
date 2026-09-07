@@ -10,7 +10,7 @@ import {
 const secret = new TextEncoder().encode("test-feed-cursor-secret");
 
 const ctx: FeedCursorContext = {
-  sort: "hot",
+  sort: "new",
   mode: "popular",
   subreddit: null,
   authorId: null,
@@ -21,7 +21,7 @@ describe("signed feed cursor", () => {
   it("round-trips a valid cursor", async () => {
     const token = await signFeedCursorWithSecret(
       secret,
-      { createdAt: "2026-01-01 12:00:00", id: "post_abc", score: 12 },
+      { createdAt: "2026-01-01 12:00:00", id: "post_abc" },
       ctx
     );
     expect(token.startsWith("fc1.")).toBe(true);
@@ -29,7 +29,6 @@ describe("signed feed cursor", () => {
     expect(opened).toEqual({
       createdAt: "2026-01-01 12:00:00",
       id: "post_abc",
-      score: 12,
     });
   });
 
@@ -65,7 +64,7 @@ describe("signed feed cursor", () => {
       now
     );
     await expect(
-      openFeedCursorWithSecret(secret, token, { ...ctx, sort: "top" }, now)
+      openFeedCursorWithSecret(secret, token, { ...ctx, mode: "home" }, now)
     ).rejects.toBeInstanceOf(InvalidFeedCursorError);
     await expect(
       openFeedCursorWithSecret(secret, token, ctx, now + 120_000)

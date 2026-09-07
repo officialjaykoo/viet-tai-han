@@ -25,6 +25,8 @@ export function AnswerForm({ questionId }: { questionId: string }) {
   const [pending, startTransition] = useTransition();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
+  const requestIdRef = useRef<string | null>(null);
+
   const bot = useBotGuard();
   const [hydrated, setHydrated] = useState(false);
 
@@ -43,11 +45,13 @@ export function AnswerForm({ questionId }: { questionId: string }) {
         setError(localizeError(check.error, t("common.error")));
         return;
       }
+      const requestId = requestIdRef.current ?? crypto.randomUUID();
+      requestIdRef.current = requestId;
 
       const res = await apiFetch(`/api/questions/${questionId}/answers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bot.attachToPayload({ body })),
+        body: JSON.stringify(bot.attachToPayload({ body, requestId })),
       });
       if (res.status === 401) {
         router.push(
@@ -64,6 +68,7 @@ export function AnswerForm({ questionId }: { questionId: string }) {
       }
 
       setBody("");
+      requestIdRef.current = null;
       turnstileReset.current?.reset();
       router.refresh();
     });

@@ -20,7 +20,6 @@ const TITLE_I18N: Partial<Record<string, Partial<Record<Locale, string>>>> = {
   follower_magnet: { vi: "Thu hút người theo dõi", ko: "팔로워 인기" },
   social_butterfly: { vi: "Kết nối xã hội", ko: "소셜 활동가" },
   popular_post: { vi: "Được yêu thích", ko: "인기 글" },
-  voter: { vi: "Người bình chọn", ko: "투표 참여자" },
   cake_day: { vi: "Ngày tham gia", ko: "가입 기념일" },
   conversationalist: { vi: "Người trò chuyện", ko: "대화 전문가" },
   link_poster: { vi: "Chia sẻ đường dẫn", ko: "링크 공유자" },
@@ -84,12 +83,8 @@ const DESCRIPTION_I18N: Partial<
     ko: "다른 회원을 팔로우하세요",
   },
   popular_post: {
-    vi: "Đưa một bài đăng đạt điểm cao",
-    ko: "글을 높은 점수까지 올려 보세요",
-  },
-  voter: {
-    vi: "Bình chọn trên toàn trang",
-    ko: "사이트의 글에 투표하세요",
+    vi: "Đưa một bài đăng đạt nhiều lượt thích",
+    ko: "글을 많은 좋아요까지 올려 보세요",
   },
   cake_day: {
     vi: "Kỷ niệm thêm một năm tại Việt tại Hàn",

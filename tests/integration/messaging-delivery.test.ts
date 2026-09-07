@@ -9,6 +9,7 @@ import {
 import {
   getChatMessages,
   listChatRooms,
+  markChatMessagesRead,
   respondToChatRequest,
   startChatRequest,
   sendChatMessage,
@@ -21,7 +22,6 @@ import {
   reportChatRoom,
   reviewChatMessageReport,
 } from "@/lib/dm-moderation";
-import { AuthError } from "@/lib/session";
 import { getUnreadCounts } from "@/lib/unread";
 import { seedUsersAndSubreddit } from "./helpers";
 
@@ -40,21 +40,21 @@ async function flushBackgroundWork() {
 
 describe("messaging delivery (D1)", () => {
   it("fans out unread counts, marks messages read, and moderates reports", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
-    const voterUsername = await usernameFor(voterId);
+    const { authorId, actorId } = await seedUsersAndSubreddit();
+    const actorUsername = await usernameFor(actorId);
     const request = await startChatRequest({
       fromUserId: authorId,
-      toUsername: voterUsername,
+      toUsername: actorUsername,
       openerBody: "Hello from the delivery test.",
       fromStatus: "active",
     });
 
-    expect((await listIncomingRequests(voterId)).some((item) => item.id === request.requestId)).toBe(
+    expect((await listIncomingRequests(actorId)).some((item) => item.id === request.requestId)).toBe(
       true
     );
     await respondToChatRequest({
       requestId: request.requestId,
-      userId: voterId,
+      userId: actorId,
       accept: true,
     });
     await flushBackgroundWork();
@@ -66,7 +66,16 @@ describe("messaging delivery (D1)", () => {
           notification.title.includes("accepted your message request")
       )
     ).toBe(true);
-    await getChatMessages({ roomId: request.roomId, userId: voterId });
+    const initialHistory = await getChatMessages({
+      roomId: request.roomId,
+      userId: actorId,
+    });
+    await markChatMessagesRead({
+      roomId: request.roomId,
+      userId: actorId,
+      messageId:
+        initialHistory.messages[initialHistory.messages.length - 1]?.id,
+    });
 
     const sent = await sendChatMessage({
       roomId: request.roomId,
@@ -74,20 +83,27 @@ describe("messaging delivery (D1)", () => {
       body: "Please review this message.",
       userStatus: "active",
     });
-    expect((await getUnreadCounts(voterId)).messageCount).toBe(1);
-    expect((await listChatRooms(voterId))[0]?.unreadCount).toBe(1);
+    expect((await getUnreadCounts(actorId)).messageCount).toBe(1);
+    expect((await listChatRooms(actorId))[0]?.unreadCount).toBe(1);
 
     const visible = await getChatMessages({
       roomId: request.roomId,
-      userId: voterId,
+      userId: actorId,
     });
-    expect(visible.some((message) => message.id === sent.id)).toBe(true);
-    expect((await getUnreadCounts(voterId)).messageCount).toBe(0);
+    expect(visible.messages.some((message) => message.id === sent.id)).toBe(
+      true
+    );
+    await markChatMessagesRead({
+      roomId: request.roomId,
+      userId: actorId,
+      messageId: sent.id,
+    });
+    expect((await getUnreadCounts(actorId)).messageCount).toBe(0);
 
     await reportChatMessage({
       roomId: request.roomId,
       messageId: sent.id,
-      reporterId: voterId,
+      reporterId: actorId,
       reason: "harassment",
       details: "Test moderation report",
     });
@@ -95,7 +111,7 @@ describe("messaging delivery (D1)", () => {
       reportChatMessage({
         roomId: request.roomId,
         messageId: sent.id,
-        reporterId: voterId,
+        reporterId: actorId,
         reason: "harassment",
       })
     ).rejects.toMatchObject({ status: 409 });
@@ -110,14 +126,13 @@ describe("messaging delivery (D1)", () => {
       removeMessage: true,
     });
     expect(
-      (await getChatMessages({ roomId: request.roomId, userId: voterId })).some(
-        (message) => message.id === sent.id
-      )
+      (await getChatMessages({ roomId: request.roomId, userId: actorId }))
+        .messages.some((message) => message.id === sent.id)
     ).toBe(false);
-  });
 
+  });
   it("reports a bounded conversation context and validates membership", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const { authorId, actorId } = await seedUsersAndSubreddit();
     const outsiderId = `u_outsider_${crypto.randomUUID().slice(0, 8)}`;
     await env.DB.prepare(
       `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
@@ -131,13 +146,13 @@ describe("messaging delivery (D1)", () => {
       .run();
     const request = await startChatRequest({
       fromUserId: authorId,
-      toUsername: await usernameFor(voterId),
+      toUsername: await usernameFor(actorId),
       openerBody: "Conversation context opener.",
       fromStatus: "active",
     });
     await respondToChatRequest({
       requestId: request.requestId,
-      userId: voterId,
+      userId: actorId,
       accept: true,
     });
     await env.DB.prepare(
@@ -170,7 +185,7 @@ describe("messaging delivery (D1)", () => {
     }
     await reportChatRoom({
       roomId: request.roomId,
-      reporterId: voterId,
+      reporterId: actorId,
       reason: "harassment",
       details: "Review the recent conversation.",
     });
@@ -195,7 +210,7 @@ describe("messaging delivery (D1)", () => {
     await expect(
       reportChatRoom({
         roomId: request.roomId,
-        reporterId: voterId,
+        reporterId: actorId,
         reason: "harassment",
       })
     ).rejects.toMatchObject({ status: 409 });
@@ -218,7 +233,7 @@ describe("messaging delivery (D1)", () => {
         context_until: string;
       }>();
     expect(stored).toMatchObject({
-      reporter_id: voterId,
+      reporter_id: actorId,
       reported_user_id: authorId,
     });
     expect(stored?.context_until).toBeTruthy();
@@ -226,7 +241,7 @@ describe("messaging delivery (D1)", () => {
     await reportChatMessage({
       roomId: request.roomId,
       messageId: report!.context[0]!.id,
-      reporterId: voterId,
+      reporterId: actorId,
       reason: "spam",
     });
     expect(
@@ -235,30 +250,35 @@ describe("messaging delivery (D1)", () => {
       )
     ).toBe(true);
   });
-
-  it("allows only one concurrent request response", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+  it("makes concurrent request acceptance idempotent", async () => {
+    const { authorId, actorId } = await seedUsersAndSubreddit();
     const request = await startChatRequest({
       fromUserId: authorId,
-      toUsername: await usernameFor(voterId),
+      toUsername: await usernameFor(actorId),
       openerBody: "Accept this exactly once.",
       fromStatus: "active",
     });
     const outcomes = await Promise.allSettled([
       respondToChatRequest({
         requestId: request.requestId,
-        userId: voterId,
+        userId: actorId,
         accept: true,
       }),
       respondToChatRequest({
         requestId: request.requestId,
-        userId: voterId,
+        userId: actorId,
         accept: true,
       }),
     ]);
-    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
-    const rejected = outcomes.find((outcome) => outcome.status === "rejected");
-    expect(rejected?.status === "rejected" && rejected.reason).toBeInstanceOf(AuthError);
+    expect(
+      outcomes.filter((outcome) => outcome.status === "fulfilled")
+    ).toHaveLength(2);
+    expect(
+      outcomes.every(
+        (outcome) =>
+          outcome.status === "fulfilled" && outcome.value.status === "accepted"
+      )
+    ).toBe(true);
     expect(
       await env.DB
         .prepare(`SELECT status FROM chat_requests WHERE id = ?`)
@@ -268,19 +288,19 @@ describe("messaging delivery (D1)", () => {
   });
 
   it("keeps notification fanout in sync when notifications are read", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const { authorId, actorId } = await seedUsersAndSubreddit();
     const notificationId = await createNotification({
-      userId: voterId,
+      userId: actorId,
       actorId: authorId,
       kind: "follow",
       title: "A new follower",
     });
     expect(notificationId).toBeTruthy();
-    expect((await getUnreadCounts(voterId)).notificationCount).toBe(1);
+    expect((await getUnreadCounts(actorId)).notificationCount).toBe(1);
     await markNotificationsRead({
-      userId: voterId,
+      userId: actorId,
       ids: [notificationId!],
     });
-    expect((await getUnreadCounts(voterId)).notificationCount).toBe(0);
+    expect((await getUnreadCounts(actorId)).notificationCount).toBe(0);
   });
 });

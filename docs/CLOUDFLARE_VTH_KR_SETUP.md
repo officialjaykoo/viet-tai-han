@@ -14,10 +14,7 @@
 - Current Version ID: `342c830d-a785-40dc-89f8-4f6f486b9a30`
 - D1: `vth-db` — 생성 및 원격 migration 적용 완료
 - R2: `vth-media` — 생성 및 Worker binding 완료
-- Vectorize: `vth-posts` — 768 dimensions, cosine
-- Vectorize metadata index:
-  - `embeddingVersion`
-  - `authorId`
+- Workers AI: 번역 전용 binding
 - Turnstile widget: `vth.kr production`
   - 허용 도메인: `vth.kr`
   - mode: Managed
@@ -291,11 +288,15 @@ npx wrangler secret put VAPID_SUBJECT
 
 ### 최초 배포 또는 migration 포함 배포
 
+운영 D1 변경 전에는 반드시 export 백업을 생성하고, 적용 대상을 확인한 뒤 migration을 실행합니다. 이 저장소에서는 production D1에 대한 명령을 자동 실행하지 않습니다.
+
 ```bash
 npm ci
 npx wrangler login
 export CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-npx wrangler d1 migrations apply DB --remote
+npx wrangler d1 export vth-db --remote --output="backup-$(date +%Y%m%d-%H%M).sql"
+npx wrangler d1 migrations list vth-db --remote
+npx wrangler d1 migrations apply vth-db --remote
 ```
 
 `seed.sql`은 운영 DB에 실행하지 않습니다.
@@ -320,19 +321,24 @@ BETTER_AUTH_URL="https://vth.kr" \
 NEXTJS_ENV=production \
 npm run deploy
 ```
-
-`.dev.vars`의 로컬 테스트용 Turnstile key를 운영 빌드에 사용하지 않습니다.
-
 ### 일반 업데이트
 
-코드 변경 후에도 동일한 빌드 환경을 전달합니다.
+코드 변경 후에도 동일한 빌드 환경을 전달합니다. Migration이 포함된 경우에만 아래의 백업·확인·적용 순서를 먼저 실행합니다.
 
 ```powershell
 $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
+$stamp = Get-Date -Format yyyyMMdd-HHmm
+npx wrangler d1 export vth-db --remote --output="backup-$stamp.sql"
+npx wrangler d1 migrations list vth-db --remote
+npx wrangler d1 migrations apply vth-db --remote
+```
+
+Migration 적용 후 배포합니다.
+
+```powershell
 $env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
 $env:BETTER_AUTH_URL="https://vth.kr"
 $env:NEXTJS_ENV="production"
-npx wrangler d1 migrations apply DB --remote
 npm run deploy
 ```
 
@@ -377,7 +383,6 @@ npx wrangler d1 execute vth-db --remote --command="UPDATE \"user\" SET role='adm
 npx wrangler whoami
 npx wrangler d1 list
 npx wrangler r2 bucket list
-npx wrangler vectorize list
 npx wrangler secret list
 npx wrangler deployments list
 ```
@@ -385,19 +390,19 @@ npx wrangler deployments list
 D1 migration 상태:
 
 ```bash
-npx wrangler d1 migrations list DB --remote
+npx wrangler d1 migrations list vth-db --remote
 ```
 
 D1 백업 예시:
 
 ```bash
-npx wrangler d1 export vth-db --remote --output="backup-$(date +%Y%m%d).sql"
+npx wrangler d1 export vth-db --remote --output="backup-$(date +%Y%m%d-%H%M).sql"
 ```
 
 Windows PowerShell에서는 날짜를 자동으로 만들 수 있습니다.
 
 ```powershell
-$stamp = Get-Date -Format yyyyMMdd
+$stamp = Get-Date -Format yyyyMMdd-HHmm
 npx wrangler d1 export vth-db --remote --output="backup-$stamp.sql"
 ```
 
@@ -419,8 +424,7 @@ R2 미디어는 별도 백업 정책을 정해야 합니다. DB 백업만으로 
 
 - [ ] 게시글·댓글·친구 관계가 D1에 저장됨
 - [ ] 이미지 업로드가 `vth-media` R2에 저장됨
-- [ ] Vectorize와 Workers AI가 활성화된 계정에서 추천/번역이 동작함
-- [ ] AI 사용량과 비용을 Cloudflare Dashboard에서 확인함
+- [ ] Workers AI 번역이 동작하고 AI 사용량과 비용을 Cloudflare Dashboard에서 확인함
 
 ### 보안
 

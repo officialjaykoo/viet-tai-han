@@ -30,6 +30,61 @@ type ChallengeResponse = {
   /** Server-random /i/api query param value. */
   v?: string;
 };
+let atkBootstrapPromise: Promise<string> | null = null;
+
+/**
+ * Reads may run together, but a challenge-backed write must wait for them and
+ * hold the ATK stable until its response is decoded.
+ */
+const resolvedApiWrite = Promise.resolve();
+let signedWriteTail = resolvedApiWrite;
+let activeSignedReads = 0;
+let readersDrained: Promise<void> | null = null;
+let resolveReadersDrained: (() => void) | null = null;
+
+async function withSignedRead<T>(operation: () => Promise<T>): Promise<T> {
+  const pendingWrites = signedWriteTail;
+  if (pendingWrites !== resolvedApiWrite) {
+    await pendingWrites;
+  }
+  activeSignedReads += 1;
+  try {
+    return await operation();
+  } finally {
+    activeSignedReads -= 1;
+    if (activeSignedReads === 0) {
+      resolveReadersDrained?.();
+      resolveReadersDrained = null;
+      readersDrained = null;
+    }
+  }
+}
+
+async function withSignedWrite<T>(operation: () => Promise<T>): Promise<T> {
+  const previousWrite = signedWriteTail;
+  let releaseWrite!: () => void;
+  const currentWrite = new Promise<void>((resolve) => {
+    releaseWrite = resolve;
+  });
+  signedWriteTail = currentWrite;
+
+  await previousWrite;
+  if (activeSignedReads > 0) {
+    readersDrained ??= new Promise<void>((resolve) => {
+      resolveReadersDrained = resolve;
+    });
+    await readersDrained;
+  }
+
+  try {
+    return await operation();
+  } finally {
+    releaseWrite();
+    if (signedWriteTail === currentWrite) {
+      signedWriteTail = resolvedApiWrite;
+    }
+  }
+}
 
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -75,7 +130,10 @@ async function solvePow(
 }
 
 /** Decode tunnel Protobuf into a Response the rest of the app can use. */
-async function unwrapTunnelResponse(http: Response): Promise<Response> {
+async function unwrapTunnelResponse(
+  http: Response,
+  responseAtk?: string | null
+): Promise<Response> {
   const contentType = http.headers.get("content-type") ?? "";
   if (!contentType.includes(PROTOBUF_CONTENT_TYPE)) {
     // Tunnel must always speak Protobuf; treat anything else as a hard failure.
@@ -88,8 +146,12 @@ async function unwrapTunnelResponse(http: Response): Promise<Response> {
   const bytes = new Uint8Array(await http.arrayBuffer());
   let frame;
   try {
-    // Prefer ATK cookie (already applied from Set-Cookie on this response).
-    frame = await resolveInternalApiResponse(bytes, readCookie(ATK_COOKIE));
+    // Use the ATK that signed this request; the browser cookie may rotate
+    // while another request is being prepared.
+    frame = await resolveInternalApiResponse(
+      bytes,
+      responseAtk ?? readCookie(ATK_COOKIE)
+    );
   } catch {
     return new Response(
       JSON.stringify({ error: "Malformed Protobuf tunnel response" }),
@@ -108,7 +170,10 @@ async function unwrapTunnelResponse(http: Response): Promise<Response> {
   });
 }
 
-async function postEnvelope(envelope: Uint8Array): Promise<Response> {
+async function postEnvelope(
+  envelope: Uint8Array,
+  responseAtk?: string | null
+): Promise<Response> {
   const http = await fetch(tunnelUrl(), {
     method: "POST",
     credentials: "same-origin",
@@ -119,7 +184,7 @@ async function postEnvelope(envelope: Uint8Array): Promise<Response> {
     },
     body: envelope as unknown as BodyInit,
   });
-  return unwrapTunnelResponse(http);
+  return unwrapTunnelResponse(http, responseAtk);
 }
 
 /** Unsigned bootstrap — only used to mint the challenge cookies. */
@@ -148,13 +213,23 @@ async function fetchChallenge(): Promise<ChallengeResponse> {
 }
 
 async function ensureAtk(): Promise<string> {
-  let atk = readCookie(ATK_COOKIE);
-  if (!atk) {
-    await fetchChallenge();
-    atk = readCookie(ATK_COOKIE);
+  const current = readCookie(ATK_COOKIE);
+  if (current) return current;
+
+  if (!atkBootstrapPromise) {
+    atkBootstrapPromise = (async () => {
+      const existing = readCookie(ATK_COOKIE);
+      if (existing) return existing;
+      await fetchChallenge();
+      const next = readCookie(ATK_COOKIE);
+      if (!next) throw new Error("Missing API token cookie");
+      return next;
+    })().finally(() => {
+      atkBootstrapPromise = null;
+    });
   }
-  if (!atk) throw new Error("Missing API token cookie");
-  return atk;
+
+  return atkBootstrapPromise;
 }
 
 /** Signed read — ATK HMAC only (no PoW / one-time challenge). */
@@ -163,42 +238,44 @@ async function signReadAndSend(input: {
   path: string;
   query: string;
 }): Promise<Response> {
-  const atk = await ensureAtk();
-  const payload = new Uint8Array();
-  const payloadHash = await sha256HexBrowser(payload);
-  const timestampMs = Date.now();
-  const nonce = randomTokenBrowser(16);
-  const canonical = buildCanonical({
-    method: input.method,
-    path: input.path,
-    query: input.query,
-    timestampMs,
-    nonce,
-    challengeId: "",
-    payloadHashHex: payloadHash,
-    powNonce: 0,
-  });
-  const signature = await hmacSha256Browser(
-    new TextEncoder().encode(atk),
-    canonical
-  );
-  const envelope = await encodeInternalApiRequest(
-    {
+  return withSignedRead(async () => {
+    const atk = await ensureAtk();
+    const payload = new Uint8Array();
+    const payloadHash = await sha256HexBrowser(payload as BufferSource);
+    const timestampMs = Date.now();
+    const nonce = randomTokenBrowser(16);
+    const canonical = buildCanonical({
       method: input.method,
       path: input.path,
       query: input.query,
       timestampMs,
       nonce,
-      payload,
-      signature,
       challengeId: "",
+      payloadHashHex: payloadHash,
       powNonce: 0,
-      contentType: "",
-      filename: "",
-    },
-    atk
-  );
-  return postEnvelope(envelope);
+    });
+    const signature = await hmacSha256Browser(
+      new TextEncoder().encode(atk),
+      canonical
+    );
+    const envelope = await encodeInternalApiRequest(
+      {
+        method: input.method,
+        path: input.path,
+        query: input.query,
+        timestampMs,
+        nonce,
+        payload,
+        signature,
+        challengeId: "",
+        powNonce: 0,
+        contentType: "",
+        filename: "",
+      },
+      atk
+    );
+    return postEnvelope(envelope, atk);
+  });
 }
 
 async function signAndSend(input: {
@@ -209,48 +286,50 @@ async function signAndSend(input: {
   contentType?: string;
   filename?: string;
 }): Promise<Response> {
-  const challenge = await fetchChallenge();
-  const atk = readCookie(ATK_COOKIE);
-  if (!atk) throw new Error("Missing API token cookie");
+  return withSignedWrite(async () => {
+    const challenge = await fetchChallenge();
+    const atk = readCookie(ATK_COOKIE);
+    if (!atk) throw new Error("Missing API token cookie");
 
-  const payloadHash = await sha256HexBrowser(input.payload as BufferSource);
-  const timestampMs = Date.now();
-  const nonce = randomTokenBrowser(16);
-  const powDifficulty = challenge.powDifficulty || POW_DIFFICULTY;
-  const powNonce = await solvePow(challenge.challengeId, powDifficulty);
-  const canonical = buildCanonical({
-    method: input.method,
-    path: input.path,
-    query: input.query,
-    timestampMs,
-    nonce,
-    challengeId: challenge.challengeId,
-    payloadHashHex: payloadHash,
-    powNonce,
-  });
-  const signature = await hmacSha256Browser(
-    new TextEncoder().encode(atk),
-    canonical
-  );
-
-  const envelope = await encodeInternalApiRequest(
-    {
+    const payloadHash = await sha256HexBrowser(input.payload as BufferSource);
+    const timestampMs = Date.now();
+    const nonce = randomTokenBrowser(16);
+    const powDifficulty = challenge.powDifficulty || POW_DIFFICULTY;
+    const powNonce = await solvePow(challenge.challengeId, powDifficulty);
+    const canonical = buildCanonical({
       method: input.method,
       path: input.path,
       query: input.query,
       timestampMs,
       nonce,
-      payload: input.payload,
-      signature,
       challengeId: challenge.challengeId,
+      payloadHashHex: payloadHash,
       powNonce,
-      contentType: input.contentType ?? "",
-      filename: input.filename ?? "",
-    },
-    atk
-  );
+    });
+    const signature = await hmacSha256Browser(
+      new TextEncoder().encode(atk),
+      canonical
+    );
 
-  return postEnvelope(envelope);
+    const envelope = await encodeInternalApiRequest(
+      {
+        method: input.method,
+        path: input.path,
+        query: input.query,
+        timestampMs,
+        nonce,
+        payload: input.payload,
+        signature,
+        challengeId: challenge.challengeId,
+        powNonce,
+        contentType: input.contentType ?? "",
+        filename: input.filename ?? "",
+      },
+      atk
+    );
+
+    return postEnvelope(envelope, atk);
+  });
 }
 
 /**
@@ -310,13 +389,13 @@ export async function apiFetch(
   }
 
   if (path === "/api/security/challenge" && method === "GET") {
-    return fetchChallenge().then(
-      (data) =>
-        new Response(JSON.stringify(data), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        })
-    );
+    return withSignedWrite(async () => {
+      const data = await fetchChallenge();
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
   }
 
   if (method === "GET" || method === "HEAD") {

@@ -1,8 +1,8 @@
 import type { AccountTag } from "@/lib/tags";
 
-export type VoteAction = "upvote" | "downvote";
-export type VoteMutation = VoteAction | "remove";
-export type ViewerVote = VoteAction | null;
+export type LikeMutation = "like" | "unlike";
+export type ViewerLike = boolean;
+
 export interface UserRow {
   id: string;
   username: string;
@@ -30,9 +30,7 @@ export interface PostRow {
   body: string | null;
   url: string | null;
   media_key: string | null;
-  upvotes: number;
-  downvotes: number;
-  score: number;
+  like_count: number;
   comment_count: number;
   is_nsfw: number;
   is_locked: number;
@@ -46,9 +44,7 @@ export interface CommentRow {
   author_id: string;
   parent_id: string | null;
   body: string;
-  upvotes: number;
-  downvotes: number;
-  score: number;
+  like_count: number;
   depth: number;
   is_deleted: number;
   created_at: string;
@@ -77,11 +73,10 @@ export interface FeedPost {
   body: string | null;
   url: string | null;
   mediaKey: string | null;
-  score: number;
   commentCount: number;
   createdAt: string;
   likeCount: number;
-  viewerVote: ViewerVote;
+  liked: ViewerLike;
   translation: ContentTranslation | null;
   author: {
     /** Internal only — omitted from public API serializers. */
@@ -127,26 +122,31 @@ export interface PaginatedFeed {
   hasMore: boolean;
 }
 
-/** Client-facing vote payload — score only (no upvote/downvote breakdown). */
-export interface VoteResult {
+export interface LikeResult {
   postId: string;
-  score: number;
-  viewerVote: ViewerVote;
+  likeCount: number;
+  liked: boolean;
 }
 
-/** Durable Object internal vote snapshot (not returned by public APIs). */
-export interface InternalVoteResult {
-  postId: string;
-  upvotes: number;
-  downvotes: number;
-  score: number;
-  viewerVote: ViewerVote;
-  pendingFlush: boolean;
-  alreadyVoted: boolean;
-}
-
-export interface CommentVoteResult {
+export interface CommentLikeResult {
   commentId: string;
-  score: number;
-  viewerVote: ViewerVote;
+  likeCount: number;
+  liked: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  clientMessageId: string | null;
+  body: string;
+  createdAt: string;
+  isMine: boolean;
+  senderUsername: string | null;
+}
+
+export interface ChatHistoryPage {
+  messages: ChatMessage[];
+  hasMoreBefore: boolean;
+  nextBeforeCursor: string | null;
+  hasMoreAfter: boolean;
+  nextAfterCursor: string | null;
 }

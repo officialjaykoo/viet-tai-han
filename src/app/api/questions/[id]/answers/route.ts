@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAnswer } from "@/lib/qna";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
 import { readApiJson } from "@/lib/security/guard";
@@ -12,20 +13,22 @@ export async function POST(
 ) {
   try {
     const session = await requireSession();
+    const user = session.user;
     const { id: questionId } = await context.params;
     const body = requireBotAttestation(await readApiJson(request)) as {
       body?: string;
+      requestId?: string | null;
     };
     if (!body.body?.trim()) {
       return await jsonLocalizedError("body is required", 400);
     }
 
-    const user = session.user as { id: string; status?: string | null };
     const result = await createAnswer({
       userId: user.id,
       userStatus: user.status,
       questionId,
       body: body.body,
+      requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

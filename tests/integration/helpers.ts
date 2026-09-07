@@ -3,7 +3,7 @@ import { env } from "cloudflare:test";
 export type SeededUsers = {
   adminId: string;
   authorId: string;
-  voterId: string;
+  actorId: string;
   subredditId: string;
   subredditName: string;
 };
@@ -14,7 +14,7 @@ export async function seedUsersAndSubreddit(
 ): Promise<SeededUsers> {
   const adminId = `u_admin_${suffix}`;
   const authorId = `u_author_${suffix}`;
-  const voterId = `u_voter_${suffix}`;
+  const actorId = `u_actor_${suffix}`;
   const subredditId = `s_${suffix}`;
   const subredditName = `c_${suffix}`;
   await env.DB.prepare(
@@ -32,9 +32,9 @@ export async function seedUsersAndSubreddit(
 
   await env.DB.prepare(
     `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-     VALUES (?, 'Voter', ?, 1, ?, 40, 'user', 'active')`
+     VALUES (?, 'Actor', ?, 1, ?, 40, 'user', 'active')`
   )
-    .bind(voterId, `${voterId}@test.local`, `voter_${suffix}`)
+    .bind(actorId, `${actorId}@test.local`, `actor_${suffix}`)
     .run();
 
   await env.DB.prepare(
@@ -43,13 +43,13 @@ export async function seedUsersAndSubreddit(
   )
     .bind(subredditId, subredditName, authorId)
     .run();
-  return { adminId, authorId, voterId, subredditId, subredditName };
+  return { adminId, authorId, actorId, subredditId, subredditName };
 
 }
 
 export async function getPostRow(postId: string) {
   return env.DB.prepare(
-    `SELECT id, title, body, url, score, upvotes, downvotes, comment_count,
+    `SELECT id, title, body, url, like_count, comment_count,
             is_removed, is_shadow_hidden, author_id
      FROM posts WHERE id = ?`
   )
@@ -59,9 +59,7 @@ export async function getPostRow(postId: string) {
       title: string;
       body: string | null;
       url: string | null;
-      score: number;
-      upvotes: number;
-      downvotes: number;
+      like_count: number;
       comment_count: number;
       is_removed: number;
       is_shadow_hidden: number;
@@ -71,14 +69,14 @@ export async function getPostRow(postId: string) {
 
 export async function getCommentRow(commentId: string) {
   return env.DB.prepare(
-    `SELECT id, body, score, is_deleted, is_removed, author_id, depth
+    `SELECT id, body, like_count, is_deleted, is_removed, author_id, depth
      FROM comments WHERE id = ?`
   )
     .bind(commentId)
     .first<{
       id: string;
       body: string;
-      score: number;
+      like_count: number;
       is_deleted: number;
       is_removed: number;
       author_id: string;

@@ -71,12 +71,6 @@ describe("request locale detection", () => {
   });
   it("keeps DM request failures actionable in Korean and Vietnamese", () => {
     expect(
-      localizeErrorMessage(
-        "Your karma is too low to send messages. Participate more first.",
-        "ko"
-      )
-    ).toBe("메시지를 보내려면 카르마가 필요합니다. 먼저 더 활동해 주세요.");
-    expect(
       localizeErrorMessage("This user isn't accepting chat requests", "vi")
     ).toBe("Người dùng này không nhận yêu cầu trò chuyện");
     expect(

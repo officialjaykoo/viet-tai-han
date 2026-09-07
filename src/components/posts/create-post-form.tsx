@@ -79,6 +79,7 @@ export function CreatePostForm({
 
   const fileRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef<string | null>(null);
   const listId = useId();
 
   const [postType, setPostType] = useState<PostType>("text");
@@ -222,6 +223,8 @@ export function CreatePostForm({
     }
 
     startTransition(async () => {
+      const requestId = requestIdRef.current ?? crypto.randomUUID();
+      requestIdRef.current = requestId;
       const check = await passBotCheck(bot, turnstileToken);
       if (!check.ok) {
         setError(localizeError(check.error, t("common.error")));
@@ -275,6 +278,7 @@ export function CreatePostForm({
             body: postType === "text" ? body || undefined : undefined,
             url: postType === "link" ? url || undefined : undefined,
             mediaKey,
+            requestId,
           })
         ),
       });
@@ -290,6 +294,7 @@ export function CreatePostForm({
         return;
       }
       const data = (await res.json()) as { id: string };
+      requestIdRef.current = null;
       router.push(`/post/${data.id}`);
       router.refresh();
     });

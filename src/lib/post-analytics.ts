@@ -1,9 +1,5 @@
 import { getDb } from "@/lib/db";
-import {
-  parseDiscoverySource,
-  type DiscoverySource,
-} from "@/lib/vote-weight";
-import { displayScore } from "@/lib/vote-weight";
+import { parseDiscoverySource, type DiscoverySource } from "@/lib/discovery";
 import { AuthError } from "@/lib/session";
 
 function dayKey(now = new Date()): string {
@@ -86,7 +82,7 @@ export async function getPostAnalytics(input: {
   const db = await getDb();
   const post = await db
     .prepare(
-      `SELECT id, author_id, title, url, score, comment_count, upvotes, downvotes, created_at
+      `SELECT id, author_id, title, url, like_count, comment_count, created_at
        FROM posts WHERE id = ? AND is_removed = 0`
     )
     .bind(input.postId)
@@ -95,10 +91,8 @@ export async function getPostAnalytics(input: {
       author_id: string;
       title: string;
       url: string | null;
-      score: number;
+      like_count: number;
       comment_count: number;
-      upvotes: number;
-      downvotes: number;
       created_at: string;
     }>();
 
@@ -191,11 +185,8 @@ export async function getPostAnalytics(input: {
     postId: post.id,
     title: post.title,
     hasLink: Boolean(post.url),
-    score: displayScore(post.score),
+    likeCount: Number(post.like_count ?? 0),
     commentCount: post.comment_count,
-    /** Author-only vote counts (not shown publicly). */
-    upvotes: post.upvotes,
-    downvotes: post.downvotes,
     createdAt: post.created_at,
     range: input.range,
     views,

@@ -11,11 +11,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import { Feed } from "@/components/feed/feed";
 import { FeedComposer } from "@/components/feed/feed-composer";
 import { FeedShortcutRail } from "@/components/feed/feed-shortcut-rail";
-import { FeedModeTabs, FeedSortTabs } from "@/components/feed/feed-controls";
+import { FeedModeTabs } from "@/components/feed/feed-controls";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { OnlinePeopleList } from "@/components/online/online-people-list";
@@ -33,9 +32,8 @@ import type { PaginatedFeed } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function parseSort(value: string | undefined): FeedSort {
-  if (value === "new" || value === "top" || value === "hot") return value;
-  return "hot";
+function parseSort(_value: string | undefined): FeedSort {
+  return "new";
 }
 
 function parseMode(value: string | undefined): "home" | "popular" {
@@ -233,10 +231,7 @@ export default async function HomePage({
               </p>
             </section>
 
-            <Suspense fallback={null}>
-              <FeedModeTabs current={mode} signedIn={signedIn} />
-              <FeedSortTabs current={sort} mode={mode} />
-            </Suspense>
+            <FeedModeTabs current={mode} signedIn={signedIn} />
 
             <FeedComposer
               signedIn={signedIn}

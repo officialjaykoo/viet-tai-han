@@ -148,9 +148,7 @@ export const ru: Messages = {
     rangeAll: "За всё время",
     views: "Просмотры",
     unique: "Уникальные",
-    score: "Рейтинг",
-    upvotes: "За",
-    downvotes: "Против",
+    likes: "Нравится",
     linkClicks: "Клики по ссылке",
     linkCtr: "CTR ссылки",
     viewsByHour: "Просмотры по часам",
@@ -707,7 +705,7 @@ export const ru: Messages = {
     submitBlurb: "Выберите сообщество, формат и опубликуйте.",
     recommended: "Рекомендации",
     recommendedBlurb:
-      "Ранжирование через Cloudflare Vectorize по вашим голосам «за» и сообществам — при отсутствии векторов используется активность.",
+      "Ранжирование основано на подписках на сообщества и недавней активности — внешний векторный индекс не используется.",
     searchResultsFor: "Результаты по запросу",
     explore: "Обзор",
     findBlurb: "Ищите людей, сообщества, вопросы, посты и объявления",
@@ -733,7 +731,7 @@ export const ru: Messages = {
     accounts: "Аккаунты",
     communities: "Сообщества",
     membersCount: "{count} участников",
-    points: "{count} очков",
+    likes: "{count} отметок «Нравится»",
   },
   admin: {
     title: "Админ",
@@ -763,7 +761,6 @@ export const ru: Messages = {
     warnUser: "Предупредить пользователя",
     users: "Пользователи",
     recommendations: "Рекомендации",
-    voteBurst: "Всплески голосов (1ч)",
     campaignName: "Название кампании",
     adCopyOptional: "Текст рекламы (необязательно)",
     feedInline: "В ленте",
@@ -782,11 +779,6 @@ export const ru: Messages = {
     userId: "ID пользователя",
     lowKarma: "низкая репутация",
     weakSource: "слабый источник",
-    backfillEmbeddings: "Переиндексировать эмбеддинги постов",
-    indexedPosts: "Проиндексировано постов: {count}",
-    failedPosts: "Ошибок: {count}",
-    embeddingHint:
-      "Индексируйте свежие посты в Cloudflare Vectorize и Workers AI, чтобы «Для вас» использовал семантическое сходство.",
     backfillTranslations: "Обновить переводы контента",
     translationBackfillResult:
       "Обработано постов: {posts}, комментариев: {comments}",
@@ -810,10 +802,8 @@ export const ru: Messages = {
     noRecentActivity: "Недавней активности нет.",
     events: "событий",
   },
-  vote: {
-    like: "Нравится",
-    upvote: "Нравится",
-    downvote: "Не нравится",
+  like: {
+    action: "Нравится",
     group: "Действие «Нравится»",
   },
   common: {

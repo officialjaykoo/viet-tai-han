@@ -7,6 +7,7 @@ import {
 } from "@/lib/businesses";
 import { BUSINESS_STATUSES } from "@/lib/business-constants";
 import { jsonLocalizedError } from "@/lib/public-error";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
 import { readApiJson } from "@/lib/security/guard";
 import { AuthError, getSession, jsonAuthError, requireSession } from "@/lib/session";
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
         price?: string | null;
         durationMinutes?: number;
       }>;
+      requestId?: string | null;
     };
     if (!body.name || !body.description || !body.category || !body.address || !body.location) {
       return await jsonLocalizedError("Required business fields are missing", 400);
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
       longitude: body.longitude,
       openingHours: body.openingHours,
       services: body.services,
+      requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

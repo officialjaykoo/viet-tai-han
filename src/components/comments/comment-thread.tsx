@@ -17,13 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { AccountTags } from "@/components/user/account-tags";
-import { VoteControls } from "@/components/votes/vote-controls";
+import { LikeButton } from "@/components/likes/like-button";
 import type { CommentNode } from "@/lib/content";
-import type {
-  CommentVoteResult,
-  VoteMutation,
-  ViewerVote,
-} from "@/lib/types";
+import type { CommentLikeResult, LikeMutation } from "@/lib/types";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
@@ -43,7 +39,7 @@ function CommentItem({
   const { t, locale } = useI18n();
   const localizeError = useLocalizedError();
   const [likeCount, setLikeCount] = useState(comment.likeCount);
-  const [viewerVote, setViewerVote] = useState<ViewerVote>(comment.viewerVote);
+  const [liked, setLiked] = useState(comment.liked);
   const [body, setBody] = useState(comment.body);
   const [replyOpen, setReplyOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -54,6 +50,7 @@ function CommentItem({
   const [showTranslation, setShowTranslation] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
+  const requestIdRef = useRef<string | null>(null);
   const bot = useBotGuard();
   const isOwner = Boolean(comment.author.isAuthor);
   const offerTranslation =
@@ -66,44 +63,45 @@ function CommentItem({
       ? comment.translation.bodyTranslated
       : body;
 
-  function vote(action: VoteMutation) {
+  function applyLike(action: LikeMutation) {
     if (pending) return;
 
     setError(null);
-    const previous = viewerVote;
+    const previous = liked;
     const optimisticLikeDelta =
-      action === "upvote" && previous !== "upvote"
+      action === "like" && !previous
         ? 1
-        : action === "remove" && previous === "upvote"
+        : action === "unlike" && previous
           ? -1
           : 0;
-    const snapshot = { likeCount, viewerVote };
+    const snapshot = { likeCount, liked };
     setLikeCount((value) => Math.max(0, value + optimisticLikeDelta));
-    setViewerVote(action === "remove" ? null : action);
+    setLiked(action === "like");
 
     startTransition(async () => {
-      const res = await apiFetch(`/api/comments/${comment.id}/vote`, {
+      const res = await apiFetch(`/api/comments/${comment.id}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
       if (res.status === 401) {
         setLikeCount(snapshot.likeCount);
-        setViewerVote(previous);
+        setLiked(snapshot.liked);
         router.push(`/login?next=${encodeURIComponent(`/post/${postId}`)}`);
         return;
       }
       if (!res.ok) {
         setLikeCount(snapshot.likeCount);
-        setViewerVote(snapshot.viewerVote);
+        setLiked(snapshot.liked);
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
         setError(localizeError(payload?.error, "Like failed"));
         return;
       }
-      const data = (await res.json()) as CommentVoteResult;
-      setViewerVote(data.viewerVote);
+      const data = (await res.json()) as CommentLikeResult;
+      setLikeCount(data.likeCount);
+      setLiked(data.liked);
     });
   }
 
@@ -112,6 +110,8 @@ function CommentItem({
     setError(null);
     bot.markTrusted();
     startTransition(async () => {
+      const requestId = requestIdRef.current ?? crypto.randomUUID();
+      requestIdRef.current = requestId;
       const check = await passBotCheck(bot, turnstileToken);
       if (!check.ok) {
         setError(localizeError(check.error, t("common.error")));
@@ -121,7 +121,11 @@ function CommentItem({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          bot.attachToPayload({ body: reply, parentId: comment.id })
+          bot.attachToPayload({
+            body: reply,
+            parentId: comment.id,
+            requestId,
+          })
         ),
       });
       if (res.status === 401) {
@@ -139,6 +143,7 @@ function CommentItem({
       setReplyOpen(false);
       setTurnstileToken(null);
       turnstileReset.current?.reset();
+      requestIdRef.current = null;
       router.refresh();
     });
   }
@@ -204,12 +209,12 @@ function CommentItem({
         ) : null}
         {!comment.isDeleted ? (
           <div className="flex flex-wrap items-center gap-1">
-            <VoteControls
+            <LikeButton
               likeCount={likeCount}
-              viewerVote={viewerVote}
+              liked={liked}
               pending={pending}
               layout="horizontal"
-              onVote={vote}
+              onToggle={applyLike}
             />
             <Button
               type="button"

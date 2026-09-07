@@ -6,10 +6,8 @@ import type {
   ContentTranslationStatus,
   FeedPost,
   OrganicFeedPage,
-  ViewerVote,
 } from "@/lib/types";
 import { resolveAccountTags } from "@/lib/tags";
-import { personalizedDisplayScore } from "@/lib/vote-weight";
 import {
   InvalidFeedCursorError,
   openFeedCursor,
@@ -19,7 +17,8 @@ import {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
-export type FeedSort = "hot" | "new" | "top";
+/** The feed is intentionally recency-first; recommendations are D1-only. */
+export type FeedSort = "new";
 export type FeedMode = "home" | "popular" | "community";
 
 export async function getDb(): Promise<D1Database> {
@@ -30,12 +29,6 @@ export async function getDb(): Promise<D1Database> {
 export async function getEnv(): Promise<CloudflareEnv> {
   const { env } = await getCloudflareContext({ async: true });
   return env;
-}
-
-function voteValueToAction(value: number | null | undefined): ViewerVote {
-  if (value === 1) return "upvote";
-  if (value === -1) return "downvote";
-  return null;
 }
 
 function mapTranslation(row: {
@@ -49,7 +42,8 @@ function mapTranslation(row: {
   if (status !== "ready") {
     return {
       sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
-      targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
+      targetLang:
+        (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
       status,
       titleTranslated: null,
       bodyTranslated: null,
@@ -57,7 +51,8 @@ function mapTranslation(row: {
   }
   return {
     sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
-    targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
+    targetLang:
+      (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
     status,
     titleTranslated: row.title_translated ?? null,
     bodyTranslated: row.body_translated ?? null,
@@ -70,9 +65,7 @@ interface FeedQueryRow {
   body: string | null;
   url: string | null;
   media_key: string | null;
-  upvotes: number;
-  downvotes: number;
-  score: number;
+  like_count: number;
   comment_count: number;
   created_at: string;
   source_lang: string | null;
@@ -93,8 +86,7 @@ interface FeedQueryRow {
   subreddit_id: string;
   subreddit_name: string;
   subreddit_title: string;
-  viewer_vote: number | null;
-  viewer_vote_weight: number | null;
+  viewer_liked: number | null;
 }
 
 function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost {
@@ -104,17 +96,10 @@ function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost 
     body: row.body,
     url: row.url,
     mediaKey: row.media_key,
-    score:
-      row.viewer_vote == null
-        ? personalizedDisplayScore(row.score, null)
-        : personalizedDisplayScore(row.score, {
-            value: row.viewer_vote,
-            weight: Number(row.viewer_vote_weight ?? 1),
-          }),
     commentCount: row.comment_count,
     createdAt: row.created_at,
-    likeCount: row.upvotes,
-    viewerVote: voteValueToAction(row.viewer_vote),
+    likeCount: Number(row.like_count ?? 0),
+    liked: Boolean(row.viewer_liked),
     translation: mapTranslation(row),
     author: {
       id: row.author_id,
@@ -139,19 +124,6 @@ function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost 
   };
 }
 
-function orderClause(sort: FeedSort): string {
-  switch (sort) {
-    case "top":
-      return `ORDER BY p.score DESC, p.created_at DESC, p.id DESC`;
-    case "hot":
-      return `ORDER BY p.hot_score DESC, p.created_at DESC, p.id DESC`;
-    case "new":
-    default:
-      return `ORDER BY p.created_at DESC, p.id DESC`;
-  }
-}
-
-
 export async function getFeedPosts(options: {
   limit?: number;
   cursor?: string | null;
@@ -166,7 +138,7 @@ export async function getFeedPosts(options: {
     Math.max(options.limit ?? DEFAULT_PAGE_SIZE, 1),
     MAX_PAGE_SIZE
   );
-  const sort = options.sort ?? "hot";
+  const sort = options.sort ?? "new";
   const mode = options.mode ?? (options.subreddit ? "community" : "popular");
   const viewerUserId = options.viewerUserId ?? null;
   const subreddit = options.subreddit ?? null;
@@ -181,64 +153,46 @@ export async function getFeedPosts(options: {
   const cursor = await openFeedCursor(options.cursor ?? null, cursorContext);
 
   const params: Array<string | number> = [];
-  const where: string[] = [`p.is_removed = 0`, `p.is_shadow_hidden = 0`];
+  const where: string[] = ["p.is_removed = 0", "p.is_shadow_hidden = 0"];
+
+  const viewerLikeSelect = viewerUserId
+    ? `EXISTS (
+         SELECT 1 FROM post_likes pl
+         WHERE pl.post_id = p.id AND pl.user_id = ?
+       ) AS viewer_liked`
+    : "0 AS viewer_liked";
+  if (viewerUserId) params.push(viewerUserId);
 
   if (viewerUserId) {
-    params.push(viewerUserId);
     where.push(
-      `p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)`
+      "p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)"
     );
     params.push(viewerUserId);
     where.push(
-      `p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)`
+      "p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)"
     );
     params.push(viewerUserId);
   }
 
   if (authorId) {
-    where.push(`p.author_id = ?`);
+    where.push("p.author_id = ?");
     params.push(authorId);
   }
 
   if (subreddit) {
-    where.push(`s.name = ?`);
+    where.push("s.name = ?");
     params.push(subreddit);
   } else if (mode === "home" && viewerUserId && !authorId) {
     where.push(
-      `p.subreddit_id IN (SELECT subreddit_id FROM subscriptions WHERE user_id = ?)`
+      "p.subreddit_id IN (SELECT subreddit_id FROM subscriptions WHERE user_id = ?)"
     );
     params.push(viewerUserId);
   }
 
-  // Cursor pagination is sort-aware for new/top; hot falls back to created_at keyset
   if (cursor) {
-    if (sort === "top" && cursor.score != null) {
-      where.push(
-        `(p.score < ? OR (p.score = ? AND (p.created_at < ? OR (p.created_at = ? AND p.id < ?))))`
-      );
-      params.push(
-        cursor.score,
-        cursor.score,
-        cursor.createdAt,
-        cursor.createdAt,
-        cursor.id
-      );
-    } else {
-      where.push(`(p.created_at < ? OR (p.created_at = ? AND p.id < ?))`);
-      params.push(cursor.createdAt, cursor.createdAt, cursor.id);
-    }
+    where.push("(p.created_at < ? OR (p.created_at = ? AND p.id < ?))");
+    params.push(cursor.createdAt, cursor.createdAt, cursor.id);
   }
-
-  const whereSql = `WHERE ${where.join(" AND ")}`;
-  const voteSelect = viewerUserId
-    ? `v.value AS viewer_vote, v.weight AS viewer_vote_weight`
-    : `NULL AS viewer_vote, NULL AS viewer_vote_weight`;
-  const voteJoin = viewerUserId
-    ? `LEFT JOIN votes v
-         ON v.target_type = 'post'
-        AND v.target_id = p.id
-        AND v.user_id = ?`
-    : "";
 
   const statement = db
     .prepare(
@@ -248,9 +202,7 @@ export async function getFeedPosts(options: {
          p.body,
          p.url,
          p.media_key,
-         p.upvotes,
-         p.downvotes,
-         p.score,
+         p.like_count,
          p.comment_count,
          p.created_at,
          p.source_lang,
@@ -278,13 +230,12 @@ export async function getFeedPosts(options: {
          s.id AS subreddit_id,
          s.name AS subreddit_name,
          s.title AS subreddit_title,
-         ${voteSelect}
+         ${viewerLikeSelect}
        FROM posts p
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id
-       ${voteJoin}
-       ${whereSql}
-       ${orderClause(sort)}
+       WHERE ${where.join(" AND ")}
+       ORDER BY p.created_at DESC, p.id DESC
        LIMIT ?`
     )
     .bind(...params, limit + 1);
@@ -300,11 +251,7 @@ export async function getFeedPosts(options: {
     nextCursor:
       hasMore && last
         ? await signFeedCursor(
-            {
-              createdAt: last.created_at,
-              id: last.id,
-              score: last.score,
-            },
+            { createdAt: last.created_at, id: last.id },
             cursorContext
           )
         : null,

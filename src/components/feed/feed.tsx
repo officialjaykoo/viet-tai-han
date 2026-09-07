@@ -29,7 +29,7 @@ function discoveryForMode(
 export function Feed({
   initialFeed,
   subreddit,
-  sort = "hot",
+  sort = "new",
   mode = "popular",
 }: FeedProps) {
   const { t } = useI18n();

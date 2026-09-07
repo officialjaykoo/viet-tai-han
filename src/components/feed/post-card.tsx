@@ -11,7 +11,7 @@ import {
   shouldOfferTranslation,
 } from "@/components/content/translate-toggle";
 import { RelativeTime } from "@/components/time/relative-time";
-import { VoteControls } from "@/components/votes/vote-controls";
+import { LikeButton } from "@/components/likes/like-button";
 import {
   Card,
   CardContent,
@@ -24,20 +24,16 @@ import { PostOverflowMenu } from "@/components/posts/post-overflow-menu";
 import { SubredditLabel } from "@/components/posts/subreddit-label";
 import { AccountTags } from "@/components/user/account-tags";
 import { UserAvatar } from "@/components/user/user-avatar";
-import type {
-  FeedPost,
-  VoteMutation,
-  VoteResult,
-  ViewerVote,
-} from "@/lib/types";
+import type { FeedPost, LikeMutation, LikeResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { getCanonicalPostUrl } from "@/lib/post-url";
+import type { DiscoverySource } from "@/lib/discovery";
 
 interface PostCardProps {
   post: FeedPost;
-  discoverySource?: "home" | "popular" | "community" | "profile" | "search";
+  discoverySource?: DiscoverySource;
 }
 
 export function PostCard({
@@ -48,7 +44,7 @@ export function PostCard({
   const { t, locale } = useI18n();
   const localizeError = useLocalizedError();
   const [likeCount, setLikeCount] = useState(post.likeCount);
-  const [viewerVote, setViewerVote] = useState<ViewerVote>(post.viewerVote);
+  const [liked, setLiked] = useState(post.liked);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
@@ -59,14 +55,14 @@ export function PostCard({
   useEffect(() => {
     const resetId = window.setTimeout(() => {
       setLikeCount(post.likeCount);
-      setViewerVote(post.viewerVote);
+      setLiked(post.liked);
       setDismissed(false);
       setShowTranslation(false);
       setShareMessage(null);
       setShareError(null);
     }, 0);
     return () => window.clearTimeout(resetId);
-  }, [post.id, post.likeCount, post.viewerVote]);
+  }, [post.id, post.likeCount, post.liked]);
 
   const offerTranslation = shouldOfferTranslation(post.translation, locale);
   const showing =
@@ -83,24 +79,24 @@ export function PostCard({
     return null;
   }
 
-  function applyVote(action: VoteMutation) {
+  function applyLike(action: LikeMutation) {
     if (pending) return;
 
     setError(null);
-    const previous = viewerVote;
+    const previous = liked;
     const optimisticLikeDelta =
-      action === "upvote" && previous !== "upvote"
+      action === "like" && !previous
         ? 1
-        : action === "remove" && previous === "upvote"
+        : action === "unlike" && previous
           ? -1
           : 0;
-    const snapshot = { likeCount, viewerVote };
+    const snapshot = { likeCount, liked };
     setLikeCount((value) => Math.max(0, value + optimisticLikeDelta));
-    setViewerVote(action === "remove" ? null : action);
+    setLiked(action === "like");
 
     startTransition(async () => {
       try {
-        const response = await apiFetch(`/api/posts/${post.id}/vote`, {
+        const response = await apiFetch(`/api/posts/${post.id}/like`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action }),
@@ -108,7 +104,7 @@ export function PostCard({
 
         if (response.status === 401) {
           setLikeCount(snapshot.likeCount);
-          setViewerVote(snapshot.viewerVote);
+          setLiked(snapshot.liked);
           router.push(
             `/login?next=${encodeURIComponent(`/post/${post.id}`)}`
           );
@@ -119,17 +115,18 @@ export function PostCard({
           const payload = (await response.json().catch(() => null)) as {
             error?: string;
           } | null;
-          throw new Error(payload?.error ?? "Vote failed");
+          throw new Error(payload?.error ?? "Like failed");
         }
 
-        const result = (await response.json()) as VoteResult;
-        setViewerVote(result.viewerVote);
-      } catch (voteError) {
+        const result = (await response.json()) as LikeResult;
+        setLikeCount(result.likeCount);
+        setLiked(result.liked);
+      } catch (likeError) {
         setLikeCount(snapshot.likeCount);
-        setViewerVote(snapshot.viewerVote);
+        setLiked(snapshot.liked);
         setError(
           localizeError(
-            voteError instanceof Error ? voteError.message : null,
+            likeError instanceof Error ? likeError.message : null,
             "Couldn't apply like. Try again."
           )
         );
@@ -271,12 +268,12 @@ export function PostCard({
 
           <CardFooter className="mt-3 flex flex-wrap gap-1 border-t border-border/70 px-3 py-1.5">
             <div data-no-nav className="min-w-0 flex-1">
-              <VoteControls
+              <LikeButton
                 likeCount={likeCount}
-                viewerVote={viewerVote}
+                liked={liked}
                 pending={pending}
                 layout="horizontal"
-                onVote={applyVote}
+                onToggle={applyLike}
               />
             </div>
             <Link

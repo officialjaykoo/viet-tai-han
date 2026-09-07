@@ -4,25 +4,22 @@ import type {
   ContentTranslation,
   ContentTranslationStatus,
   FeedPost,
-  ViewerVote,
+  ViewerLike,
 } from "@/lib/types";
 import type { AccountBadge } from "@/lib/achievement-levels";
 import { resolveAccountBadges } from "@/lib/achievement-levels";
 import { resolveAccountTags, type AccountTag } from "@/lib/tags";
-import { displayScore, personalizedDisplayScore } from "@/lib/vote-weight";
-import { voteValueToAction } from "@/lib/votes";
 
 export interface CommentNode {
   id: string;
   postId: string;
   parentId: string | null;
   body: string;
-  score: number;
   likeCount: number;
   depth: number;
   createdAt: string;
   isDeleted: boolean;
-  viewerVote: ViewerVote;
+  liked: ViewerLike;
   translation: ContentTranslation | null;
   author: {
     id?: string;
@@ -102,9 +99,7 @@ function mapFeedRow(
     body: string | null;
     url: string | null;
     media_key: string | null;
-    upvotes: number;
-    downvotes: number;
-    score: number;
+    like_count: number;
     comment_count: number;
     created_at: string;
     source_lang?: string | null;
@@ -125,8 +120,7 @@ function mapFeedRow(
     subreddit_id: string;
     subreddit_name: string;
     subreddit_title: string;
-    viewer_vote?: number | null;
-    viewer_vote_weight?: number | null;
+    viewer_liked?: number | null;
   },
   viewerUserId?: string | null
 ): FeedPost {
@@ -136,17 +130,10 @@ function mapFeedRow(
     body: row.body,
     url: row.url,
     mediaKey: row.media_key,
-    score:
-      row.viewer_vote == null
-        ? displayScore(row.score)
-        : personalizedDisplayScore(row.score, {
-            value: row.viewer_vote,
-            weight: Number(row.viewer_vote_weight ?? 1),
-          }),
     commentCount: row.comment_count,
     createdAt: row.created_at,
-    likeCount: row.upvotes,
-    viewerVote: voteValueToAction(row.viewer_vote),
+    likeCount: Number(row.like_count ?? 0),
+    liked: Boolean(row.viewer_liked),
     translation: mapTranslation(row),
     author: {
       id: row.author_id,
@@ -254,21 +241,22 @@ export async function getPostDetail(
         .prepare(
           `SELECT
              p.id, p.title, p.body, p.url, p.media_key,
-             p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at, p.is_locked,
-             p.source_lang, p.title_translated, p.body_translated, p.translation_status,
-             p.translation_target_lang,
+             p.like_count, p.comment_count, p.is_locked, p.created_at,
+             p.source_lang, p.title_translated, p.body_translated,
+             p.translation_status, p.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
              u.name AS author_display_name,
              u.image AS author_image,
              ${AUTHOR_TAG_SELECT},
-             s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
-             v.value AS viewer_vote,
-             v.weight AS viewer_vote_weight
+             s.id AS subreddit_id, s.name AS subreddit_name,
+             s.title AS subreddit_title,
+             EXISTS (
+               SELECT 1 FROM post_likes pl
+               WHERE pl.post_id = p.id AND pl.user_id = ?
+             ) AS viewer_liked
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
-           LEFT JOIN votes v
-             ON v.target_type = 'post' AND v.target_id = p.id AND v.user_id = ?
            WHERE p.id = ? AND p.is_removed = 0`
         )
         .bind(viewerUserId, postId)
@@ -277,16 +265,16 @@ export async function getPostDetail(
         .prepare(
           `SELECT
              p.id, p.title, p.body, p.url, p.media_key,
-             p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at, p.is_locked,
-             p.source_lang, p.title_translated, p.body_translated, p.translation_status,
-             p.translation_target_lang,
+             p.like_count, p.comment_count, p.is_locked, p.created_at,
+             p.source_lang, p.title_translated, p.body_translated,
+             p.translation_status, p.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
              u.name AS author_display_name,
              u.image AS author_image,
              ${AUTHOR_TAG_SELECT},
-             s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
-             NULL AS viewer_vote,
-             NULL AS viewer_vote_weight
+             s.id AS subreddit_id, s.name AS subreddit_name,
+             s.title AS subreddit_title,
+             0 AS viewer_liked
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
@@ -294,14 +282,14 @@ export async function getPostDetail(
         )
         .bind(postId)
         .first();
-
+ 
   if (!post) return null;
 
   const { results } = viewerUserId
     ? await db
         .prepare(
           `SELECT
-             c.id, c.post_id, c.parent_id, c.body, c.score, c.upvotes, c.downvotes,
+             c.id, c.post_id, c.parent_id, c.body, c.like_count,
              c.depth, c.created_at, c.is_deleted, c.is_shadow_hidden,
              c.source_lang, c.body_translated, c.translation_status,
              c.translation_target_lang,
@@ -309,12 +297,12 @@ export async function getPostDetail(
              u.name AS author_display_name,
              u.image AS author_image,
              ${COMMENT_AUTHOR_TAG_SELECT},
-             v.value AS viewer_vote,
-             v.weight AS viewer_vote_weight
+             EXISTS (
+               SELECT 1 FROM comment_likes cl
+               WHERE cl.comment_id = c.id AND cl.user_id = ?
+             ) AS viewer_liked
            FROM comments c
            INNER JOIN "user" u ON u.id = c.author_id
-           LEFT JOIN votes v
-             ON v.target_type = 'comment' AND v.target_id = c.id AND v.user_id = ?
            WHERE c.post_id = ? AND c.is_removed = 0
            ORDER BY c.created_at ASC`
         )
@@ -323,7 +311,7 @@ export async function getPostDetail(
     : await db
         .prepare(
           `SELECT
-             c.id, c.post_id, c.parent_id, c.body, c.score, c.upvotes, c.downvotes,
+             c.id, c.post_id, c.parent_id, c.body, c.like_count,
              c.depth, c.created_at, c.is_deleted, c.is_shadow_hidden,
              c.source_lang, c.body_translated, c.translation_status,
              c.translation_target_lang,
@@ -331,8 +319,7 @@ export async function getPostDetail(
              u.name AS author_display_name,
              u.image AS author_image,
              ${COMMENT_AUTHOR_TAG_SELECT},
-             NULL AS viewer_vote,
-             NULL AS viewer_vote_weight
+             0 AS viewer_liked
            FROM comments c
            INNER JOIN "user" u ON u.id = c.author_id
            WHERE c.post_id = ? AND c.is_removed = 0
@@ -350,9 +337,7 @@ export async function getPostDetail(
       post_id: string;
       parent_id: string | null;
       body: string;
-      score: number;
-      upvotes: number;
-      downvotes: number;
+      like_count: number;
       depth: number;
       created_at: string;
       is_deleted: number;
@@ -371,8 +356,7 @@ export async function getPostDetail(
       author_karma: number | null;
       author_is_community_mod: number | null;
       author_has_veteran: number | null;
-      viewer_vote: number | null;
-      viewer_vote_weight: number | null;
+      viewer_liked: number | null;
     };
     if (row.is_shadow_hidden) continue;
     const node: CommentNode = {
@@ -380,18 +364,11 @@ export async function getPostDetail(
       postId: row.post_id,
       parentId: row.parent_id,
       body: row.is_deleted ? "[deleted]" : row.body,
-      score:
-        row.viewer_vote == null
-          ? displayScore(row.score)
-          : personalizedDisplayScore(row.score, {
-              value: row.viewer_vote,
-              weight: Number(row.viewer_vote_weight ?? 1),
-            }),
-      likeCount: row.upvotes,
+      likeCount: Number(row.like_count ?? 0),
       depth: row.depth,
       createdAt: row.created_at,
       isDeleted: Boolean(row.is_deleted),
-      viewerVote: voteValueToAction(row.viewer_vote),
+      liked: Boolean(row.viewer_liked),
       translation: row.is_deleted
         ? null
         : mapTranslation({
@@ -546,123 +523,45 @@ export async function getPublicProfile(
 
 export async function getRecommendations(userId: string, limit = 10) {
   const db = await getDb();
-
-  const { queryRecommendedPostIds } = await import("@/lib/embeddings");
-  const vectorIds = await queryRecommendedPostIds(userId, limit);
-
-  if (vectorIds && vectorIds.length > 0) {
-    const placeholders = vectorIds.map(() => "?").join(", ");
-    const { results } = await db
-      .prepare(
-        `SELECT
-           p.id, p.title, p.body, p.url, p.media_key,
-           p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at,
-           p.source_lang, p.title_translated, p.body_translated, p.translation_status,
-           p.translation_target_lang,
-           u.id AS author_id, u.username AS author_username,
-           u.name AS author_display_name,
-           u.image AS author_image,
-           ${AUTHOR_TAG_SELECT},
-           s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
-           v.value AS viewer_vote
-         FROM posts p
-         INNER JOIN "user" u ON u.id = p.author_id
-         INNER JOIN subreddits s ON s.id = p.subreddit_id
-         LEFT JOIN votes v
-           ON v.target_type = 'post' AND v.target_id = p.id AND v.user_id = ?
-         WHERE p.id IN (${placeholders})
-           AND p.is_removed = 0 AND p.is_shadow_hidden = 0
-           AND p.author_id != ?
-           AND p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)
-           AND p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)`
-      )
-      .bind(userId, ...vectorIds, userId, userId, userId)
-      .all();
-
-    const byId = new Map(
-      (results ?? []).map((row) => {
-        const mapped = mapFeedRow(
-          row as Parameters<typeof mapFeedRow>[0],
-          userId
-        );
-        return [mapped.id, mapped] as const;
-      })
-    );
-
-    const ordered = vectorIds
-      .map((id) => byId.get(id))
-      .filter((post): post is NonNullable<typeof post> => Boolean(post))
-      .slice(0, limit);
-
-    if (ordered.length > 0) {
-      return ordered;
-    }
-  }
-
   const { results } = await db
     .prepare(
       `SELECT
          p.id, p.title, p.body, p.url, p.media_key,
-         p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at,
-         p.source_lang, p.title_translated, p.body_translated, p.translation_status,
-         p.translation_target_lang,
+         p.like_count, p.comment_count, p.created_at,
+         p.source_lang, p.title_translated, p.body_translated,
+         p.translation_status, p.translation_target_lang,
          u.id AS author_id, u.username AS author_username,
          u.name AS author_display_name,
          u.image AS author_image,
          ${AUTHOR_TAG_SELECT},
-         s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
-         v.value AS viewer_vote
-       FROM user_activity ua
-       INNER JOIN posts p ON p.subreddit_id = ua.subreddit_id
-       INNER JOIN "user" u ON u.id = p.author_id
-       INNER JOIN subreddits s ON s.id = p.subreddit_id
-       LEFT JOIN votes v
-         ON v.target_type = 'post' AND v.target_id = p.id AND v.user_id = ?
-       WHERE ua.user_id = ?
-         AND p.is_removed = 0 AND p.is_shadow_hidden = 0
-         AND p.author_id != ?
-         AND p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)
-         AND p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)
-       ORDER BY ua.score DESC, p.score DESC, p.created_at DESC
-       LIMIT ?`
-    )
-    .bind(userId, userId, userId, userId, userId, limit)
-    .all();
-
-  if (results && results.length > 0) {
-    return results.map((row) =>
-      mapFeedRow(row as Parameters<typeof mapFeedRow>[0], userId)
-    );
-  }
-
-  const fallback = await db
-    .prepare(
-      `SELECT
-         p.id, p.title, p.body, p.url, p.media_key,
-         p.upvotes, p.downvotes, p.score, p.comment_count, p.created_at,
-         p.source_lang, p.title_translated, p.body_translated, p.translation_status,
-         p.translation_target_lang,
-         u.id AS author_id, u.username AS author_username,
-         u.name AS author_display_name,
-         u.image AS author_image,
-         ${AUTHOR_TAG_SELECT},
-         s.id AS subreddit_id, s.name AS subreddit_name, s.title AS subreddit_title,
-         v.value AS viewer_vote
+         s.id AS subreddit_id, s.name AS subreddit_name,
+         s.title AS subreddit_title,
+         CASE WHEN ua.user_id IS NOT NULL THEN 1 ELSE 0 END AS activity_match,
+         CASE WHEN uf.follower_id IS NOT NULL THEN 1 ELSE 0 END AS followed_author,
+         EXISTS (
+           SELECT 1 FROM post_likes pl
+           WHERE pl.post_id = p.id AND pl.user_id = ?
+         ) AS viewer_liked
        FROM posts p
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id
-       LEFT JOIN votes v
-         ON v.target_type = 'post' AND v.target_id = p.id AND v.user_id = ?
-       WHERE p.is_removed = 0 AND p.is_shadow_hidden = 0
+       LEFT JOIN user_activity ua
+         ON ua.subreddit_id = p.subreddit_id AND ua.user_id = ?
+       LEFT JOIN user_follows uf
+         ON uf.follower_id = ? AND uf.following_id = p.author_id
+       WHERE p.is_removed = 0
+         AND p.is_shadow_hidden = 0
+         AND p.author_id != ?
          AND p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)
          AND p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)
-       ORDER BY p.score DESC, p.created_at DESC
+       ORDER BY activity_match DESC, followed_author DESC,
+                p.created_at DESC, p.id DESC
        LIMIT ?`
     )
-    .bind(userId, userId, userId, limit)
+    .bind(userId, userId, userId, userId, userId, userId, limit)
     .all();
 
-  return (fallback.results ?? []).map((row) =>
+  return (results ?? []).map((row) =>
     mapFeedRow(row as Parameters<typeof mapFeedRow>[0], userId)
   );
 }
@@ -672,7 +571,7 @@ export interface ProfileComment {
   postId: string;
   postTitle: string;
   body: string;
-  score: number;
+  likeCount: number;
   createdAt: string;
   subreddit: {
     id: string;
@@ -692,7 +591,7 @@ export async function listUserComments(
          c.id,
          c.post_id,
          c.body,
-         c.score,
+         c.like_count,
          c.created_at,
          c.is_deleted,
          p.title AS post_title,
@@ -713,7 +612,7 @@ export async function listUserComments(
       id: string;
       post_id: string;
       body: string;
-      score: number;
+      like_count: number;
       created_at: string;
       is_deleted: number;
       post_title: string;
@@ -726,7 +625,7 @@ export async function listUserComments(
     postId: row.post_id,
     postTitle: row.post_title,
     body: row.is_deleted ? "[deleted]" : row.body,
-    score: displayScore(row.score),
+    likeCount: Number(row.like_count ?? 0),
     createdAt: row.created_at,
     subreddit: {
       id: row.subreddit_id,

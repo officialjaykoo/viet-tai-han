@@ -16,6 +16,7 @@ import {
   encodeGeneratedAvatar,
   normalizeAvatarImage,
 } from "@/lib/avatar";
+import { generateBase62Id, generateUserId } from "@/lib/id";
 export type AppUserRole = "user" | "moderator" | "admin";
 export type AppUserStatus = "active" | "banned" | "shadowbanned";
 type AuthEnv = {
@@ -166,7 +167,11 @@ function e2eSessionPlugin() {
         "/e2e-session",
         { method: "POST" },
         async (ctx) => {
-          const user = await ctx.context.internalAdapter.findUserById("user_alice");
+          const user = (
+            await ctx.context.internalAdapter.findUserByEmail(
+              "alice@example.local"
+            )
+          )?.user;
           if (!user) {
             throw APIError.from("NOT_FOUND", {
               code: "E2E_USER_NOT_FOUND",
@@ -200,6 +205,12 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
       type: "sqlite",
       // Better Auth default column names are camelCase (emailVerified, createdAt, …)
       transaction: false,
+    },
+    advanced: {
+      database: {
+        generateId: ({ model, size }) =>
+          model === "user" ? generateUserId() : generateBase62Id(size ?? 32),
+      },
     },
     secret: env.BETTER_AUTH_SECRET,
     baseURL,

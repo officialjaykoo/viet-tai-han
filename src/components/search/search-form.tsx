@@ -413,7 +413,7 @@ export function SearchForm({
                           {/^u_/i.test(post.subredditName)
                             ? `@${post.subredditName.slice(2)}`
                             : post.subredditName}{" "}
-                          {t("search.points", { count: post.score })}
+                          {t("search.likes", { count: post.likeCount })}
                         </span>
                       </span>
                     </SuggestionRow>

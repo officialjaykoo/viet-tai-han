@@ -192,7 +192,7 @@ export async function listChatRoomReports(
        INNER JOIN "user" reporter ON reporter.id = r.reporter_id
        INNER JOIN "user" reported ON reported.id = r.reported_user_id
        WHERE r.status = ?
-       ORDER BY r.created_at ASC
+       ORDER BY r.created_at ASC, r.id ASC
        LIMIT 100`
     )
     .bind(status)
@@ -221,7 +221,7 @@ export async function listChatRoomReports(
            WHERE m.room_id = ?
              AND m.delivery_status = 'delivered'
              AND m.created_at <= ?
-           ORDER BY m.created_at DESC
+           ORDER BY m.created_at DESC, m.id DESC
            LIMIT ?`
         )
         .bind(row.room_id, row.context_until, CHAT_REPORT_CONTEXT_LIMIT)
@@ -247,7 +247,9 @@ export async function listChatRoomReports(
         createdAt: row.created_at,
         context: (contextRows ?? [])
           .sort(
-            (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)
+            (a, b) =>
+              a.created_at.localeCompare(b.created_at) ||
+              a.id.localeCompare(b.id)
           )
           .map((message) => ({
             id: message.id,

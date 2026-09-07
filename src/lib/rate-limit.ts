@@ -1,9 +1,7 @@
 import { getDb, getEnv } from "@/lib/db";
-import { syncAchievementsForEvent } from "@/lib/achievements";
 import { AuthError } from "@/lib/session";
 import { getSiteSetting } from "@/lib/settings";
 import { createPublicId } from "@/lib/id";
-import { appendReputationLedgerEntry } from "@/lib/monetization";
 
 type RateLimitBindingName =
   | "EDGE_IP_RATE_LIMITER"
@@ -55,7 +53,6 @@ export async function checkSubjectRateLimit(options: {
     const which: RateLimitBindingName =
       options.action.startsWith("expensive") ||
       options.action.includes("search") ||
-      options.action.includes("recommend") ||
       options.action.includes("challenge") ||
       options.action.includes("bot-check")
         ? "EXPENSIVE_IP_RATE_LIMITER"
@@ -113,20 +110,6 @@ export async function checkSubjectRateLimit(options: {
   return { allowed: true, remaining: Math.max(0, options.limit - count - 1) };
 }
 
-/** @deprecated Prefer checkSubjectRateLimit — kept for older call sites. */
-export async function checkRateLimit(options: {
-  userId: string;
-  action: string;
-  limit: number;
-  windowSeconds: number;
-}): Promise<{ allowed: boolean; remaining: number }> {
-  return checkSubjectRateLimit({
-    subject: `user:${options.userId}`,
-    action: options.action,
-    limit: options.limit,
-    windowSeconds: options.windowSeconds,
-  });
-}
 
 async function settingInt(key: string, fallback: number): Promise<number> {
   const raw = await getSiteSetting(key, String(fallback));
@@ -137,7 +120,7 @@ async function settingInt(key: string, fallback: number): Promise<number> {
 type CreateKind =
   | "post"
   | "comment"
-  | "vote"
+  | "like"
   | "dm_request"
   | "dm_message"
   | "dm_report"
@@ -164,11 +147,11 @@ const CREATE_DEFAULTS: Record<
     burstKey: "max_comments_burst_per_min",
     burst: 4,
   },
-  vote: {
-    hourKey: "max_votes_per_hour",
-    hour: 60,
-    burstKey: "max_votes_burst_per_min",
-    burst: 12,
+  like: {
+    hourKey: "max_likes_per_hour",
+    hour: 120,
+    burstKey: "max_likes_burst_per_min",
+    burst: 30,
   },
   dm_request: {
     hourKey: "max_dm_requests_per_hour",
@@ -315,7 +298,7 @@ export async function enforceApiReadRateLimit(input: { ip: string }) {
   }
 }
 
-/** AI / search / challenge — keep Workers AI + Vectorize bills bounded. */
+/** AI, search, and challenge routes — keep expensive Worker calls bounded. */
 export async function enforceExpensiveIpRateLimit(
   ip: string,
   action = "expensive:burst"
@@ -350,19 +333,3 @@ export async function bumpUserActivity(
     .run();
 }
 
-export async function adjustAuthorKarma(
-  authorId: string,
-  kind: "post" | "comment",
-  delta: number
-) {
-  if (delta === 0) return;
-  await appendReputationLedgerEntry({
-    userId: authorId,
-    eventType: "vote_received",
-    amount: delta,
-    kind,
-    sourceType: "vote",
-  });
-
-  syncAchievementsForEvent(authorId, "karma_changed");
-}

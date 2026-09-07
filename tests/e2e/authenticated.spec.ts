@@ -20,7 +20,7 @@ test.describe("authenticated flows", () => {
     await seedLocaleCookie(page);
   });
 
-  test("account can post, comment, vote, hide, open settings, create community", async ({
+  test("account can post, comment, like, hide, open settings, create community", async ({
     page,
   }) => {
     await disguiseAutomation(page);
@@ -56,7 +56,7 @@ test.describe("authenticated flows", () => {
     await expect(page).toHaveURL(/\/post\//, { timeout: 45_000 });
     await expect(page.getByRole("link", { name: title })).toBeVisible();
 
-    // Comment + vote
+    // Comment + like
     await warmBotGuard(page);
     const commentBody = `E2E comment ${Date.now()}`;
     await page.getByLabel(/^bình luận$/i).fill(commentBody);
@@ -65,9 +65,9 @@ test.describe("authenticated flows", () => {
       page.getByRole("listitem").filter({ hasText: commentBody })
     ).toBeVisible({ timeout: 30_000 });
 
-    const upvote = page.getByRole("button", { name: /^thích$/i }).first();
-    await upvote.click();
-    await expect(upvote).toHaveAttribute("aria-pressed", "true", {
+    const likeButton = page.getByRole("button", { name: /^thích$/i }).first();
+    await likeButton.click();
+    await expect(likeButton).toHaveAttribute("aria-pressed", "true", {
       timeout: 15_000,
     });
 

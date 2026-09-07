@@ -2,15 +2,21 @@
 
 import { useEffect, useRef } from "react";
 
-import type { DiscoverySource } from "@/lib/vote-weight";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import type { DiscoverySource } from "@/lib/discovery";
+import { apiFetch } from "@/lib/api-client";
 
-const SESSION_KEY = "red_view_session";
+const SESSION_KEY = "vth_view_session";
+const LEGACY_SESSION_KEY = "red_view_session";
 
 function getSessionKey(): string {
   try {
-    const existing = window.sessionStorage.getItem(SESSION_KEY);
-    if (existing) return existing;
+    const existing =
+      window.sessionStorage.getItem(SESSION_KEY) ??
+      window.sessionStorage.getItem(LEGACY_SESSION_KEY);
+    if (existing) {
+      window.sessionStorage.setItem(SESSION_KEY, existing);
+      return existing;
+    }
     const next = crypto.randomUUID();
     window.sessionStorage.setItem(SESSION_KEY, next);
     return next;

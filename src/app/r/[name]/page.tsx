@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 import { SubscribeButton } from "@/components/communities/subscribe-button";
 import { Feed } from "@/components/feed/feed";
-import { FeedSortTabs } from "@/components/feed/feed-controls";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { withFeedAds } from "@/lib/ads";
@@ -18,9 +16,8 @@ import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
-function parseSort(value: string | undefined): FeedSort {
-  if (value === "new" || value === "top" || value === "hot") return value;
-  return "hot";
+function parseSort(_value: string | undefined): FeedSort {
+  return "new";
 }
 
 export default async function SubredditPage({
@@ -87,9 +84,6 @@ export default async function SubredditPage({
               </Link>
             </div>
           </section>
-          <Suspense fallback={null}>
-            <FeedSortTabs current={sort} />
-          </Suspense>
           <Feed
             initialFeed={initialFeed}
             subreddit={sub.name}

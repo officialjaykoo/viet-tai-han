@@ -27,6 +27,7 @@
 !.dev.vars.example
 
 # production
+/.tmp
 /build
 
 # misc

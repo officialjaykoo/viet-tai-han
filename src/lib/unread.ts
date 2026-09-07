@@ -36,6 +36,13 @@ export async function ensureUnreadFanout(userId: string) {
              AND (
                rm.last_read_at IS NULL
                OR cm.created_at > rm.last_read_at
+               OR (
+                 cm.created_at = rm.last_read_at
+                 AND (
+                   rm.last_read_message_id IS NULL
+                   OR cm.id > rm.last_read_message_id
+                 )
+               )
              )
          )
        )`
@@ -107,6 +114,13 @@ export async function refreshUnreadCounts(userId: string) {
              AND (
                rm.last_read_at IS NULL
                OR cm.created_at > rm.last_read_at
+               OR (
+                 cm.created_at = rm.last_read_at
+                 AND (
+                   rm.last_read_message_id IS NULL
+                   OR cm.id > rm.last_read_message_id
+                 )
+               )
              )
          ),
          updated_at = datetime('now')
@@ -117,15 +131,39 @@ export async function refreshUnreadCounts(userId: string) {
 }
 
 export async function getUnreadCounts(userId: string): Promise<UnreadCounts> {
-  await ensureUnreadFanout(userId);
   const db = await getDb();
   const row = await db
     .prepare(
-      `SELECT notification_count, message_count
-       FROM unread_fanout
-       WHERE user_id = ?`
+      `SELECT
+         (
+           SELECT COUNT(*)
+           FROM notifications
+           WHERE user_id = ? AND is_read = 0
+         ) AS notification_count,
+         (
+           SELECT COUNT(*)
+           FROM chat_messages cm
+           INNER JOIN chat_room_members rm
+             ON rm.room_id = cm.room_id AND rm.user_id = ?
+           WHERE rm.membership_status = 'active'
+             AND cm.sender_id != ?
+             AND cm.delivery_status = 'delivered'
+             AND cm.is_shadow_hidden = 0
+             AND cm.is_moderation_hidden = 0
+             AND (
+               rm.last_read_at IS NULL
+               OR cm.created_at > rm.last_read_at
+               OR (
+                 cm.created_at = rm.last_read_at
+                 AND (
+                   rm.last_read_message_id IS NULL
+                   OR cm.id > rm.last_read_message_id
+                 )
+               )
+             )
+         ) AS message_count`
     )
-    .bind(userId)
+    .bind(userId, userId, userId)
     .first<{ notification_count: number; message_count: number }>();
   const notificationCount = Number(row?.notification_count ?? 0);
   const messageCount = Number(row?.message_count ?? 0);

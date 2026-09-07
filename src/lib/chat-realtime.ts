@@ -3,6 +3,7 @@ import { getEnv } from "@/lib/db";
 export type ChatRealtimeMessage = {
   roomId: string;
   id: string;
+  clientMessageId: string | null;
   body: string;
   createdAt: string;
   senderId: string;
@@ -37,6 +38,14 @@ export async function broadcastChatMessage(input: ChatRealtimeMessage) {
       throw new Error(`Chat realtime broadcast failed (${response.status})`);
     }
   } catch (error) {
-    console.error("chat realtime broadcast failed", error);
+    console.error(
+      JSON.stringify({
+        level: "warn",
+        msg: "chat_realtime_broadcast_failed",
+        roomId: input.roomId,
+        messageId: input.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
   }
 }

@@ -18,7 +18,7 @@ import { seedUsersAndSubreddit } from "./helpers";
 
 describe("business lifecycle (D1)", () => {
   it("creates, edits, submits, reviews, and discovers a business", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const { authorId, actorId } = await seedUsersAndSubreddit();
 
     await expect(
       createBusiness({
@@ -59,7 +59,7 @@ describe("business lifecycle (D1)", () => {
     expect(ownerDetail?.verificationStatus).toBe("unverified");
     expect(ownerDetail?.services).toHaveLength(1);
 
-    expect(await getBusinessDetail(created.id, voterId)).toBeNull();
+    expect(await getBusinessDetail(created.id, actorId)).toBeNull();
     expect(
       (await listBusinesses({ query: "Viet House" })).some((item) => item.id === created.id)
     ).toBe(false);
@@ -67,7 +67,7 @@ describe("business lifecycle (D1)", () => {
     await expect(
       updateBusiness({
         businessId: created.id,
-        ownerId: voterId,
+        ownerId: actorId,
         name: "Unauthorized edit",
         description: "This edit must be rejected.",
         category: "Restaurant",
@@ -121,14 +121,14 @@ describe("business lifecycle (D1)", () => {
 
     await reviewBusinessVerification({
       requestId: verification.id,
-      reviewerId: voterId,
+      reviewerId: actorId,
       status: "approved",
       resolutionNote: "Evidence reviewed.",
     });
     await expect(
       reviewBusinessVerification({
         requestId: verification.id,
-        reviewerId: voterId,
+        reviewerId: actorId,
         status: "approved",
       })
     ).rejects.toBeInstanceOf(AuthError);
@@ -143,7 +143,7 @@ describe("business lifecycle (D1)", () => {
   });
 
   it("creates, confirms, conflicts, and cancels booking requests", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const { authorId, actorId } = await seedUsersAndSubreddit();
     const competitorId = `u_competitor_${crypto.randomUUID().slice(0, 8)}`;
     await env.DB.prepare(
       `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
@@ -180,19 +180,30 @@ describe("business lifecycle (D1)", () => {
     });
     await reviewBusinessVerification({
       requestId: verification.id,
-      reviewerId: voterId,
+      reviewerId: actorId,
       status: "approved",
     });
 
     const startAt = new Date(Date.now() + 2 * 60 * 60_000).toISOString();
+    const requestId = crypto.randomUUID();
     const first = await createBusinessBooking({
       businessId: business.id,
-      requesterId: voterId,
+      requesterId: actorId,
       serviceId,
       startAt,
       note: "Please confirm this appointment.",
+      requestId,
     });
     expect(first.status).toBe("requested");
+    const retried = await createBusinessBooking({
+      businessId: business.id,
+      requesterId: actorId,
+      serviceId,
+      startAt,
+      note: "Please confirm this appointment.",
+      requestId,
+    });
+    expect(retried).toEqual(first);
     expect((await listBusinessBookings({ businessId: business.id, viewerUserId: authorId }))[0])
       .toMatchObject({
         id: first.id,
@@ -200,7 +211,7 @@ describe("business lifecycle (D1)", () => {
         status: "requested",
         serviceId,
       });
-    expect((await listBusinessBookings({ businessId: business.id, viewerUserId: voterId }))[0])
+    expect((await listBusinessBookings({ businessId: business.id, viewerUserId: actorId }))[0])
       .toMatchObject({ id: first.id, isOwner: false, status: "requested" });
 
     await updateBusinessBooking({
@@ -210,7 +221,7 @@ describe("business lifecycle (D1)", () => {
       ownerNote: "Confirmed for the requested time.",
     });
     expect(
-      (await listBusinessBookings({ businessId: business.id, viewerUserId: voterId })).find(
+      (await listBusinessBookings({ businessId: business.id, viewerUserId: actorId })).find(
         (item) => item.id === first.id
       )
     ).toMatchObject({ status: "confirmed", ownerNote: "Confirmed for the requested time." });
@@ -227,17 +238,17 @@ describe("business lifecycle (D1)", () => {
     await expect(
       updateBusinessBooking({
         bookingId: first.id,
-        viewerUserId: voterId,
+        viewerUserId: actorId,
         status: "completed",
       })
     ).rejects.toBeInstanceOf(AuthError);
     await updateBusinessBooking({
       bookingId: first.id,
-      viewerUserId: voterId,
+      viewerUserId: actorId,
       status: "cancelled",
     });
     expect(
-      (await listBusinessBookings({ businessId: business.id, viewerUserId: voterId })).find(
+      (await listBusinessBookings({ businessId: business.id, viewerUserId: actorId })).find(
         (item) => item.id === first.id
       )?.status
     ).toBe("cancelled");

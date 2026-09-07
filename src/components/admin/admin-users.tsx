@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { AdminFeedback, useAdminAction } from "@/components/admin/admin-action";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { AdminUser } from "@/lib/admin";
 
 export function AdminUsers({
@@ -17,6 +19,7 @@ export function AdminUsers({
   query: string;
   page: number;
 }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const { t } = useI18n();
   const { pending, error, message, run } = useAdminAction();
   const previous = page > 1 ? `/admin/users?q=${encodeURIComponent(query)}&page=${page - 1}` : null;
@@ -49,8 +52,26 @@ export function AdminUsers({
             {users.map((user) => (
               <tr key={user.id}>
                 <td className="px-4 py-3">
-                  <Link className="font-medium hover:underline" href={user.username ? `/u/${user.username}` : "#"}>{user.username ? `@${user.username}` : user.name}</Link>
-                  <p className="mt-1 max-w-[220px] truncate text-xs text-muted-foreground">{user.id}</p>
+                  <Link
+                    className="font-medium hover:underline"
+                    href={user.username ? `/u/${user.username}` : "#"}
+                  >
+                    {user.username ? `@${user.username}` : user.name}
+                  </Link>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <code className="font-mono">ID: {user.id}</code>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      onClick={async () => {
+                        await copyTextToClipboard(user.id);
+                        setCopiedId(user.id);
+                      }}
+                    >
+                      {copiedId === user.id ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
                 </td>
                 <td className="px-4 py-3">{user.role}</td>
                 <td className="px-4 py-3">{user.status}</td>

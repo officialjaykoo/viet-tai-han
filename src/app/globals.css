@@ -144,6 +144,7 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     hanging-punctuation: first last;
+    scrollbar-gutter: stable;
   }
 
   body {

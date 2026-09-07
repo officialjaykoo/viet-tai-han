@@ -28,7 +28,6 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { SearchForm } from "@/components/search/search-form";
 import { MessagesNavIcon } from "@/components/messages/messages-nav-icon";
-import { useScrollVisibility } from "@/components/layout/use-scroll-visibility";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import {
   DropdownMenu,
@@ -68,7 +67,6 @@ export function SiteHeader() {
   const image = visibleSession?.user?.image ?? null;
   const authReady = hydrated && !isPending;
   const signedIn = authReady && Boolean(visibleSession?.user);
-  const mobileChromeVisible = useScrollVisibility();
   const primaryNav = [
     { href: "/", label: t("nav.popular"), icon: FlameIcon },
     { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
@@ -79,11 +77,8 @@ export function SiteHeader() {
 
   return (
     <header
-      className={cn(
-        "sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header transition-transform duration-200 ease-out motion-reduce:transition-none",
-        !mobileChromeVisible &&
-          "-translate-y-full pointer-events-none sm:translate-y-0 sm:pointer-events-auto"
-      )}
+      data-testid="site-header"
+      className="sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header"
     >
       <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
         <Link

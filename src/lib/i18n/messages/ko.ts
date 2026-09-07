@@ -146,9 +146,7 @@ export const ko: Messages = {
     rangeAll: "전체 기간",
     views: "조회수",
     unique: "순 방문자",
-    score: "점수",
-    upvotes: "추천",
-    downvotes: "비추천",
+    likes: "좋아요",
     linkClicks: "링크 클릭",
     linkCtr: "링크 CTR",
     viewsByHour: "시간별 조회수",
@@ -718,7 +716,7 @@ export const ko: Messages = {
     accounts: "계정",
     communities: "커뮤니티",
     membersCount: "멤버 {count}명",
-    points: "점수 {count}",
+    likes: "좋아요 {count}개",
   },
   admin: {
     title: "관리자",
@@ -748,7 +746,6 @@ export const ko: Messages = {
     warnUser: "사용자 경고",
     users: "사용자",
     recommendations: "추천",
-    voteBurst: "투표 급증 신호(1시간)",
     campaignName: "캠페인 이름",
     adCopyOptional: "광고 문구(선택 사항)",
     feedInline: "피드 중간",
@@ -767,11 +764,6 @@ export const ko: Messages = {
     userId: "사용자 ID",
     lowKarma: "낮은 신뢰 점수",
     weakSource: "약한 출처",
-    backfillEmbeddings: "글 임베딩 보충",
-    indexedPosts: "글 {count}개를 색인했습니다",
-    failedPosts: "{count}개 실패",
-    embeddingHint:
-      "Cloudflare Vectorize와 Workers AI로 최근 글을 색인해 맞춤 추천을 의미 유사도로 정렬합니다.",
     backfillTranslations: "콘텐츠 번역 보충",
     translationBackfillResult:
       "게시물 {posts}개와 댓글 {comments}개를 처리했습니다",
@@ -795,10 +787,8 @@ export const ko: Messages = {
     noRecentActivity: "최근 활동이 없습니다.",
     events: "이벤트",
   },
-  vote: {
-    like: "좋아요",
-    upvote: "좋아요",
-    downvote: "싫어요",
+  like: {
+    action: "좋아요",
     group: "좋아요",
   },
   common: {

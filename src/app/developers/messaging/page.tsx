@@ -27,11 +27,19 @@ export default function MessagingPage() {
       </Section>
 
       <Section title="Realtime chat">
-        <p>Realtime chat uses a Durable Object-backed WebSocket path for active rooms. Session and room membership checks happen before realtime access is granted.</p>
+        <p>Realtime chat uses a Durable Object-backed WebSocket path for active rooms. Session and room membership checks happen before realtime access is granted. A message is committed to D1 before the live event is attempted; a WebSocket failure never turns a successful D1 write into a failed send.</p>
+      </Section>
+
+      <Section title="History and recovery">
+        <p>Room history loads the latest page first. Signed before and after cursors provide older-history pagination and reconnect catch-up without exposing mutable database cursors. The browser deduplicates D1 responses and live events by message ID, then orders them by the server timestamp and message ID tuple.</p>
+      </Section>
+
+      <Section title="Read state">
+        <p>Loading history is read-only. The client explicitly marks the latest visible message as read only while the viewport is at the bottom. Unread counts are calculated from the persisted per-room read boundary; the fanout table is only a derived cache.</p>
       </Section>
 
       <Section title="Reliability">
-        <Note>Messaging mutations should be idempotent where practical. Duplicate requests, retries, and relationship changes must not create duplicate rooms or duplicate state transitions.</Note>
+        <Note>Every client send should include a stable clientMessageId. Retries return the original canonical message instead of inserting another row. Duplicate request acceptance is idempotent, while conflicting actions remain errors.</Note>
       </Section>
     </>
   );

@@ -6,6 +6,7 @@ import {
   serializeQuestionSummary,
 } from "@/lib/qna";
 import { jsonLocalizedError } from "@/lib/public-error";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { readApiJson } from "@/lib/security/guard";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
 import {
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
       community?: string;
       title?: string;
       body?: string;
+      requestId?: string | null;
     };
     if (!body.community || !body.title || !body.body) {
       return await jsonLocalizedError(
@@ -61,6 +63,7 @@ export async function POST(request: NextRequest) {
       subredditName: body.community,
       title: body.title,
       body: body.body,
+      requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

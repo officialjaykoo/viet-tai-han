@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 const guides = [
   ["Getting started", "Run the project locally and understand the basic repository workflow.", "/getting-started"],
-  ["Architecture", "See how Next.js, Workers, D1, R2, Durable Objects, AI, and Vectorize fit together.", "/architecture"],
+  ["Architecture", "See how Next.js, Workers, D1, R2, Durable Objects, and Workers AI fit together.", "/architecture"],
   ["Identity & auth", "Understand immutable user IDs, public usernames, social sign-in, and account linking.", "/identity"],
   ["Social graph", "Follow, friendship, blocking, and the relationship rules used across VTH.", "/social-graph"],
   ["Messaging", "Direct messages, message requests, relationship-based access, and realtime chat.", "/messaging"],

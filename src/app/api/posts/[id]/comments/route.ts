@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createComment } from "@/lib/actions";
-import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
+import {
+  AuthError,
+  jsonAuthError,
+  requireSession,
+} from "@/lib/session";
 
 export async function POST(
   request: NextRequest,
@@ -16,6 +21,7 @@ export async function POST(
     const body = requireBotAttestation(await readApiJson(request)) as {
       body?: string;
       parentId?: string | null;
+      requestId?: string;
     };
 
     if (!body.body?.trim()) {
@@ -29,6 +35,7 @@ export async function POST(
       postId,
       parentId: body.parentId,
       body: body.body,
+      requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
 
     return NextResponse.json(result, { status: 201 });

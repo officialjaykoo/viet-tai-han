@@ -20,7 +20,7 @@ import { seedUsersAndSubreddit } from "./helpers";
 
 describe("marketplace lifecycle (D1)", () => {
   it("creates, filters, saves, and changes listing status", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const { authorId, actorId } = await seedUsersAndSubreddit();
     const listing = await createListing({
       sellerId: authorId,
       sellerStatus: "active",
@@ -53,7 +53,7 @@ describe("marketplace lifecycle (D1)", () => {
     await expect(
       updateListingStatus({
         listingId: listing.id,
-        sellerId: voterId,
+        sellerId: actorId,
         status: "sold",
       })
     ).rejects.toBeInstanceOf(AuthError);
@@ -77,7 +77,7 @@ describe("marketplace lifecycle (D1)", () => {
   });
 
   it("rejects public contact details and duplicate reports", async () => {
-    const { authorId, voterId } = await seedUsersAndSubreddit();
+    const { authorId, actorId } = await seedUsersAndSubreddit();
     await expect(
       createListing({
         sellerId: authorId,
@@ -110,14 +110,14 @@ describe("marketplace lifecycle (D1)", () => {
 
     await reportListing({
       listingId: listing.id,
-      reporterId: voterId,
+      reporterId: actorId,
       reason: "misleading",
       details: "The service description needs moderator review.",
     });
     await expect(
       reportListing({
         listingId: listing.id,
-        reporterId: voterId,
+        reporterId: actorId,
         reason: "misleading",
       })
     ).rejects.toBeInstanceOf(AuthError);
@@ -133,7 +133,7 @@ describe("marketplace lifecycle (D1)", () => {
       removeListing: true,
       resolutionNote: "Removed after review.",
     });
-    expect(await getListingDetail(listing.id, voterId)).toBeNull();
+    expect(await getListingDetail(listing.id, actorId)).toBeNull();
   });
 
   it("creates, lists, and deletes search alerts", async () => {

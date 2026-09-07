@@ -15,7 +15,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
 import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
-import { parseDiscoverySource } from "@/lib/vote-weight";
+import { parseDiscoverySource } from "@/lib/discovery";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,7 @@ export default async function PostPage({
       <main className="relative flex-1">
         <PageShell width="narrow" className="space-y-6">
 
-          <PostCard post={post} />
+          <PostCard post={post} discoverySource={discoverySource} />
 
           <PostAuthorActions
             postId={post.id}

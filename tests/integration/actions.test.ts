@@ -9,7 +9,6 @@ import {
   editPost,
   softDeleteComment,
   softDeletePost,
-  voteOnComment,
 } from "@/lib/actions";
 import { getFeedPosts } from "@/lib/db";
 import { AuthError } from "@/lib/session";
@@ -22,7 +21,12 @@ import {
   unfollowUser,
   unhidePost,
 } from "@/lib/user-actions";
-import { voteOnPost } from "@/lib/votes";
+import {
+  likeComment,
+  likePost,
+  unlikeComment,
+  unlikePost,
+} from "@/lib/likes";
 
 import {
   getCommentRow,
@@ -70,8 +74,8 @@ describe("content lifecycle (D1)", () => {
     expect(row?.is_removed).toBe(1);
   });
 
-  it("creates nested comments, edits, votes, and deletes them", async () => {
-    const { authorId, voterId, subredditId } = await seedUsersAndSubreddit();
+  it("creates nested comments, edits, likes, and deletes them", async () => {
+    const { authorId, actorId, subredditId } = await seedUsersAndSubreddit();
 
     const post = await createPost({
       userId: authorId,
@@ -88,7 +92,7 @@ describe("content lifecycle (D1)", () => {
     expect(parent.depth).toBe(0);
 
     const child = await createComment({
-      userId: voterId,
+      userId: actorId,
       postId: post.id,
       parentId: parent.id,
       body: "Child reply",
@@ -106,17 +110,18 @@ describe("content lifecycle (D1)", () => {
     let comment = await getCommentRow(parent.id);
     expect(comment?.body).toBe("Parent comment edited");
 
-    const vote = await voteOnComment({
-      commentId: parent.id,
-      userId: voterId,
-      voterKarma: 40,
-      action: "upvote",
-    });
-    expect(vote.viewerVote).toBe("upvote");
-    comment = await getCommentRow(parent.id);
-    expect(comment?.score).toBeGreaterThan(0);
+    const like = await likeComment(parent.id, actorId);
+    expect(like.liked).toBe(true);
+    expect(like.likeCount).toBe(1);
+    const repeatedLike = await likeComment(parent.id, actorId);
+    expect(repeatedLike.likeCount).toBe(1);
+    expect((await getCommentRow(parent.id))?.like_count).toBe(1);
 
-    await softDeleteComment(child.id, voterId);
+    const unlike = await unlikeComment(parent.id, actorId);
+    expect(unlike.liked).toBe(false);
+    expect(unlike.likeCount).toBe(0);
+
+    await softDeleteComment(child.id, actorId);
     comment = await getCommentRow(child.id);
     expect(comment?.is_deleted).toBe(1);
     expect(comment?.body).toBe("[deleted]");
@@ -125,51 +130,82 @@ describe("content lifecycle (D1)", () => {
     expect(postRow?.comment_count).toBe(1);
   });
 
-  it("assigns post ratings via voteOnPost", async () => {
-    const { authorId, voterId, subredditId } = await seedUsersAndSubreddit();
+  it("assigns post likes idempotently", async () => {
+    const { authorId, actorId, subredditId } = await seedUsersAndSubreddit();
 
     const post = await createPost({
       userId: authorId,
       subredditId,
-      title: "Vote target post",
-      body: "Please rate",
+      title: "Like target post",
+      body: "Please like",
     });
 
-    const up = await voteOnPost(post.id, "upvote", {
-      userId: voterId,
-      voterKarma: 500,
+    const liked = await likePost(post.id, actorId);
+    expect(liked.liked).toBe(true);
+    expect(liked.likeCount).toBe(1);
+    expect((await getPostRow(post.id))?.like_count).toBe(1);
+
+    const repeatedLike = await likePost(post.id, actorId);
+    expect(repeatedLike.likeCount).toBe(1);
+    expect((await getPostRow(post.id))?.like_count).toBe(1);
+
+    const unliked = await unlikePost(post.id, actorId);
+    expect(unliked.liked).toBe(false);
+    expect(unliked.likeCount).toBe(0);
+    expect((await getPostRow(post.id))?.like_count).toBe(0);
+  });
+  it("returns the same rows for retried post and comment writes", async () => {
+    const { authorId, subredditId } = await seedUsersAndSubreddit();
+    const postRequestId = crypto.randomUUID();
+    const firstPost = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Retry-safe post",
+      body: "The same request must not create two posts.",
+      requestId: postRequestId,
     });
-    expect(up.viewerVote).toBe("upvote");
-
-    let row = await getPostRow(post.id);
-    expect(row?.upvotes).toBe(1);
-    // Score is stored in millipoints (100 ≈ 1 display point).
-    expect(row?.score).toBeGreaterThan(0);
-    expect(up.score).toBe(Math.round((row?.score ?? 0) / 100));
-
-    const down = await voteOnPost(post.id, "downvote", {
-      userId: voterId,
-      voterKarma: 500,
+    const retriedPost = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Retry-safe post",
+      body: "The same request must not create two posts.",
+      requestId: postRequestId,
     });
-    expect(down.viewerVote).toBe("downvote");
+    expect(retriedPost).toEqual(firstPost);
 
-    row = await getPostRow(post.id);
-    expect(row?.downvotes).toBe(1);
-    expect(row?.upvotes).toBe(0);
+    const postCount = await env.DB
+      .prepare(`SELECT COUNT(*) AS count FROM posts WHERE id = ?`)
+      .bind(firstPost.id)
+      .first<{ count: number }>();
+    expect(Number(postCount?.count)).toBe(1);
 
-    const voteRow = await env.DB.prepare(
-      `SELECT value FROM votes
-       WHERE user_id = ? AND target_type = 'post' AND target_id = ?`
-    )
-      .bind(voterId, post.id)
-      .first<{ value: number }>();
-    expect(voteRow?.value).toBe(-1);
+    const commentRequestId = crypto.randomUUID();
+    const firstComment = await createComment({
+      userId: authorId,
+      postId: firstPost.id,
+      body: "This comment is also retry-safe.",
+      requestId: commentRequestId,
+    });
+    const retriedComment = await createComment({
+      userId: authorId,
+      postId: firstPost.id,
+      body: "This comment is also retry-safe.",
+      requestId: commentRequestId,
+    });
+    expect(retriedComment).toEqual(firstComment);
+
+    const commentCount = await env.DB
+      .prepare(`SELECT COUNT(*) AS count FROM comments WHERE id = ?`)
+      .bind(firstComment.id)
+      .first<{ count: number }>();
+    expect(Number(commentCount?.count)).toBe(1);
   });
 });
 
+
 describe("user actions (hide / block / follow / report)", () => {
   it("hides a post from the viewer feed", async () => {
-    const { authorId, voterId, subredditId, subredditName } =
+    const { authorId, actorId, subredditId, subredditName } =
       await seedUsersAndSubreddit();
 
     const post = await createPost({
@@ -181,32 +217,32 @@ describe("user actions (hide / block / follow / report)", () => {
 
     const before = await getFeedPosts({
       subreddit: subredditName,
-      viewerUserId: voterId,
+      viewerUserId: actorId,
       sort: "new",
       limit: 10,
     });
     expect(before.posts.some((p) => p.id === post.id)).toBe(true);
 
-    await hidePost(voterId, post.id);
+    await hidePost(actorId, post.id);
     const hidden = await env.DB.prepare(
       `SELECT 1 AS ok FROM hidden_posts WHERE user_id = ? AND post_id = ?`
     )
-      .bind(voterId, post.id)
+      .bind(actorId, post.id)
       .first();
     expect(hidden).toBeTruthy();
 
     const after = await getFeedPosts({
       subreddit: subredditName,
-      viewerUserId: voterId,
+      viewerUserId: actorId,
       sort: "new",
       limit: 10,
     });
     expect(after.posts.some((p) => p.id === post.id)).toBe(false);
 
-    await unhidePost(voterId, post.id);
+    await unhidePost(actorId, post.id);
     const restored = await getFeedPosts({
       subreddit: subredditName,
-      viewerUserId: voterId,
+      viewerUserId: actorId,
       sort: "new",
       limit: 10,
     });
@@ -214,7 +250,7 @@ describe("user actions (hide / block / follow / report)", () => {
   });
 
   it("blocks a user and filters their posts from the feed", async () => {
-    const { authorId, voterId, subredditId, subredditName } =
+    const { authorId, actorId, subredditId, subredditName } =
       await seedUsersAndSubreddit();
 
     const post = await createPost({
@@ -224,19 +260,19 @@ describe("user actions (hide / block / follow / report)", () => {
       body: "Bye",
     });
 
-    await followUser(voterId, authorId);
+    await followUser(actorId, authorId);
     let follow = await env.DB.prepare(
       `SELECT 1 AS ok FROM user_follows WHERE follower_id = ? AND following_id = ?`
     )
-      .bind(voterId, authorId)
+      .bind(actorId, authorId)
       .first();
     expect(follow).toBeTruthy();
 
-    await blockUser(voterId, authorId);
+    await blockUser(actorId, authorId);
     const block = await env.DB.prepare(
       `SELECT 1 AS ok FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?`
     )
-      .bind(voterId, authorId)
+      .bind(actorId, authorId)
       .first();
     expect(block).toBeTruthy();
 
@@ -244,25 +280,25 @@ describe("user actions (hide / block / follow / report)", () => {
     follow = await env.DB.prepare(
       `SELECT 1 AS ok FROM user_follows WHERE follower_id = ? AND following_id = ?`
     )
-      .bind(voterId, authorId)
+      .bind(actorId, authorId)
       .first();
     expect(follow).toBeFalsy();
 
     const feed = await getFeedPosts({
       subreddit: subredditName,
-      viewerUserId: voterId,
+      viewerUserId: actorId,
       sort: "new",
       limit: 10,
     });
     expect(feed.posts.some((p) => p.id === post.id)).toBe(false);
 
-    await unblockUser(voterId, authorId);
-    await followUser(voterId, authorId);
-    await unfollowUser(voterId, authorId);
+    await unblockUser(actorId, authorId);
+    await followUser(actorId, authorId);
+    await unfollowUser(actorId, authorId);
   });
 
   it("reports a post once and rejects duplicates", async () => {
-    const { authorId, voterId, subredditId } = await seedUsersAndSubreddit();
+    const { authorId, actorId, subredditId } = await seedUsersAndSubreddit();
 
     const post = await createPost({
       userId: authorId,
@@ -272,7 +308,7 @@ describe("user actions (hide / block / follow / report)", () => {
     });
 
     const result = await reportTarget({
-      reporterId: voterId,
+      reporterId: actorId,
       targetType: "post",
       targetId: post.id,
       reason: "spam",
@@ -282,7 +318,7 @@ describe("user actions (hide / block / follow / report)", () => {
 
     await expect(
       reportTarget({
-        reporterId: voterId,
+        reporterId: actorId,
         targetType: "post",
         targetId: post.id,
         reason: "spam",

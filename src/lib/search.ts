@@ -1,6 +1,5 @@
 import { getDb } from "@/lib/db";
 import { resolveAccountTags, type AccountTag } from "@/lib/tags";
-import { displayScore } from "@/lib/vote-weight";
 
 const MAX_QUERY_LENGTH = 80;
 const DEFAULT_LIMIT = 8;
@@ -23,7 +22,7 @@ export type SearchPostHit = {
   id: string;
   title: string;
   body: string | null;
-  score: number;
+  likeCount: number;
   commentCount: number;
   createdAt: string;
   authorUsername: string;
@@ -200,7 +199,7 @@ async function searchPosts(
   const { results } = await db
     .prepare(
       `SELECT
-         p.id, p.title, p.body, p.score, p.comment_count, p.created_at,
+         p.id, p.title, p.body, p.like_count, p.comment_count, p.created_at,
          u.username AS author_username,
          s.name AS subreddit_name
        FROM posts p
@@ -210,7 +209,7 @@ async function searchPosts(
          AND p.is_shadow_hidden = 0
          AND (p.title LIKE ? ESCAPE '\\'
               OR IFNULL(p.body, '') LIKE ? ESCAPE '\\')
-       ORDER BY p.score DESC, p.created_at DESC
+       ORDER BY p.like_count DESC, p.created_at DESC
        LIMIT ?`
     )
     .bind(pattern, pattern, limit)
@@ -218,7 +217,7 @@ async function searchPosts(
       id: string;
       title: string;
       body: string | null;
-      score: number;
+      like_count: number;
       comment_count: number;
       created_at: string;
       author_username: string;
@@ -229,7 +228,7 @@ async function searchPosts(
     id: row.id,
     title: row.title,
     body: row.body,
-    score: displayScore(Number(row.score ?? 0)),
+    likeCount: Number(row.like_count ?? 0),
     commentCount: Number(row.comment_count ?? 0),
     createdAt: row.created_at,
     authorUsername: row.author_username,

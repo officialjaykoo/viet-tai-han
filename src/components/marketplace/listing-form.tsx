@@ -34,6 +34,7 @@ export function ListingForm() {
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
   const bot = useBotGuard();
   const [hydrated, setHydrated] = useState(false);
+  const requestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setHydrated(true);
@@ -45,6 +46,8 @@ export function ListingForm() {
     setError(null);
 
     startTransition(async () => {
+      const requestId = requestIdRef.current ?? crypto.randomUUID();
+      requestIdRef.current = requestId;
       const check = await passBotCheck(bot, turnstileToken);
       if (!check.ok) {
         setError(localizeError(check.error, t("common.error")));
@@ -62,6 +65,7 @@ export function ListingForm() {
             body,
             price: price.trim() || null,
             location,
+            requestId,
           })
         ),
       });
@@ -78,6 +82,7 @@ export function ListingForm() {
       }
 
       const data = (await res.json()) as { id: string };
+      requestIdRef.current = null;
       router.push(`/marketplace/${data.id}`);
       router.refresh();
     });

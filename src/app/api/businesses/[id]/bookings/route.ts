@@ -7,6 +7,7 @@ import {
 } from "@/lib/businesses";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 
 export async function GET(
@@ -36,11 +37,13 @@ export async function POST(
     const session = await requireSession();
     const { id } = await context.params;
     const body = (await readApiJson(request)) as {
+      requestId?: string | null;
       serviceId?: string | null;
       startAt?: string;
       durationMinutes?: number;
       note?: string | null;
     };
+    const requestId = body.requestId ?? requestIdFromHeaders(request.headers);
     if (!body.startAt) {
       return await jsonLocalizedError("Booking time is required", 400);
     }
@@ -48,6 +51,7 @@ export async function POST(
       await createBusinessBooking({
         businessId: id,
         requesterId: session.user.id,
+        requestId,
         serviceId: body.serviceId,
         startAt: body.startAt,
         durationMinutes: body.durationMinutes,

@@ -74,8 +74,8 @@ const ROUTES: RouteEntry[] = [
   },
   {
     methods: ["POST"],
-    pattern: "/api/posts/:id/vote",
-    load: () => import("@/app/api/posts/[id]/vote/route"),
+    pattern: "/api/posts/:id/like",
+    load: () => import("@/app/api/posts/[id]/like/route"),
   },
   {
     methods: ["POST"],
@@ -104,8 +104,8 @@ const ROUTES: RouteEntry[] = [
   },
   {
     methods: ["POST"],
-    pattern: "/api/comments/:id/vote",
-    load: () => import("@/app/api/comments/[id]/vote/route"),
+    pattern: "/api/comments/:id/like",
+    load: () => import("@/app/api/comments/[id]/like/route"),
   },
   {
     methods: ["GET", "POST"],

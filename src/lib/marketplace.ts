@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import { enforceCreateRateLimit } from "@/lib/rate-limit";
+import { normalizeRequestId } from "@/lib/idempotency";
 import { AuthError } from "@/lib/session";
 
 import {
@@ -286,6 +287,7 @@ export async function createListing(input: {
   body: string;
   price?: string | null;
   location: string;
+  requestId?: string | null;
 }) {
   if (!isListingKind(input.kind)) {
     throw new AuthError("Invalid listing type", 400);
@@ -310,13 +312,23 @@ export async function createListing(input: {
   }
   assertNoDirectContact(`${title}\n${body}\n${location}`);
 
+  const requestId = normalizeRequestId(input.requestId);
+  const db = await getDb();
+  if (requestId) {
+    const existing = await db
+      .prepare(
+        `SELECT id FROM listings WHERE seller_id = ? AND request_id = ?`
+      )
+      .bind(input.sellerId, requestId)
+      .first<{ id: string }>();
+    if (existing) return { id: existing.id };
+  }
+
   await enforceCreateRateLimit(input.sellerId, "listing");
   const moderation = await moderateText(`${title}\n${body}`);
   if (moderation.blocked) {
     throw new AuthError("This content isn't allowed", 400);
   }
-
-  const db = await getDb();
   const seller = await db
     .prepare(`SELECT id FROM "user" WHERE id = ? AND status != 'banned'`)
     .bind(input.sellerId)
@@ -326,25 +338,38 @@ export async function createListing(input: {
   const id = createPublicId();
   const shadow =
     moderation.shadow || input.sellerStatus === "shadowbanned" ? 1 : 0;
-  await db
-    .prepare(
-      `INSERT INTO listings (
-         id, seller_id, kind, category, title, body, price, location,
-         is_shadow_hidden
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      id,
-      input.sellerId,
-      input.kind,
-      category,
-      title,
-      body,
-      price,
-      location,
-      shadow
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO listings (
+           id, seller_id, kind, category, title, body, price, location,
+           is_shadow_hidden, request_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        input.sellerId,
+        input.kind,
+        category,
+        title,
+        body,
+        price,
+        location,
+        shadow,
+        requestId
+      )
+      .run();
+  } catch (error) {
+    if (!requestId) throw error;
+    const existing = await db
+      .prepare(
+        `SELECT id FROM listings WHERE seller_id = ? AND request_id = ?`
+      )
+      .bind(input.sellerId, requestId)
+      .first<{ id: string }>();
+    if (existing) return { id: existing.id };
+    throw error;
+  }
 
   return { id };
 }

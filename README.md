@@ -20,7 +20,7 @@ Core product areas include:
 - **Follow, friend, block, and presence** relationships
 - **Direct messages and message requests**
 - **Notifications and browser push**
-- **Communities, posts, comments, and voting**
+- **Communities, posts, comments, and likes**
 - **Questions & answers**
 - **Marketplace**
 - **Local business / service discovery**
@@ -54,7 +54,7 @@ Existing conversations remain tied to user IDs, not usernames.
 
 ## Reputation
 
-VTH still has reputation-related data inherited from the original community architecture, but the product direction is to keep **reputation separate from core permissions**.
+VTH retains reputation-related data for profiles, permissions, achievements, and monetization. **Post and comment likes are separate engagement records and do not change reputation.**
 
 A normal new user with zero reputation should still be able to use ordinary social and community features. Abuse prevention should rely on account state, moderation, rate limits, relationship rules, and behavioral signals rather than a single karma threshold.
 
@@ -68,7 +68,7 @@ VTH is deployed primarily on Cloudflare.
 | **D1** | Primary relational database |
 | **R2** | Media storage |
 | **Durable Objects** | Stateful coordination where required |
-| **Workers AI + Vectorize** | AI-assisted translation/recommendation features |
+| **Workers AI** | Translation only |
 | **Turnstile** | Human / abuse checks |
 | **Workers Rate Limiting** | Request flood protection |
 | **Workers Logs** | Production observability |

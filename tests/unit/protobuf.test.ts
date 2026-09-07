@@ -12,14 +12,14 @@ import { buildCanonical } from "@/lib/security/shared";
 
 describe("InternalApiRequest protobuf", () => {
   it("round-trips sealed route fields without plaintext path", async () => {
-    const payload = new TextEncoder().encode('{"action":"upvote"}');
+    const payload = new TextEncoder().encode('{"action":"like"}');
     const signature = new Uint8Array([1, 2, 3, 4]);
     const atk = "test-atk-key-material-32bytes!!";
     const encoded = await encodeInternalApiRequest(
       {
         method: "POST",
-        path: "/api/posts/abc/vote",
-        query: "sort=hot",
+        path: "/api/posts/abc/like",
+        query: "sort=new",
         timestampMs: 1_700_000_000_000,
         nonce: "deadbeefdeadbeef",
         payload,
@@ -35,12 +35,12 @@ describe("InternalApiRequest protobuf", () => {
     const asText = new TextDecoder().decode(encoded);
     expect(asText.includes("/api/posts")).toBe(false);
     expect(asText.includes("POST")).toBe(false);
-    expect(asText.includes("sort=hot")).toBe(false);
+    expect(asText.includes("sort=new")).toBe(false);
 
     const decoded = await decodeInternalApiRequest(encoded, atk);
     expect(decoded.method).toBe("POST");
-    expect(decoded.path).toBe("/api/posts/abc/vote");
-    expect(decoded.query).toBe("sort=hot");
+    expect(decoded.path).toBe("/api/posts/abc/like");
+    expect(decoded.query).toBe("sort=new");
   });
 
   it("bootstraps challenge without ATK via route id", async () => {

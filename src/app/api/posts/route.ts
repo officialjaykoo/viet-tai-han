@@ -17,11 +17,12 @@ import {
   requireSession,
 } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
-import { readApiJson } from "@/lib/security/guard";
+import { requestIdFromHeaders } from "@/lib/idempotency";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
+import { readApiJson } from "@/lib/security/guard";
 import { requireActiveUser } from "@/lib/permissions";
 
-const SORTS = new Set<FeedSort>(["hot", "new", "top"]);
+const SORTS = new Set<FeedSort>(["new"]);
 const MODES = new Set<FeedMode>(["home", "popular", "community"]);
 
 export async function GET(request: NextRequest) {
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     const subreddit = searchParams.get("subreddit");
     const limitParam = searchParams.get("limit");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
-    const sortParam = searchParams.get("sort") ?? "hot";
+    const sortParam = searchParams.get("sort") ?? "new";
     const modeParam = searchParams.get("feed") ?? (subreddit ? "community" : "popular");
 
     if (limitParam && Number.isNaN(limit)) {
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
       body?: string;
       url?: string;
       mediaKey?: string;
+      requestId?: string;
     };
 
     if (!body.subreddit || !body.title) {
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
       body: body.body,
       url: body.url,
       mediaKey: body.mediaKey,
+      requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
 
     return NextResponse.json(result, { status: 201 });

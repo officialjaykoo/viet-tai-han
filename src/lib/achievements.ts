@@ -161,8 +161,7 @@ export async function syncUserAchievements(userId: string) {
               (SELECT COUNT(*) FROM subreddit_moderators WHERE user_id = ?) AS modCount,
               (SELECT COUNT(*) FROM user_follows WHERE following_id = ?) AS followerCount,
               (SELECT COUNT(*) FROM user_follows WHERE follower_id = ?) AS followingCount,
-              (SELECT COUNT(*) FROM votes WHERE user_id = ? AND value != 0) AS voteCount,
-              (SELECT COALESCE(MAX(score), 0) FROM posts WHERE author_id = ? AND is_removed = 0) AS bestPostScore,
+              (SELECT COALESCE(MAX(like_count), 0) FROM posts WHERE author_id = ? AND is_removed = 0) AS bestPostLikes,
               (SELECT COUNT(*) FROM posts WHERE author_id = ? AND is_removed = 0 AND url IS NOT NULL AND url != '') AS linkPostCount,
               (SELECT COUNT(*) FROM posts WHERE author_id = ? AND is_removed = 0 AND media_key IS NOT NULL) AS mediaPostCount,
               (SELECT COUNT(*) FROM comments c
@@ -190,7 +189,6 @@ export async function syncUserAchievements(userId: string) {
       userId,
       userId,
       userId,
-      userId,
       userId
     )
     .first<{
@@ -205,8 +203,7 @@ export async function syncUserAchievements(userId: string) {
       modCount: number;
       followerCount: number;
       followingCount: number;
-      voteCount: number;
-      bestPostScore: number;
+      bestPostLikes: number;
       linkPostCount: number;
       mediaPostCount: number;
       replyCount: number;
@@ -279,9 +276,8 @@ export async function syncUserAchievements(userId: string) {
   );
   await bump(
     "popular_post",
-    levelForValue(LEVEL_THRESHOLDS.popular_post, user.bestPostScore)
+    levelForValue(LEVEL_THRESHOLDS.popular_post, user.bestPostLikes)
   );
-  await bump("voter", levelForValue(LEVEL_THRESHOLDS.voter, user.voteCount));
   await bump(
     "conversationalist",
     levelForValue(LEVEL_THRESHOLDS.conversationalist, user.replyCount)
@@ -350,7 +346,6 @@ export type AchievementEvent =
   | "post_created"
   | "comment_created"
   | "follow"
-  | "vote_cast"
   | "community_created"
   | "karma_changed"
   | "nsfw_changed";
@@ -443,20 +438,6 @@ async function syncAchievementEventNow(
     return;
   }
 
-  if (event === "vote_cast") {
-    const row = await db
-      .prepare(
-        `SELECT COUNT(*) AS count
-         FROM votes WHERE user_id = ? AND value != 0`
-      )
-      .bind(userId)
-      .first<{ count: number }>();
-    await grant(
-      "voter",
-      levelForValue(LEVEL_THRESHOLDS.voter, row?.count ?? 0)
-    );
-    return;
-  }
 
   if (event === "community_created") {
     const row = await db

@@ -48,8 +48,48 @@ test.describe("cross-platform smoke", () => {
     const metrics = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
+      scrollbarGutter: getComputedStyle(document.documentElement).scrollbarGutter,
     }));
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+    expect(metrics.scrollbarGutter).toBe("stable");
+  });
+  test("mobile chrome remains visible during scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await dismissLanguagePrompt(page);
+
+    const header = page.getByTestId("site-header");
+    const mobileNav = page.getByTestId("mobile-nav");
+    await expect(header).toBeVisible();
+    await expect(mobileNav).toBeVisible();
+
+    const before = await page.evaluate(() => ({
+      headerTop: document.querySelector('[data-testid="site-header"]')?.getBoundingClientRect().top,
+      navBottom: document.querySelector('[data-testid="mobile-nav"]')?.getBoundingClientRect().bottom,
+    }));
+    await page.evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
+    await page.waitForTimeout(100);
+    await expect(header).toBeVisible();
+    await expect(mobileNav).toBeVisible();
+    const after = await page.evaluate(() => ({
+      headerTop: document.querySelector('[data-testid="site-header"]')?.getBoundingClientRect().top,
+      navBottom: document.querySelector('[data-testid="mobile-nav"]')?.getBoundingClientRect().bottom,
+    }));
+
+    expect(after.headerTop).toBe(before.headerTop);
+    expect(after.navBottom).toBe(before.navBottom);
+  });
+
+  test("developers header uses the public VTH logo asset", async ({ page }) => {
+    for (const path of ["/developers", "/developers/getting-started"]) {
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      const header = page.locator("header");
+      const logos = header.locator("img");
+      await expect(logos).toHaveCount(2);
+      await expect(logos.nth(0)).toHaveAttribute("src", /vth-logo\.png/);
+      await expect(logos.nth(1)).toHaveAttribute("src", /vth-logo\.png/);
+      await expect(header.locator('img[src*="icon.png"]')).toHaveCount(0);
+    }
   });
   test("service worker endpoint registers in the browser", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });

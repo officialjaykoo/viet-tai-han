@@ -12,7 +12,6 @@ const CURSOR_VERSION = 1 as const;
 export type FeedCursorPosition = {
   createdAt: string;
   id: string;
-  score?: number;
 };
 
 export type FeedCursorContext = {
@@ -43,7 +42,7 @@ async function cursorSecret(): Promise<Uint8Array> {
   const env = await getEnv();
   const secret =
     env.BETTER_AUTH_SECRET || "dev-secret-must-be-at-least-32-chars!!";
-  return new TextEncoder().encode(`red-feed-cursor-v1:${secret}`);
+  return new TextEncoder().encode(`vth-feed-cursor-v1:${secret}`);
 }
 
 function encodePayload(payload: SealedPayload): string {
@@ -69,7 +68,6 @@ function decodePayload(raw: string): SealedPayload | null {
       v: CURSOR_VERSION,
       createdAt: parsed.createdAt,
       id: parsed.id,
-      score: typeof parsed.score === "number" ? parsed.score : undefined,
       sort: parsed.sort as FeedSort,
       mode: parsed.mode as FeedMode,
       subreddit: parsed.subreddit ?? null,
@@ -99,7 +97,6 @@ export async function signFeedCursorWithSecret(
     v: CURSOR_VERSION,
     createdAt: position.createdAt,
     id: position.id,
-    ...(position.score != null ? { score: position.score } : {}),
     sort: context.sort,
     mode: context.mode,
     subreddit: context.subreddit,
@@ -158,7 +155,6 @@ export async function openFeedCursorWithSecret(
   return {
     createdAt: payload.createdAt,
     id: payload.id,
-    ...(payload.score != null ? { score: payload.score } : {}),
   };
 }
 

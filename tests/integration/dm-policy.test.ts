@@ -21,7 +21,7 @@ import {
   sendFriendRequest,
 } from "@/lib/friends";
 import { listNotifications } from "@/lib/notifications";
-import { voteOnPost } from "@/lib/votes";
+import { likePost } from "@/lib/likes";
 
 async function insertUser(
   id: string,
@@ -93,6 +93,59 @@ describe("DM relationship policy (D1)", () => {
       .bind(request.roomId, senderId)
       .first<{ delivery_status: string }>();
     expect(message?.delivery_status).toBe("pending");
+  });
+
+  it("returns the same chat request after a retried start", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const senderId = `dm_retry_sender_${suffix}`;
+    const recipientId = `dm_retry_recipient_${suffix}`;
+    const recipientUsername = `dm_retry_recipient_${suffix}`;
+    await Promise.all([
+      insertUser(senderId, `dm_retry_sender_${suffix}`),
+      insertUser(recipientId, recipientUsername),
+    ]);
+
+    const requestId = crypto.randomUUID();
+    const first = await startConversation({
+      fromUserId: senderId,
+      toUsername: recipientUsername,
+      openerBody: "Retry-safe opener.",
+      fromStatus: "active",
+      requestId,
+    });
+    const retried = await startConversation({
+      fromUserId: senderId,
+      toUsername: recipientUsername,
+      openerBody: "Retry-safe opener.",
+      fromStatus: "active",
+      requestId,
+    });
+
+    expect(first).toMatchObject({
+      conversationType: "request",
+      created: true,
+      roomId: expect.any(String),
+    });
+    expect(retried).toMatchObject({
+      conversationType: "request",
+      created: false,
+      roomId: first.roomId,
+      requestId: first.requestId,
+    });
+
+    const requestCount = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count FROM chat_requests
+         WHERE from_user_id = ? AND request_id = ?`
+      )
+      .bind(senderId, requestId)
+      .first<{ count: number }>();
+    expect(Number(requestCount?.count)).toBe(1);
+    await flushBackgroundWork();
+    const notifications = await listNotifications(recipientId);
+    expect(
+      notifications.filter((notification) => notification.kind === "chat_request")
+    ).toHaveLength(1);
   });
 
   it("uses opposite follow directions for direct access and request privacy", async () => {
@@ -227,6 +280,33 @@ describe("DM relationship policy (D1)", () => {
     expect(direct.conversationType).toBe("direct");
     expect(direct.roomId).toBe(request.roomId);
 
+    const messageRequestId = crypto.randomUUID();
+    const firstMessage = await sendChatMessage({
+      roomId: request.roomId,
+      userId: pair.senderId,
+      body: "Retry-safe direct message.",
+      requestId: messageRequestId,
+    });
+    const retriedMessage = await sendChatMessage({
+      roomId: request.roomId,
+      userId: pair.senderId,
+      body: "Retry-safe direct message.",
+      requestId: messageRequestId,
+    });
+    expect(firstMessage.created).toBe(true);
+    expect(retriedMessage).toMatchObject({
+      id: firstMessage.id,
+      created: false,
+    });
+    const messageCount = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count FROM chat_messages
+         WHERE sender_id = ? AND request_id = ?`
+      )
+      .bind(pair.senderId, messageRequestId)
+      .first<{ count: number }>();
+    expect(Number(messageCount?.count)).toBe(1);
+
     await unfollowUser(pair.recipientId, pair.senderId);
     await env.DB
       .prepare(`UPDATE "user" SET allowDms = 'nobody' WHERE id = ?`)
@@ -352,11 +432,11 @@ describe("DM relationship policy (D1)", () => {
     const suffix = crypto.randomUUID().slice(0, 8);
     const adminId = `admin_${suffix}`;
     const creatorId = `normal_negative_creator_${suffix}`;
-    const voterId = `normal_zero_voter_${suffix}`;
+    const actorId = `normal_zero_actor_${suffix}`;
     await Promise.all([
       insertUser(adminId, `admin_${suffix}`, { role: "admin" }),
       insertUser(creatorId, `normal_negative_creator_${suffix}`, { karma: -25 }),
-      insertUser(voterId, `normal_zero_voter_${suffix}`, { karma: 0 }),
+      insertUser(actorId, `normal_zero_actor_${suffix}`, { karma: 0 }),
     ]);
 
     const community = await createSubreddit({
@@ -371,16 +451,13 @@ describe("DM relationship policy (D1)", () => {
       body: "Negative reputation does not block creation.",
     });
     const comment = await createComment({
-      userId: voterId,
+      userId: actorId,
       postId: post.id,
       body: "Zero reputation can comment.",
     });
     expect(comment.id).toBeTruthy();
 
-    const vote = await voteOnPost(post.id, "upvote", {
-      userId: voterId,
-      voterKarma: 0,
-    });
-    expect(vote.viewerVote).toBe("upvote");
+    const liked = await likePost(post.id, actorId);
+    expect(liked.liked).toBe(true);
   });
 });

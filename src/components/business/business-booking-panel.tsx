@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
@@ -45,7 +45,7 @@ export function BusinessBookingPanel({
   const [minStartAt, setMinStartAt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const ownerView = isOwner;
+  const requestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMinStartAt(localDateTimeValue(Date.now() + 15 * 60_000));
@@ -57,6 +57,8 @@ export function BusinessBookingPanel({
     setError(null);
     setMessage(null);
     startTransition(async () => {
+      const requestId = requestIdRef.current ?? crypto.randomUUID();
+      requestIdRef.current = requestId;
       const parsed = new Date(startAt);
       const res = await apiFetch(`/api/businesses/${businessId}/bookings`, {
         method: "POST",
@@ -65,6 +67,7 @@ export function BusinessBookingPanel({
           serviceId: serviceId || null,
           startAt: parsed.toISOString(),
           note: note.trim() || null,
+          requestId,
         }),
       });
       if (res.status === 401) {
@@ -80,8 +83,8 @@ export function BusinessBookingPanel({
       }
       setStartAt("");
       setNote("");
+      requestIdRef.current = null;
       setMessage(t("business.bookingRequested"));
-      window.location.reload();
     });
   }
 
@@ -124,16 +127,16 @@ export function BusinessBookingPanel({
     <section className="space-y-4 rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5">
       <div>
         <h2 className="font-heading text-lg font-semibold">
-          {ownerView ? t("business.myBookings") : t("business.bookingTitle")}
+          {isOwner ? t("business.myBookings") : t("business.bookingTitle")}
         </h2>
-        {!ownerView ? (
+        {!isOwner ? (
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {verified ? t("business.bookingHint") : t("business.bookingNotVerified")}
           </p>
         ) : null}
       </div>
 
-      {!ownerView && verified ? (
+      {!isOwner && verified ? (
         <form onSubmit={requestBooking} className="space-y-3">
           {services.length > 0 ? (
             <div className="space-y-1.5">
@@ -221,14 +224,14 @@ export function BusinessBookingPanel({
                 {booking.serviceName ?? t("business.services")} · {booking.durationMinutes} min
               </p>
               <p className="text-xs text-muted-foreground">
-                {ownerView
+                {isOwner
                   ? `${t("business.customer")}: @${booking.requesterUsername ?? "unknown"}`
                   : `${t("business.owner")}: ${booking.businessName}`}
               </p>
               {booking.note ? (
                 <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{booking.note}</p>
               ) : null}
-              {ownerView && booking.status === "requested" ? (
+              {isOwner && booking.status === "requested" ? (
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -249,7 +252,7 @@ export function BusinessBookingPanel({
                   </Button>
                 </div>
               ) : null}
-              {ownerView && booking.status === "confirmed" ? (
+              {isOwner && booking.status === "confirmed" ? (
                 <Button
                   type="button"
                   size="sm"
@@ -260,7 +263,7 @@ export function BusinessBookingPanel({
                   {t("business.completeBooking")}
                 </Button>
               ) : null}
-              {!ownerView && ["requested", "confirmed"].includes(booking.status) ? (
+              {!isOwner && ["requested", "confirmed"].includes(booking.status) ? (
                 <Button
                   type="button"
                   size="sm"

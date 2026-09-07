@@ -11,6 +11,7 @@ export interface ChatRoomEnv {
 type ChatMessageBroadcast = {
   roomId: string;
   id: string;
+  clientMessageId?: string | null;
   body: string;
   createdAt: string;
   senderId: string;
@@ -22,13 +23,13 @@ type ChatRoomEvent = {
   roomId: string;
   message?: {
     id: string;
+    clientMessageId: string | null;
     body: string;
     createdAt: string;
     isMine: boolean;
     senderUsername: string | null;
   };
 };
-
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
     status,
@@ -57,10 +58,14 @@ function isChatMessageBroadcast(value: unknown): value is ChatMessageBroadcast {
     typeof input.createdAt === "string" &&
     typeof input.senderId === "string" &&
     input.senderId.length > 0 &&
+    (input.clientMessageId === undefined ||
+      input.clientMessageId === null ||
+      (typeof input.clientMessageId === "string" &&
+        input.clientMessageId.length > 0 &&
+        input.clientMessageId.length <= 200)) &&
     (typeof input.senderUsername === "string" || input.senderUsername === null)
   );
 }
-
 /**
  * One hibernatable Durable Object instance per active DM room.
  * D1 remains the source of truth; this object only coordinates live delivery.
@@ -68,9 +73,10 @@ function isChatMessageBroadcast(value: unknown): value is ChatMessageBroadcast {
 export class ChatRoom extends DurableObject<ChatRoomEnv> {
   constructor(ctx: DurableObjectState, env: ChatRoomEnv) {
     super(ctx, env);
-    // Cloudflare handles protocol-level ping/pong without waking the object.
+    this.ctx.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair("ping", "pong")
+    );
   }
-
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -142,6 +148,7 @@ export class ChatRoom extends DurableObject<ChatRoomEnv> {
         roomId: input.roomId,
         message: {
           id: input.id,
+          clientMessageId: input.clientMessageId ?? null,
           body: input.body,
           createdAt: input.createdAt,
           isMine: userId === input.senderId,

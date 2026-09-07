@@ -372,20 +372,6 @@ const ERROR_CATALOG: Record<
     en: "You don't have permission to do that",
     ru: "У вас нет прав для этого действия",
   },
-  "Your karma is too low to create posts. Contribute positively first.": {
-    en: "Your karma is too low to create posts. Contribute positively first.",
-    ru: "Недостаточно кармы для постов. Сначала участвуйте конструктивно.",
-  },
-  "Your karma is too low to send messages. Participate more first.": {
-    en: "Your karma is too low to send messages. Participate more first.",
-    vi: "Điểm karma của bạn chưa đủ để gửi tin nhắn. Hãy tham gia thêm trước.",
-    ko: "메시지를 보내려면 카르마가 필요합니다. 먼저 더 활동해 주세요.",
-    ru: "Недостаточно кармы для сообщений. Сначала поучаствуйте в обсуждениях.",
-  },
-  "Your karma is too low to create a community.": {
-    en: "Your karma is too low to create a community.",
-    ru: "Недостаточно кармы, чтобы создать сообщество.",
-  },
   "Invalid username for profile posts": {
     en: "Invalid username for profile posts",
     ru: "Некорректное имя пользователя для постов профиля",
@@ -535,14 +521,6 @@ const ERROR_CATALOG: Record<
   Saved: {
     en: "Saved",
     ru: "Сохранено",
-  },
-  "Vote failed": {
-    en: "Vote failed",
-    ru: "Не удалось проголосовать",
-  },
-  "Couldn't apply vote. Try again.": {
-    en: "Couldn't apply vote. Try again.",
-    ru: "Не удалось учесть голос. Попробуйте снова.",
   },
   "Could not post comment": {
     en: "Could not post comment",
@@ -728,10 +706,6 @@ const ERROR_CATALOG: Record<
     en: "Search failed",
     ru: "Поиск не удался",
   },
-  "Failed to apply vote": {
-    en: "Failed to apply vote",
-    ru: "Не удалось учесть голос",
-  },
   "Failed to create comment": {
     en: "Failed to create comment",
     ru: "Не удалось создать комментарий",
@@ -747,14 +721,6 @@ const ERROR_CATALOG: Record<
   "Failed to load recommendations": {
     en: "Failed to load recommendations",
     ru: "Не удалось загрузить рекомендации",
-  },
-  "Failed to vote on comment": {
-    en: "Failed to vote on comment",
-    ru: "Не удалось проголосовать за комментарий",
-  },
-  "action must be 'upvote' or 'downvote'": {
-    en: "action must be 'upvote' or 'downvote'",
-    ru: "Действие должно быть upvote или downvote",
   },
   "name and title are required": {
     en: "name and title are required",
@@ -804,10 +770,10 @@ export function localizeErrorMessage(
     return genericError(locale);
   }
   if (
-    /sql|d1|sqlite|vectorize|workers ai|durable object|r2|wrangler/i.test(key)
+    /sql|d1|sqlite|workers ai|durable object|r2|wrangler/i.test(key)
   ) {
     return genericError(locale);
   }
 
-  return genericError(locale);
+  return fallback ?? genericError(locale);
 }

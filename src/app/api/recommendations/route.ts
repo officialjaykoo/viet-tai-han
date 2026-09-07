@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { withFeedAds } from "@/lib/ads";
 import { getRecommendations } from "@/lib/content";
-import { clientIpFromHeaders } from "@/lib/security/challenge";
-import { enforceExpensiveIpRateLimit } from "@/lib/rate-limit";
 import { serializeFeed } from "@/lib/serializers";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const ip = clientIpFromHeaders(request.headers);
-    await enforceExpensiveIpRateLimit(ip, "recommend:burst");
     const session = await requireSession();
     const posts = await getRecommendations(session.user.id, 20);
     const feed = await withFeedAds(

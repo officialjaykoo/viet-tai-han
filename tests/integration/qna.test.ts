@@ -13,7 +13,7 @@ import { seedUsersAndSubreddit } from "./helpers";
 
 describe("Q&A lifecycle (D1)", () => {
   it("creates questions and answers, then toggles acceptance atomically", async () => {
-    const { authorId, voterId, subredditName } = await seedUsersAndSubreddit();
+    const { authorId, actorId, subredditName } = await seedUsersAndSubreddit();
 
     const question = await createQuestion({
       userId: authorId,
@@ -32,7 +32,7 @@ describe("Q&A lifecycle (D1)", () => {
     expect(search.questions.some((item) => item.id === question.id)).toBe(true);
 
     const answer = await createAnswer({
-      userId: voterId,
+      userId: actorId,
       questionId: question.id,
       body: "Bring your identity documents and verify every deposit and fee in writing.",
     });
@@ -40,7 +40,7 @@ describe("Q&A lifecycle (D1)", () => {
 
     await expect(
       toggleAcceptedAnswer({
-        userId: voterId,
+        userId: actorId,
         questionId: question.id,
         answerId: answer.id,
       })

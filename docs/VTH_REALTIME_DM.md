@@ -64,9 +64,13 @@ POST /api/messages/<roomId>
 - Web Push 알림
 
 D1 저장이 성공한 뒤 `broadcastChatMessage()`가 해당 room Durable Object에
-메시지 이벤트를 전달한다. 연결된 모든 클라이언트는 같은 메시지 ID를 받으며,
-클라이언트는 ID로 중복을 제거한다. 브라우저가 보낸 메시지는 HTTP 응답으로도
-즉시 화면에 추가되므로 자기 자신의 WebSocket fan-out과 충돌하지 않는다.
+메시지 이벤트를 best-effort로 전달한다. 연결된 모든 클라이언트는 같은 메시지 ID와
+`clientMessageId`를 받으며, 클라이언트는 ID로 중복을 제거한다. direct conversation
+시작 경로도 동일하게 D1 저장 후 broadcast한다. `clientMessageId`가 같은 재시도는
+기존 canonical row를 반환하고 알림·broadcast를 반복하지 않는다.
+
+`requestId`는 구형 클라이언트의 입력 alias로만 유지한다. 새 클라이언트는
+`clientMessageId`를 body에 보낸다.
 
 WebSocket은 메시지 작성 API가 아니다. 메시지 작성은 계속 HTTP API로 수행하여
 기존 보안·moderation 경로를 우회하지 않는다.
@@ -75,19 +79,24 @@ WebSocket은 메시지 작성 API가 아니다. 메시지 작성은 계속 HTTP 
 
 `src/components/messages/messages-client.tsx`가 다음을 담당한다.
 
-- 대화방 선택 시 기존 HTTP GET으로 초기 메시지 로드
+- 대화방 선택 시 D1에서 최신 history page 로드
+- `before` signed cursor로 위로 스크롤할 때 과거 history prepend
 - 같은 room에 WebSocket 연결
-- `message` event 수신 즉시 화면에 추가
-- 이미 로드된 메시지 ID 중복 제거
-- live event 이후 room GET을 event-driven으로 한 번 수행하여 읽음 상태 반영
-- 연결 종료 시 exponential backoff 재연결
-  - 1초 → 2초 → 4초 → 8초 → 최대 10초
+- `ready` 이후 `after` signed cursor로 reconnect catch-up
+- `message` event 수신 및 HTTP 응답을 같은 ID merge 경로로 처리
+- 서버 timestamp와 message ID tuple 순서 유지
+- live event 이후 room 전체 GET을 수행하지 않음
+- viewport가 하단일 때만 명시적인 read endpoint 호출
+- 연결 종료 시 jitter가 있는 exponential backoff 재연결
+  - 1초 → 2초 → 4초 → 8초 → 최대 10초(+jitter)
+- browser offline/hidden 상태에서는 연결·재연결을 멈추고 online/visible 때 복구
 - room 변경 또는 페이지 이탈 시 이전 연결 정리
 
 이 구현에는 새 메시지를 찾기 위한 `setInterval` 조회가 없다. 재연결용
 `setTimeout`은 데이터 polling이 아니라 끊어진 WebSocket 연결을 복구하기 위한
-backoff timer다. Cloudflare의 WebSocket protocol ping/pong은 런타임이 처리하므로
-애플리케이션 heartbeat도 추가하지 않는다.
+backoff timer다. Cloudflare `setWebSocketAutoResponse()`가 protocol-level
+ping/pong을 처리하므로 애플리케이션 heartbeat나 Durable Object 내 history cache를
+추가하지 않는다.
 
 ## Push 알림과 실시간의 차이
 
@@ -132,9 +141,8 @@ Worker entry에서 클래스를 export해야 Wrangler가 migration 대상 클래
 
 ```ts
 import { ChatRoom } from "./workers/ChatRoom";
-import { PostObject } from "./workers/PostObject";
 
-export { ChatRoom, PostObject };
+export { ChatRoom };
 ```
 
 ## 개발·배포 확인
@@ -164,9 +172,11 @@ custom Worker entry의 WebSocket 라우팅을 거치지 않을 수 있다.
 - `src/worker.ts`: WebSocket upgrade, Better Auth 검증, DO 라우팅
 - `src/workers/ChatRoom.ts`: room별 hibernatable WebSocket과 fan-out
 - `src/lib/chat-realtime.ts`: Next API에서 DO broadcast 호출
-- `src/app/api/messages/[roomId]/route.ts`: 저장 성공 후 broadcast
-- `src/components/messages/messages-client.tsx`: 연결·수신·재연결·중복 제거
-- `src/components/notifications/use-unread-count.ts`: polling 없는 event-driven unread 갱신
+- `src/lib/security/chat-cursor.ts`: room/user/direction에 묶인 signed cursor
+- `src/app/api/messages/[roomId]/route.ts`: history page와 저장 후 broadcast
+- `src/app/api/messages/[roomId]/read/route.ts`: 명시적인 monotonic read boundary
+- `src/components/messages/messages-client.tsx`: history·catch-up·수신·재연결·중복 제거
+- `migrations/0036_chat_reliability.sql`: client ID, read boundary, tuple index
 - `wrangler.jsonc`: production DO binding/migration
 - `wrangler.test.jsonc`: Worker 테스트 DO binding/migration
-- `tests/workers/chat-room.test.ts`: 연결 인증 전제, fan-out, pending/block 거부 검증
+- `tests/workers/chat-room.test.ts`: 연결 인증, auto-response, fan-out, pending/block 거부 검증

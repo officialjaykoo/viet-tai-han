@@ -12,10 +12,8 @@ type Stats = {
   postId: string;
   title: string;
   hasLink: boolean;
-  score: number;
+  likeCount: number;
   commentCount: number;
-  upvotes: number;
-  downvotes: number;
   views: number;
   uniqueViewers: number;
   linkClicks: number | null;
@@ -129,10 +127,8 @@ export function PostStatsClient({ postId }: { postId: string }) {
               [
                 ["post.views", stats.views],
                 ["post.unique", stats.uniqueViewers],
-                ["post.score", stats.score],
+                ["post.likes", stats.likeCount],
                 ["feed.comments", stats.commentCount],
-                ["post.upvotes", stats.upvotes],
-                ["post.downvotes", stats.downvotes],
               ] as const
             ).map(([labelKey, value]) => (
               <div

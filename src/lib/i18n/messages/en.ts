@@ -146,9 +146,7 @@ export const en = {
     rangeAll: "All time",
     views: "Views",
     unique: "Unique",
-    score: "Score",
-    upvotes: "Upvotes",
-    downvotes: "Downvotes",
+    likes: "Likes",
     linkClicks: "Link clicks",
     linkCtr: "Link CTR",
     viewsByHour: "Views by hour",
@@ -707,7 +705,7 @@ export const en = {
     submitBlurb: "Pick a community, choose a format, then publish.",
     recommended: "Recommended",
     recommendedBlurb:
-      "Ranked with Cloudflare Vectorize from posts you’ve upvoted and communities you join — falls back to activity if vectors aren’t ready yet.",
+      "Ranked from communities you join and recent activity — no external vector index is required.",
     searchResultsFor: "Results for",
     explore: "Explore",
     findBlurb: "Find people, communities, questions, posts, and listings",
@@ -733,7 +731,7 @@ export const en = {
     accounts: "Accounts",
     communities: "Communities",
     membersCount: "{count} members",
-    points: "{count} points",
+    likes: "{count} likes",
   },
   admin: {
     title: "Admin",
@@ -763,7 +761,6 @@ export const en = {
     warnUser: "Warn user",
     users: "Users",
     recommendations: "Recommendations",
-    voteBurst: "Vote burst signals (1h)",
     campaignName: "Campaign name",
     adCopyOptional: "Ad copy (optional)",
     feedInline: "Feed inline",
@@ -782,11 +779,6 @@ export const en = {
     userId: "User ID",
     lowKarma: "low reputation",
     weakSource: "weak source",
-    backfillEmbeddings: "Backfill post embeddings",
-    indexedPosts: "{count} posts indexed",
-    failedPosts: "{count} failed",
-    embeddingHint:
-      "Index recent posts into Cloudflare Vectorize and Workers AI so For you can rank by semantic similarity.",
     backfillTranslations: "Backfill content translations",
     translationBackfillResult:
       "Processed {posts} posts and {comments} comments",
@@ -810,10 +802,8 @@ export const en = {
     noRecentActivity: "No recent activity.",
     events: "events",
   },
-  vote: {
-    like: "Like",
-    upvote: "Like",
-    downvote: "Dislike",
+  like: {
+    action: "Like",
     group: "Like action",
   },
   common: {

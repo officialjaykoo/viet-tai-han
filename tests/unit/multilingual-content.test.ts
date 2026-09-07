@@ -5,12 +5,6 @@ import {
   detectLanguageHeuristic,
   translationTargetFor,
 } from "@/lib/translation";
-import {
-  EMBEDDING_DIMENSIONS,
-  EMBEDDING_MODEL,
-  EMBEDDING_VERSION,
-  postEmbeddingText,
-} from "@/lib/embeddings";
 
 describe("multilingual content contracts", () => {
   it.each([
@@ -54,19 +48,4 @@ describe("multilingual content contracts", () => {
     ).toBe(true);
   });
 
-  it("keeps post embedding text language-neutral", () => {
-    const text = postEmbeddingText({
-      subredditName: "cloudflare",
-      title: "한국어 제목",
-      body: "Nội dung tiếng Việt",
-    });
-
-    expect(text).toContain("Community: cloudflare");
-    expect(text).toContain("한국어 제목");
-    expect(text).toContain("Nội dung tiếng Việt");
-    expect(text).not.toContain("r/cloudflare");
-    expect(EMBEDDING_MODEL).toBe("@cf/google/embeddinggemma-300m");
-    expect(EMBEDDING_DIMENSIONS).toBe(768);
-    expect(EMBEDDING_VERSION).toBe("embeddinggemma-300m-v1");
-  });
 });
