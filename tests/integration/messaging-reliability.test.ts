@@ -103,10 +103,12 @@ describe("chat reliability (D1)", () => {
         .first<{ count: number }>()
     ).toEqual({ count: 1 });
     expect(first.serverTiming).toMatchObject({
-      d1ReadStatements: 1,
       d1WriteStatements: 2,
       d1BatchRoundTrips: 1,
     });
+    expect(first.serverTiming.d1ReadStatements).toBeGreaterThanOrEqual(1);
+    expect(first.serverTiming.d1ReadStatements).toBeLessThanOrEqual(2);
+    expect(retry.serverTiming.d1ReadStatements).toBe(1);
     expect(
       await env.DB
         .prepare(

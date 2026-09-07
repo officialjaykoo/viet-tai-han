@@ -13,10 +13,15 @@ export type BannedWordHit = {
 
 const BANNED_WORDS_TTL_SECONDS = 60;
 
-export async function getBannedWords(force = false): Promise<BannedWordHit[]> {
+type BannedWordsLoad = {
+  words: BannedWordHit[];
+  d1ReadStatements: number;
+};
+
+async function loadBannedWords(force = false): Promise<BannedWordsLoad> {
   if (!force) {
     const cached = await cacheGetJson<BannedWordHit[]>(CacheKeys.bannedWords);
-    if (cached) return cached;
+    if (cached) return { words: cached, d1ReadStatements: 0 };
   }
 
   const db = await getDb();
@@ -26,7 +31,11 @@ export async function getBannedWords(force = false): Promise<BannedWordHit[]> {
 
   const words = results ?? [];
   await cacheSetJson(CacheKeys.bannedWords, words, BANNED_WORDS_TTL_SECONDS);
-  return words;
+  return { words, d1ReadStatements: 1 };
+}
+
+export async function getBannedWords(force = false): Promise<BannedWordHit[]> {
+  return (await loadBannedWords(force)).words;
 }
 
 export function findBannedWordHits(
@@ -56,13 +65,15 @@ export async function moderateText(text: string): Promise<{
   blocked: boolean;
   shadow: boolean;
   hits: BannedWordHit[];
+  d1ReadStatements: number;
 }> {
-  const words = await getBannedWords();
-  const hits = findBannedWordHits(text, words);
+  const loaded = await loadBannedWords();
+  const hits = findBannedWordHits(text, loaded.words);
   return {
     blocked: hits.some((h) => h.severity === "block"),
     shadow: hits.some((h) => h.severity === "shadow"),
     hits,
+    d1ReadStatements: loaded.d1ReadStatements,
   };
 }
 

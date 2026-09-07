@@ -1722,6 +1722,7 @@ export async function sendChatMessage(input: {
   const moderationStartedAt = performance.now();
   const moderation = await moderateText(body);
   timing.moderationMs = performance.now() - moderationStartedAt;
+  timing.d1ReadStatements += moderation.d1ReadStatements;
   if (moderation.blocked) {
     throw new AuthError("This content isn't allowed", 400);
   }
