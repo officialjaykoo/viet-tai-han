@@ -27,11 +27,11 @@ export default function MessagingPage() {
       </Section>
 
       <Section title="Realtime chat">
-        <p>Realtime chat uses a Durable Object-backed WebSocket path for active rooms. Session and room membership checks happen before realtime access is granted. A message is committed to D1 before the live event is attempted; a WebSocket failure never turns a successful D1 write into a failed send.</p>
+        <p>Realtime chat uses a Durable Object-backed WebSocket path for active rooms. Session and room membership checks happen before realtime access is granted. A message is committed to D1 before the live event is attempted; the broadcast, push notification, and unread fanout run after the write, and a WebSocket failure never turns a successful D1 write into a failed send.</p>
       </Section>
 
       <Section title="History and recovery">
-        <p>Room history loads the latest page first. Signed before and after cursors provide older-history pagination and reconnect catch-up without exposing mutable database cursors. The browser deduplicates D1 responses and live events by message ID, then orders them by the server timestamp and message ID tuple.</p>
+        <p>Room history loads the latest page first. Signed before and after cursors provide older-history pagination and reconnect catch-up without exposing mutable database cursors. The browser reconciles D1, HTTP, and live responses by server message ID or the sender&apos;s non-null clientMessageId, then orders them by the server timestamp and message ID tuple.</p>
       </Section>
 
       <Section title="Read state">
@@ -39,7 +39,7 @@ export default function MessagingPage() {
       </Section>
 
       <Section title="Reliability">
-        <Note>Every client send should include a stable clientMessageId. Retries return the original canonical message instead of inserting another row. Duplicate request acceptance is idempotent, while conflicting actions remain errors.</Note>
+        <Note>Every client send should include a stable clientMessageId. The sender sees an optimistic bubble immediately with sending, sent, or failed state; a failed bubble remains available for retry with the same ID. Retries return the original canonical message instead of inserting another row. Duplicate request acceptance is idempotent, while conflicting actions remain errors.</Note>
       </Section>
     </>
   );
