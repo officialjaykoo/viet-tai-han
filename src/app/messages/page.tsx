@@ -23,18 +23,7 @@ export default async function MessagesPage() {
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
         />
-        <PageShell width="standard" className="space-y-6">
-          <section>
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "messages.inbox")}
-            </p>
-            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "messages.title")}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {tLocale(locale, "messages.description")}
-            </p>
-          </section>
+        <PageShell width="wide" className="py-3 sm:py-4">
           <Suspense
             fallback={
               <p className="text-sm text-muted-foreground">

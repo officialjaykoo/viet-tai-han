@@ -12,6 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { apiFetch } from "@/lib/api-client";
 import {
+  applyIncomingRoomMessage,
+  reconcileChatRoomRead,
+  reconcileRoomLatestMessage,
+} from "@/lib/chat-room-state";
+import {
   mergeMessages,
   updateLocalDeliveryState,
   type LocalChatMessage,
@@ -142,6 +147,7 @@ export function MessagesClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composeUser, setComposeUser] = useState(toParam);
   const [composeBody, setComposeBody] = useState("");
+  const [composeOpen, setComposeOpen] = useState(Boolean(toParam));
   const [reply, setReply] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -153,6 +159,7 @@ export function MessagesClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const roomsRef = useRef<Room[]>([]);
   const messageListRef = useRef<HTMLDivElement>(null);
+  const latestRoomMessagesRef = useRef(new Map<string, ChatMessage>());
   const composeClientMessageIdRef = useRef<string | null>(null);
   const beforeCursorRef = useRef<string | null>(null);
   const afterCursorRef = useRef<string | null>(null);
@@ -172,9 +179,41 @@ export function MessagesClient() {
 
   useEffect(() => {
     // URL query changes intentionally seed the compose field.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (toParam) setComposeUser(toParam);
+    if (toParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setComposeUser(toParam);
+      setComposeOpen(true);
+    }
   }, [toParam]);
+
+  const rememberRoomLatestMessage = useCallback(
+    (roomId: string, message: ChatMessage) => {
+      const current = latestRoomMessagesRef.current.get(roomId);
+      const isLater =
+        !current ||
+        message.createdAt > current.createdAt ||
+        (message.createdAt === current.createdAt && message.id >= current.id);
+      if (isLater || current?.id === message.id) {
+        latestRoomMessagesRef.current.set(roomId, message);
+      }
+    },
+    []
+  );
+
+  const reconcileRoomLatest = useCallback(
+    (roomId: string, message: ChatMessage) => {
+      rememberRoomLatestMessage(roomId, message);
+      const nextRooms = reconcileRoomLatestMessage(
+        roomsRef.current,
+        roomId,
+        message
+      );
+      if (nextRooms === roomsRef.current) return;
+      roomsRef.current = nextRooms;
+      setRooms(nextRooms);
+    },
+    [rememberRoomLatestMessage]
+  );
 
   const loadInbox = useCallback(() => {
     startTransition(async () => {
@@ -191,8 +230,12 @@ export function MessagesClient() {
         rooms: Room[];
         requests: RequestItem[];
       };
-      roomsRef.current = data.rooms;
-      setRooms(data.rooms);
+      let nextRooms = data.rooms;
+      for (const [roomId, message] of latestRoomMessagesRef.current) {
+        nextRooms = reconcileRoomLatestMessage(nextRooms, roomId, message);
+      }
+      roomsRef.current = nextRooms;
+      setRooms(nextRooms);
       setRequests(data.requests);
       setLoaded(true);
     });
@@ -200,40 +243,23 @@ export function MessagesClient() {
 
   const applyRoomMessage = useCallback(
     (roomId: string, message: ChatMessage) => {
-      const room = roomsRef.current.find((item) => item.id === roomId);
-      if (!room) return;
-      const isNewer =
-        !room.lastMessageAt ||
-        message.createdAt > room.lastMessageAt ||
-        (message.createdAt === room.lastMessageAt &&
-          message.id >= (room.lastMessageId ?? ""));
-      if (message.id === room.lastMessageId || !isNewer) return;
-      const shouldIncrementUnread =
-        !message.isMine && !isNearBottomRef.current;
-      setRooms((current) => {
-        const nextRoom = current.find((item) => item.id === roomId);
-        if (!nextRoom) return current;
-        const next = {
-          ...nextRoom,
-          lastBody: message.body,
-          lastMessageAt: message.createdAt,
-          lastMessageId: message.id,
-          unreadCount: shouldIncrementUnread
-            ? nextRoom.unreadCount + 1
-            : nextRoom.unreadCount,
-        };
-        const nextRooms = [
-          next,
-          ...current.filter((item) => item.id !== roomId),
-        ];
-        roomsRef.current = nextRooms;
-        return nextRooms;
-      });
-      if (shouldIncrementUnread) {
-        announceUnreadChanged({ messageDelta: 1 });
+      rememberRoomLatestMessage(roomId, message);
+      const result = applyIncomingRoomMessage(
+        roomsRef.current,
+        roomId,
+        message,
+        isNearBottomRef.current
+      );
+      if (result.rooms === roomsRef.current && result.unreadDelta === 0) {
+        return;
+      }
+      roomsRef.current = result.rooms;
+      setRooms(result.rooms);
+      if (result.unreadDelta > 0) {
+        announceUnreadChanged({ messageDelta: result.unreadDelta });
       }
     },
-    []
+    [rememberRoomLatestMessage]
   );
 
   const catchUpRoom = useCallback(
@@ -324,6 +350,10 @@ export function MessagesClient() {
         afterCursorRef.current = page.nextAfterCursor;
         setHasMoreBefore(page.hasMoreBefore);
         setMessages((current) => mergeMessages(current, page.messages));
+        const latestMessage = page.messages[page.messages.length - 1];
+        if (latestMessage) {
+          reconcileRoomLatest(roomId, latestMessage);
+        }
         if (socketReadyRoomRef.current === roomId) {
           void catchUpRoom(roomId);
         }
@@ -333,8 +363,9 @@ export function MessagesClient() {
         }
       }
     },
-    [catchUpRoom, localizeError]
+    [catchUpRoom, localizeError, reconcileRoomLatest]
   );
+
 
   useEffect(() => {
     loadInbox();
@@ -386,20 +417,25 @@ export function MessagesClient() {
           body: JSON.stringify({ messageId }),
         });
         if (!res.ok) return;
-        const result = (await res.json()) as { updated?: boolean };
-        if (!result.updated) return;
-        const currentRoom = roomsRef.current.find(
-          (room) => room.id === roomId
+        const result = (await res.json()) as {
+          messageId?: string | null;
+          updated?: boolean;
+        };
+        // `updated` only describes a server-side boundary mutation. A
+        // successful response still authoritatively acknowledges messageId.
+        if (result.messageId !== messageId) return;
+        const reconciliation = reconcileChatRoomRead(
+          roomsRef.current,
+          roomId,
+          result.messageId
         );
-        if (!currentRoom || currentRoom.lastMessageId !== messageId) return;
-        const previousUnread = currentRoom.unreadCount;
-        const nextRooms = roomsRef.current.map((room) =>
-          room.id === roomId ? { ...room, unreadCount: 0 } : room
-        );
-        roomsRef.current = nextRooms;
-        setRooms(nextRooms);
-        if (previousUnread > 0) {
-          announceUnreadChanged({ messageDelta: -previousUnread });
+        if (!reconciliation.acknowledged) return;
+        roomsRef.current = reconciliation.rooms;
+        setRooms(reconciliation.rooms);
+        if (reconciliation.clearedUnread > 0) {
+          announceUnreadChanged({
+            messageDelta: -reconciliation.clearedUnread,
+          });
         }
       } catch {
         // The next explicit read or inbox refresh reconciles the boundary.
@@ -611,6 +647,7 @@ export function MessagesClient() {
         };
         setComposeUser("");
         setComposeBody("");
+        setComposeOpen(false);
         composeClientMessageIdRef.current = null;
         setError(null);
         if (result.conversationType === "direct" && result.roomId) {
@@ -764,28 +801,46 @@ export function MessagesClient() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-      <aside className="space-y-6">
-        {!selectedRoom ? (
-          <section className="space-y-3">
-            <h2 className="font-heading text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-              {t("messages.newChat")}
-            </h2>
-            <form onSubmit={startConversation} className="space-y-2">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-[17rem_minmax(0,1fr)]">
+      <aside
+        className={cn(
+          "min-w-0 space-y-3",
+          selectedRoom ? "hidden lg:block" : "block",
+          "lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1"
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+          <h1 className="font-heading text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            {t("messages.inbox")}
+          </h1>
+          <Button
+            type="button"
+            size="xs"
+            variant={composeOpen ? "secondary" : "ghost"}
+            aria-expanded={composeOpen}
+            onClick={() => setComposeOpen((open) => !open)}
+          >
+            {t("messages.newChat")}
+          </Button>
+        </div>
+
+        {composeOpen ? (
+          <section className="rounded-xl border border-border/60 bg-card/70 p-2.5">
+            <form onSubmit={startConversation} className="space-y-1.5">
               <Input
                 value={composeUser}
                 onChange={(e) => setComposeUser(e.target.value)}
                 placeholder={t("messages.username")}
                 required
-                className="rounded-lg"
+                className="h-10 rounded-lg text-sm sm:h-9"
               />
               <Textarea
                 value={composeBody}
                 onChange={(e) => setComposeBody(e.target.value)}
                 placeholder={t("messages.openerPlaceholder")}
-                rows={3}
+                rows={2}
                 required
-                className="rounded-lg"
+                className="min-h-14 rounded-lg px-3 py-2 text-sm"
               />
               <Button
                 type="submit"
@@ -796,22 +851,22 @@ export function MessagesClient() {
                 {t("messages.send")}
               </Button>
             </form>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-1.5 text-xs text-muted-foreground">
               {t("messages.requestHint")}
             </p>
           </section>
         ) : null}
 
         {requests.length > 0 ? (
-          <section className="space-y-2">
-            <h2 className="font-heading text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+          <section className="space-y-1.5">
+            <h2 className="font-heading text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t("messages.requests")}
             </h2>
-            <ul className="space-y-2">
+            <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
               {requests.map((req) => (
                 <li
                   key={req.id}
-                  className="rounded-xl border border-border/60 bg-card/70 p-3"
+                  className="rounded-xl border border-border/60 bg-card/70 p-2.5"
                 >
                   <div className="flex items-center gap-2">
                     <UserAvatar
@@ -823,10 +878,10 @@ export function MessagesClient() {
                       @{req.from.username}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">
+                  <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground">
                     {req.openerBody}
                   </p>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-1.5 flex gap-2">
                     <Button
                       type="button"
                       size="xs"
@@ -851,8 +906,8 @@ export function MessagesClient() {
           </section>
         ) : null}
 
-        <section className="space-y-2">
-          <h2 className="font-heading text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+        <section className="space-y-1.5">
+          <h2 className="font-heading text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {t("messages.chats")}
           </h2>
           {!loaded ? (
@@ -862,14 +917,14 @@ export function MessagesClient() {
               {t("messages.noOpenChats")}
             </p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {rooms.map((room) => (
                 <li key={room.id}>
                   <button
                     type="button"
                     onClick={() => router.push(`/messages?room=${room.id}`)}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted",
+                      "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted",
                       selectedRoom === room.id && "bg-muted"
                     )}
                   >
@@ -904,11 +959,31 @@ export function MessagesClient() {
         </section>
       </aside>
 
-      <section className="relative flex h-[calc(100dvh-8rem)] min-h-[28rem] max-h-[48rem] flex-col rounded-2xl border border-border/60 bg-card/70 lg:h-[calc(100dvh-10rem)] lg:max-h-[calc(100dvh-10rem)]">
+      <section
+        className={cn(
+          "relative min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 h-[calc(100dvh-8rem)] min-h-[28rem]",
+          selectedRoom ? "flex" : "hidden lg:flex",
+          "lg:h-[calc(100dvh-6rem)] lg:min-h-0 lg:max-h-none"
+        )}
+      >
         {activeRoom ? (
           <>
-            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
-              <p className="truncate font-medium">@{activeRoom.peer.username}</p>
+            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  className="lg:hidden"
+                  aria-label={t("messages.chats")}
+                  onClick={() => router.push("/messages")}
+                >
+                  ←
+                </Button>
+                <p className="truncate font-medium">
+                  @{activeRoom.peer.username}
+                </p>
+              </div>
               <Button
                 type="button"
                 size="xs"
@@ -940,48 +1015,57 @@ export function MessagesClient() {
                   void loadOlderMessages();
                 }
               }}
-              className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+              className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2"
             >
-              <div className="space-y-3">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "space-y-1",
-                      message.isMine ? "ml-auto max-w-[85%]" : "max-w-[85%]"
-                    )}
-                  >
+              <div className="flex flex-col">
+                {messages.map((message, index) => {
+                  const previous = messages[index - 1];
+                  const sameSide = previous
+                    ? previous.isMine === message.isMine
+                    : false;
+                  return (
                     <div
+                      key={message.id}
                       className={cn(
-                        "whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm",
+                        index === 0 ? "pt-0" : sameSide ? "pt-0.5" : "pt-2",
+                        "space-y-0.5",
                         message.isMine
-                          ? "bg-[color-mix(in_oklch,var(--brand)_18%,transparent)]"
-                          : "bg-muted"
+                          ? "ml-auto max-w-[88%] sm:max-w-[80%] lg:max-w-[75%]"
+                          : "max-w-[88%] sm:max-w-[80%] lg:max-w-[75%]"
                       )}
                     >
-                      {message.body}
-                    </div>
-                    {message.localDeliveryState === "sending" ? (
-                      <p className="text-right text-[11px] text-muted-foreground">
-                        {t("messages.sending")}
-                      </p>
-                    ) : null}
-                    {message.localDeliveryState === "failed" &&
-                    message.clientMessageId ? (
-                      <div className="flex items-center justify-end gap-2 text-[11px] text-destructive">
-                        <span role="status">{t("messages.sendFailed")}</span>
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => retryMessage(message)}
-                        >
-                          {t("messages.retry")}
-                        </Button>
+                      <div
+                        className={cn(
+                          "whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm",
+                          message.isMine
+                            ? "bg-[color-mix(in_oklch,var(--brand)_18%,transparent)]"
+                            : "bg-muted"
+                        )}
+                      >
+                        {message.body}
                       </div>
-                    ) : null}
-                  </div>
-                ))}
+                      {message.localDeliveryState === "sending" ? (
+                        <p className="text-right text-[11px] text-muted-foreground">
+                          {t("messages.sending")}
+                        </p>
+                      ) : null}
+                      {message.localDeliveryState === "failed" &&
+                      message.clientMessageId ? (
+                        <div className="flex items-center justify-end gap-2 text-[11px] text-destructive">
+                          <span role="status">{t("messages.sendFailed")}</span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => retryMessage(message)}
+                          >
+                            {t("messages.retry")}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
               {showNewMessages ? (
                 <Button
@@ -1005,7 +1089,7 @@ export function MessagesClient() {
             </div>
             <form
               onSubmit={sendReply}
-              className="flex shrink-0 items-end gap-2 border-t border-border/50 p-3"
+              className="flex shrink-0 items-end gap-2 border-t border-border/50 px-3 py-2"
             >
               <Textarea
                 value={reply}
@@ -1024,9 +1108,9 @@ export function MessagesClient() {
                 }}
                 placeholder={t("messages.placeholder")}
                 rows={1}
-                className="max-h-32 min-h-10 flex-1 overflow-y-auto rounded-lg"
+                className="max-h-32 min-h-10 flex-1 overflow-y-auto rounded-lg px-3 py-2 text-sm"
               />
-              <Button type="submit" disabled={!reply.trim()}>
+              <Button type="submit" size="sm" disabled={!reply.trim()}>
                 {t("messages.send")}
               </Button>
             </form>
@@ -1092,7 +1176,7 @@ export function MessagesClient() {
             ) : null}
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
             {t("messages.selectChat")}
           </div>
         )}
