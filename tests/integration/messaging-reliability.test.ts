@@ -104,6 +104,26 @@ describe("chat reliability (D1)", () => {
     ).toEqual({ count: 1 });
     expect((await getUnreadCounts(actorId)).messageCount).toBe(1);
   });
+  it("keeps shadow-hidden sends out of recipient delivery", async () => {
+    const { actorId, authorId, roomId } = await createActiveRoom();
+    const message = await sendChatMessage({
+      roomId,
+      userId: authorId,
+      body: "shadow-only body",
+      userStatus: "shadowbanned",
+      clientMessageId: `shadow_${crypto.randomUUID()}`,
+    });
+
+    expect(message.created).toBe(true);
+    expect(message.shouldBroadcast).toBe(false);
+    expect(
+      (await getChatMessages({ roomId, userId: actorId })).messages
+    ).toHaveLength(0);
+    expect(
+      (await getChatMessages({ roomId, userId: authorId })).messages
+    ).toHaveLength(1);
+    expect((await getUnreadCounts(actorId)).messageCount).toBe(0);
+  });
 
   it("pages complete history with a deterministic same-millisecond tuple", async () => {
     const { actorId, authorId, roomId } = await createActiveRoom();
@@ -167,6 +187,49 @@ describe("chat reliability (D1)", () => {
       `${roomId}_message_10`,
     ]);
 
+  });
+  it("loads and paginates a large room from the latest page", async () => {
+    const { actorId, authorId, roomId } = await createActiveRoom();
+    const ids = Array.from(
+      { length: 500 },
+      (_, index) => `${roomId}_large_${String(index + 1).padStart(3, "0")}`
+    );
+    await env.DB.batch(
+      ids.map((id) =>
+        env.DB.prepare(
+          `INSERT INTO chat_messages
+           (id, room_id, sender_id, body, delivery_status, is_shadow_hidden, created_at)
+           VALUES (?, ?, ?, ?, 'delivered', 0, ?)`
+        ).bind(id, roomId, authorId, id, SAME_MILLISECOND)
+      )
+    );
+
+    const initial = await getChatMessages({
+      roomId,
+      userId: actorId,
+      limit: 50,
+    });
+    expect(initial.messages.map((message) => message.id)).toEqual(
+      ids.slice(-50)
+    );
+    expect(initial.messages).toHaveLength(50);
+    expect(initial.hasMoreBefore).toBe(true);
+
+    const collected = initial.messages.map((message) => message.id);
+    let cursor = initial.nextBeforeCursor;
+    while (cursor) {
+      const page = await getChatMessages({
+        roomId,
+        userId: actorId,
+        limit: 50,
+        before: cursor,
+      });
+      collected.unshift(...page.messages.map((message) => message.id));
+      cursor = page.hasMoreBefore ? page.nextBeforeCursor : null;
+    }
+
+    expect(collected).toEqual(ids);
+    expect(new Set(collected).size).toBe(ids.length);
   });
   it("marks a monotonic tuple boundary without mutating history reads", async () => {
     const { actorId, authorId, roomId } = await createActiveRoom();

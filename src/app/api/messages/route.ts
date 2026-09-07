@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     if (
       result.conversationType === "direct" &&
       result.created &&
+      result.shouldBroadcast &&
       result.messageId &&
       result.messageBody &&
       result.messageCreatedAt

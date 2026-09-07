@@ -85,7 +85,7 @@ export async function POST(
       requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
 
-    if (message.created) {
+    if (message.created && message.shouldBroadcast) {
       runBackgroundTask("chat_realtime_broadcast", () =>
         broadcastChatMessage({
           roomId,
@@ -99,9 +99,13 @@ export async function POST(
       );
     }
 
-    const { created: _created, ...response } = message;
-    void _created;
-    return NextResponse.json(response, { status: message.created ? 201 : 200 });
+    const {
+      created,
+      shouldBroadcast: _shouldBroadcast,
+      ...response
+    } = message;
+    void _shouldBroadcast;
+    return NextResponse.json(response, { status: created ? 201 : 200 });
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);
     console.error("POST /api/messages/[roomId] failed", error);

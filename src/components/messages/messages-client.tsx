@@ -387,6 +387,23 @@ export function MessagesClient() {
     }, 150);
     return () => window.clearTimeout(timer);
   }, [isNearBottom, messages, markChatRead, selectedRoom]);
+  useEffect(() => {
+    if (!selectedRoom || messages.length === 0) return;
+    const handleVisibility = () => {
+      if (
+        document.visibilityState !== "visible" ||
+        !isNearBottomRef.current
+      ) {
+        return;
+      }
+      const lastMessage = messages[messages.length - 1];
+      void markChatRead(selectedRoom, lastMessage.id);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, [markChatRead, messages, selectedRoom]);
+
 
   useEffect(() => {
     if (!selectedRoom) return;

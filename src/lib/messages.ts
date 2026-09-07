@@ -341,14 +341,16 @@ async function notifyChatAccepted(input: {
   });
 }
 
-async function notifyDeliveredChatMessage(input: {
+function notifyDeliveredChatMessage(input: {
   db: D1Database;
   recipientId: string;
   senderId: string;
   roomId: string;
   body: string;
 }) {
-  await incrementUnread(input.recipientId, "messages");
+  runBackgroundTask("chat_unread_fanout", () =>
+    incrementUnread(input.recipientId, "messages")
+  );
   runBackgroundTask("chat_push_notification", async () => {
     if (!(await canNotifyChat(input.recipientId))) return;
     const actor = await input.db
@@ -371,6 +373,7 @@ async function notifyDeliveredChatMessage(input: {
 type ChatMessageWrite = {
   message: ChatMessage & { isMine: true };
   created: boolean;
+  shouldBroadcast: boolean;
 };
 
 type ChatMessageRow = {
@@ -444,7 +447,7 @@ async function insertDeliveredChatMessage(input: {
         messageId: existing.id,
       })
     );
-    return { message: existing, created: false };
+    return { message: existing, created: false, shouldBroadcast: false };
   }
 
   const id = createPublicId();
@@ -483,7 +486,7 @@ async function insertDeliveredChatMessage(input: {
             messageId: raced.id,
           })
         );
-        return { message: raced, created: false };
+        return { message: raced, created: false, shouldBroadcast: false };
       }
     }
     throw error;
@@ -508,7 +511,7 @@ async function insertDeliveredChatMessage(input: {
       )
       .bind(message.createdAt, input.roomId)
       .run();
-    await notifyDeliveredChatMessage({
+    notifyDeliveredChatMessage({
       db: input.db,
       recipientId: input.recipientId,
       senderId: input.senderId,
@@ -517,8 +520,13 @@ async function insertDeliveredChatMessage(input: {
     });
   }
 
-  return { message, created: true };
+  return {
+    message,
+    created: true,
+    shouldBroadcast: !input.shadow,
+  };
 }
+
 
 async function promotePendingRequest(
   db: D1Database,
@@ -598,7 +606,9 @@ async function promotePendingRequest(
 
   const count = Number(pendingMessages?.count ?? 0);
   if (count > 0) {
-    await incrementUnread(request.to_user_id, "messages", count);
+    runBackgroundTask("chat_unread_fanout", () =>
+      incrementUnread(request.to_user_id, "messages", count)
+    );
   }
   await notifyChatAccepted({
     db,
@@ -940,6 +950,7 @@ async function startDirectConversation(
     messageBody: write.message.body,
     messageCreatedAt: write.message.createdAt,
     created: write.created,
+    shouldBroadcast: write.shouldBroadcast,
   };
 }
 
@@ -1565,7 +1576,13 @@ export async function sendChatMessage(input: {
     clientMessageId,
     requestId,
   });
-  if (existing) return { ...existing, created: false as const };
+  if (existing) {
+    return {
+      ...existing,
+      created: false as const,
+      shouldBroadcast: false as const,
+    };
+  }
   await enforceCreateRateLimit(input.userId, "dm_message");
 
   const moderation = await moderateText(body);
@@ -1585,7 +1602,11 @@ export async function sendChatMessage(input: {
     clientMessageId,
     requestId,
   });
-  return { ...write.message, created: write.created };
+  return {
+    ...write.message,
+    created: write.created,
+    shouldBroadcast: write.shouldBroadcast,
+  };
 }
 
 export async function findActiveRoomWithUsername(
