@@ -41,14 +41,39 @@ export async function POST(request: NextRequest) {
     };
     await requireActiveUser(user);
 
-    const body = (await readApiJson(request)) as {
-      toUsername?: string;
-      body?: string;
-      clientMessageId?: string | null;
-      requestId?: string | null;
+    const payload = await readApiJson(request);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return await jsonLocalizedError(
+        "toUsername and body are required",
+        400
+      );
+    }
+    const body = payload as {
+      toUsername?: unknown;
+      body?: unknown;
+      clientMessageId?: unknown;
+      requestId?: unknown;
     };
-    if (!body.toUsername || !body.body) {
-      return await jsonLocalizedError("toUsername and body are required", 400);
+    if (
+      typeof body.toUsername !== "string" ||
+      body.toUsername.trim().length === 0 ||
+      typeof body.body !== "string" ||
+      body.body.trim().length === 0
+    ) {
+      return await jsonLocalizedError(
+        "toUsername and body are required",
+        400
+      );
+    }
+    if (
+      (body.clientMessageId !== undefined &&
+        body.clientMessageId !== null &&
+        typeof body.clientMessageId !== "string") ||
+      (body.requestId !== undefined &&
+        body.requestId !== null &&
+        typeof body.requestId !== "string")
+    ) {
+      return await jsonLocalizedError("Invalid request ID", 400);
     }
 
     const result = await startConversation({

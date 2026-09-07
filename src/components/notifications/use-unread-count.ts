@@ -11,6 +11,12 @@ type UnreadResponse = {
   messageCount?: number;
 };
 
+export type UnreadChange = {
+  notificationDelta?: number;
+  messageDelta?: number;
+  reconcile?: boolean;
+};
+
 export function useUnreadCount(kind: UnreadCountKind): number {
   const [count, setCount] = useState(0);
 
@@ -32,7 +38,21 @@ export function useUnreadCount(kind: UnreadCountKind): number {
       }
     }
     void load();
-    const refresh = () => void load();
+    const refresh = (event: Event) => {
+      const detail =
+        event instanceof CustomEvent
+          ? (event.detail as UnreadChange | undefined)
+          : undefined;
+      const delta =
+        kind === "notifications"
+          ? detail?.notificationDelta
+          : detail?.messageDelta;
+      if (typeof delta === "number" && !detail?.reconcile) {
+        setCount((current) => Math.max(0, current + delta));
+        return;
+      }
+      if (detail?.reconcile || !detail) void load();
+    };
     window.addEventListener("vth-unread-changed", refresh);
     return () => {
       active = false;
@@ -43,6 +63,10 @@ export function useUnreadCount(kind: UnreadCountKind): number {
   return count;
 }
 
-export function announceUnreadChanged() {
-  window.dispatchEvent(new Event("vth-unread-changed"));
+export function announceUnreadChanged(
+  change: UnreadChange = { reconcile: true }
+) {
+  window.dispatchEvent(
+    new CustomEvent<UnreadChange>("vth-unread-changed", { detail: change })
+  );
 }

@@ -9,7 +9,10 @@ import { formatUserHandle } from "@/lib/profile-url";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import { queuePushDelivery } from "@/lib/push";
-import { enforceCreateRateLimit } from "@/lib/rate-limit";
+import {
+  enforceActiveDmRateLimit,
+  enforceCreateRateLimit,
+} from "@/lib/rate-limit";
 import { normalizeRequestId } from "@/lib/idempotency";
 import {
   openChatCursor,
@@ -146,6 +149,12 @@ async function prepareConversationStart(
     clientMessageId,
     requestId: clientMessageId,
   };
+  if (
+    typeof input.toUsername !== "string" ||
+    typeof input.openerBody !== "string"
+  ) {
+    throw new AuthError("toUsername and body are required", 400);
+  }
   const body = input.openerBody.trim();
   if (body.length < 1 || body.length > 4000) {
     throw new AuthError("Message must be 1–4000 characters", 400);
@@ -376,6 +385,29 @@ type ChatMessageWrite = {
   shouldBroadcast: boolean;
 };
 
+type ChatSendTiming = {
+  authorizeMs: number;
+  rateMs: number;
+  moderationMs: number;
+  dbWriteMs: number;
+  d1ReadStatements: number;
+  d1WriteStatements: number;
+  d1BatchRoundTrips: number;
+};
+
+function createChatSendTiming(): ChatSendTiming {
+  return {
+    authorizeMs: 0,
+    rateMs: 0,
+    moderationMs: 0,
+    dbWriteMs: 0,
+    d1ReadStatements: 0,
+    d1WriteStatements: 0,
+    d1BatchRoundTrips: 0,
+  };
+}
+
+
 type ChatMessageRow = {
   id: string;
   body: string;
@@ -425,6 +457,91 @@ async function findDeliveredChatMessage(input: {
   return row ? ownChatMessage(row) : null;
 }
 
+type ActiveChatSendContext = {
+  senderMembershipStatus: string;
+  recipientId: string;
+  recipientMembershipStatus: string;
+  blocked: boolean;
+  existingMessage: ChatMessageWrite["message"] | null;
+};
+
+async function loadActiveChatSendContext(input: {
+  db: D1Database;
+  roomId: string;
+  senderId: string;
+  clientMessageId: string | null;
+  requestId: string | null;
+}): Promise<ActiveChatSendContext | null> {
+  const row = await input.db
+    .prepare(
+      `SELECT
+         me.membership_status AS sender_membership_status,
+         peer.user_id AS recipient_id,
+         peer.membership_status AS recipient_membership_status,
+         EXISTS (
+           SELECT 1
+           FROM user_blocks b
+           WHERE (b.blocker_id = me.user_id AND b.blocked_id = peer.user_id)
+              OR (b.blocker_id = peer.user_id AND b.blocked_id = me.user_id)
+         ) AS blocked,
+         duplicate.id AS existing_id,
+         duplicate.body AS existing_body,
+         duplicate.created_at AS existing_created_at,
+         duplicate.client_message_id AS existing_client_message_id
+       FROM chat_room_members me
+       INNER JOIN chat_room_members peer
+         ON peer.room_id = me.room_id
+        AND peer.user_id != me.user_id
+       LEFT JOIN chat_messages duplicate
+         ON duplicate.room_id = me.room_id
+        AND duplicate.sender_id = me.user_id
+        AND duplicate.delivery_status = 'delivered'
+        AND (
+          (? IS NOT NULL AND duplicate.client_message_id = ?)
+          OR (? IS NOT NULL AND duplicate.request_id = ?)
+        )
+       WHERE me.room_id = ? AND me.user_id = ?
+       LIMIT 1`
+    )
+    .bind(
+      input.clientMessageId,
+      input.clientMessageId,
+      input.requestId,
+      input.requestId,
+      input.roomId,
+      input.senderId
+    )
+    .first<{
+      sender_membership_status: string;
+      recipient_id: string;
+      recipient_membership_status: string;
+      blocked: number;
+      existing_id: string | null;
+      existing_body: string | null;
+      existing_created_at: string | null;
+      existing_client_message_id: string | null;
+    }>();
+
+  if (!row) return null;
+  return {
+    senderMembershipStatus: row.sender_membership_status,
+    recipientId: row.recipient_id,
+    recipientMembershipStatus: row.recipient_membership_status,
+    blocked: Boolean(row.blocked),
+    existingMessage:
+      row.existing_id &&
+      row.existing_body !== null &&
+      row.existing_created_at !== null
+        ? ownChatMessage({
+            id: row.existing_id,
+            body: row.existing_body,
+            created_at: row.existing_created_at,
+            client_message_id: row.existing_client_message_id,
+          })
+        : null,
+  };
+}
+
 async function insertDeliveredChatMessage(input: {
   db: D1Database;
   roomId: string;
@@ -434,8 +551,12 @@ async function insertDeliveredChatMessage(input: {
   shadow: number;
   clientMessageId: string | null;
   requestId: string | null;
+  existingMessage?: ChatMessageWrite["message"] | null;
 }): Promise<ChatMessageWrite> {
-  const existing = await findDeliveredChatMessage(input);
+  const existing =
+    "existingMessage" in input
+      ? input.existingMessage
+      : await findDeliveredChatMessage(input);
   if (existing) {
     console.info(
       JSON.stringify({
@@ -452,12 +573,13 @@ async function insertDeliveredChatMessage(input: {
 
   const id = createPublicId();
   try {
-    await input.db
+    const insert = input.db
       .prepare(
         `INSERT INTO chat_messages (
            id, room_id, sender_id, body, delivery_status, is_shadow_hidden,
            request_id, client_message_id, created_at
-         ) VALUES (?, ?, ?, ?, 'delivered', ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`
+         ) VALUES (?, ?, ?, ?, 'delivered', ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+         RETURNING id, body, created_at, client_message_id`
       )
       .bind(
         id,
@@ -467,8 +589,45 @@ async function insertDeliveredChatMessage(input: {
         input.shadow,
         input.requestId,
         input.clientMessageId
-      )
-      .run();
+      );
+    const statements = [insert];
+    if (!input.shadow) {
+      statements.push(
+        input.db
+          .prepare(
+            `UPDATE chat_rooms
+             SET last_message_at = (
+               SELECT created_at FROM chat_messages WHERE id = ?
+             )
+             WHERE id = ?
+               AND (
+                 last_message_at IS NULL
+                 OR last_message_at <= (
+                   SELECT created_at FROM chat_messages WHERE id = ?
+                 )
+               )`
+          )
+          .bind(id, input.roomId, id)
+      );
+    }
+    const [insertResult] = await input.db.batch<ChatMessageRow>(statements);
+    const row = insertResult?.results?.[0];
+    if (!row) throw new Error("Inserted chat message was not returned");
+    const message = ownChatMessage(row);
+    if (!input.shadow) {
+      notifyDeliveredChatMessage({
+        db: input.db,
+        recipientId: input.recipientId,
+        senderId: input.senderId,
+        roomId: input.roomId,
+        body: message.body,
+      });
+    }
+    return {
+      message,
+      created: true,
+      shouldBroadcast: !input.shadow,
+    };
   } catch (error) {
     if (
       isUniqueConstraint(error) &&
@@ -491,40 +650,6 @@ async function insertDeliveredChatMessage(input: {
     }
     throw error;
   }
-
-  const row = await input.db
-    .prepare(
-      `SELECT id, body, created_at, client_message_id
-       FROM chat_messages WHERE id = ?`
-    )
-    .bind(id)
-    .first<ChatMessageRow>();
-  if (!row) throw new Error("Inserted chat message was not found");
-
-  const message = ownChatMessage(row);
-  if (!input.shadow) {
-    await input.db
-      .prepare(
-        `UPDATE chat_rooms
-         SET last_message_at = ?
-         WHERE id = ?`
-      )
-      .bind(message.createdAt, input.roomId)
-      .run();
-    notifyDeliveredChatMessage({
-      db: input.db,
-      recipientId: input.recipientId,
-      senderId: input.senderId,
-      roomId: input.roomId,
-      body: message.body,
-    });
-  }
-
-  return {
-    message,
-    created: true,
-    shouldBroadcast: !input.shadow,
-  };
 }
 
 
@@ -859,7 +984,7 @@ async function startDirectConversation(
     throw new AuthError("You can't message this user", 403);
   }
   await assertNotBlocked(context.input.fromUserId, context.toUser.id);
-  await enforceCreateRateLimit(context.input.fromUserId, "dm_message");
+  await enforceActiveDmRateLimit(context.input.fromUserId);
   const moderation = await moderateText(context.body);
   if (moderation.blocked) {
     throw new AuthError("This content isn't allowed", 400);
@@ -1165,15 +1290,8 @@ export async function listChatRooms(userId: string) {
          u.username AS peer_username,
          u.image AS peer_image,
          u.name AS peer_name,
-         (
-           SELECT body FROM chat_messages cm
-           WHERE cm.room_id = r.id
-             AND cm.delivery_status = 'delivered'
-             AND cm.is_moderation_hidden = 0
-             AND (cm.is_shadow_hidden = 0 OR cm.sender_id = ?)
-           ORDER BY cm.created_at DESC, cm.id DESC
-           LIMIT 1
-         ) AS last_body,
+         latest.id AS last_message_id,
+         latest.body AS last_body,
          (
            SELECT COUNT(*)
            FROM chat_messages unread
@@ -1203,6 +1321,17 @@ export async function listChatRooms(userId: string) {
          ON peer.room_id = r.id
         AND peer.user_id != ?
         AND peer.membership_status = 'active'
+       LEFT JOIN chat_messages latest
+         ON latest.id = (
+           SELECT cm.id
+           FROM chat_messages cm
+           WHERE cm.room_id = r.id
+             AND cm.delivery_status = 'delivered'
+             AND cm.is_moderation_hidden = 0
+             AND (cm.is_shadow_hidden = 0 OR cm.sender_id = me.user_id)
+           ORDER BY cm.created_at DESC, cm.id DESC
+           LIMIT 1
+         )
        INNER JOIN "user" u ON u.id = peer.user_id
        WHERE NOT EXISTS (
          SELECT 1 FROM user_blocks b
@@ -1212,7 +1341,7 @@ export async function listChatRooms(userId: string) {
        ORDER BY COALESCE(r.last_message_at, r.created_at) DESC, r.id DESC
        LIMIT 50`
     )
-    .bind(userId, userId, userId)
+    .bind(userId, userId)
     .all<{
       id: string;
       last_message_at: string | null;
@@ -1221,6 +1350,7 @@ export async function listChatRooms(userId: string) {
       peer_username: string | null;
       peer_image: string | null;
       peer_name: string;
+      last_message_id: string | null;
       last_body: string | null;
       unread_count: number;
     }>();
@@ -1235,6 +1365,7 @@ export async function listChatRooms(userId: string) {
       displayName: row.peer_name,
     },
     lastBody: row.last_body,
+    lastMessageId: row.last_message_id,
     unreadCount: Number(row.unread_count ?? 0),
   }));
 }
@@ -1534,78 +1665,95 @@ export async function sendChatMessage(input: {
   /** Legacy alias retained for older clients. */
   requestId?: string | null;
 }) {
+  const totalStartedAt = performance.now();
+  if (typeof input.body !== "string") {
+    throw new AuthError("Message must be 1–4000 characters", 400);
+  }
   const body = input.body.trim();
   if (body.length < 1 || body.length > 4000) {
     throw new AuthError("Message must be 1–4000 characters", 400);
   }
-
-  const db = await getDb();
-  const membership = await db
-    .prepare(
-      `SELECT membership_status FROM chat_room_members
-       WHERE room_id = ? AND user_id = ?`
-    )
-    .bind(input.roomId, input.userId)
-    .first<{ membership_status: string }>();
-
-  if (!membership || membership.membership_status !== "active") {
-    throw new AuthError("Chat not found", 404);
-  }
-
-  const peer = await db
-    .prepare(
-      `SELECT user_id, membership_status FROM chat_room_members
-       WHERE room_id = ? AND user_id != ?`
-    )
-    .bind(input.roomId, input.userId)
-    .first<{ user_id: string; membership_status: string }>();
-
-  if (!peer || peer.membership_status !== "active") {
-    throw new AuthError("Chat isn't open yet", 403);
-  }
-
-  await assertNotBlocked(input.userId, peer.user_id);
   const clientMessageId = normalizeRequestId(input.clientMessageId);
   const requestId = clientMessageId
     ? null
     : normalizeRequestId(input.requestId);
-  const existing = await findDeliveredChatMessage({
+  const timing = createChatSendTiming();
+  const db = await getDb();
+
+  const authorizeStartedAt = performance.now();
+  const context = await loadActiveChatSendContext({
     db,
     roomId: input.roomId,
     senderId: input.userId,
     clientMessageId,
     requestId,
   });
-  if (existing) {
+  timing.authorizeMs = performance.now() - authorizeStartedAt;
+  timing.d1ReadStatements = 1;
+
+  if (!context) {
+    throw new AuthError("Chat not found", 404);
+  }
+  if (context.senderMembershipStatus !== "active") {
+    throw new AuthError("Chat not found", 404);
+  }
+  if (context.recipientMembershipStatus !== "active") {
+    throw new AuthError("Chat isn't open yet", 403);
+  }
+  if (context.blocked) {
+    throw new AuthError("You can't message this user", 403);
+  }
+  if (context.existingMessage) {
     return {
-      ...existing,
+      ...context.existingMessage,
       created: false as const,
       shouldBroadcast: false as const,
+      serverTiming: {
+        ...timing,
+        totalMs: performance.now() - totalStartedAt,
+      },
     };
   }
-  await enforceCreateRateLimit(input.userId, "dm_message");
 
+  const rateStartedAt = performance.now();
+  await enforceActiveDmRateLimit(input.userId);
+  timing.rateMs = performance.now() - rateStartedAt;
+
+  const moderationStartedAt = performance.now();
   const moderation = await moderateText(body);
+  timing.moderationMs = performance.now() - moderationStartedAt;
   if (moderation.blocked) {
     throw new AuthError("This content isn't allowed", 400);
   }
 
   const shadow =
     moderation.shadow || input.userStatus === "shadowbanned" ? 1 : 0;
+  const dbWriteStartedAt = performance.now();
   const write = await insertDeliveredChatMessage({
     db,
     roomId: input.roomId,
     senderId: input.userId,
-    recipientId: peer.user_id,
+    recipientId: context.recipientId,
     body,
     shadow,
     clientMessageId,
     requestId,
+    existingMessage: context.existingMessage,
   });
+  timing.dbWriteMs = performance.now() - dbWriteStartedAt;
+  if (write.created) {
+    timing.d1WriteStatements = shadow ? 1 : 2;
+    timing.d1BatchRoundTrips = 1;
+  }
+
   return {
     ...write.message,
     created: write.created,
     shouldBroadcast: write.shouldBroadcast,
+    serverTiming: {
+      ...timing,
+      totalMs: performance.now() - totalStartedAt,
+    },
   };
 }
 

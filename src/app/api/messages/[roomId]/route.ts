@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { broadcastChatMessage } from "@/lib/chat-realtime";
 import { runBackgroundTask } from "@/lib/background-task";
 import { getChatMessages, sendChatMessage } from "@/lib/messages";
+import { CHAT_SLOW_REQUEST_MS, formatChatServerTiming } from "@/lib/chat-timing";
 
 import { requireActiveUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
@@ -56,6 +57,8 @@ export async function POST(
   context: { params: Promise<{ roomId: string }> }
 ) {
   try {
+    const totalStartedAt = performance.now();
+    const authStartedAt = performance.now();
     const session = await requireSession();
     const user = session.user as {
       id: string;
@@ -65,15 +68,29 @@ export async function POST(
       role?: string | null;
     };
     await requireActiveUser(user);
-
+    const authMs = performance.now() - authStartedAt;
     const { roomId } = await context.params;
-    const body = (await readApiJson(request)) as {
-      body?: string;
-      clientMessageId?: string | null;
-      requestId?: string | null;
-    };
-    if (!body.body) {
+    const payload = await readApiJson(request);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       return await jsonLocalizedError("body is required", 400);
+    }
+    const body = payload as {
+      body?: unknown;
+      clientMessageId?: unknown;
+      requestId?: unknown;
+    };
+    if (typeof body.body !== "string" || body.body.trim().length === 0) {
+      return await jsonLocalizedError("body is required", 400);
+    }
+    if (
+      (body.clientMessageId !== undefined &&
+        body.clientMessageId !== null &&
+        typeof body.clientMessageId !== "string") ||
+      (body.requestId !== undefined &&
+        body.requestId !== null &&
+        typeof body.requestId !== "string")
+    ) {
+      return await jsonLocalizedError("Invalid request ID", 400);
     }
 
     const message = await sendChatMessage({
@@ -85,7 +102,13 @@ export async function POST(
       requestId: body.requestId ?? requestIdFromHeaders(request.headers),
     });
 
-    if (message.created && message.shouldBroadcast) {
+    const {
+      created,
+      shouldBroadcast,
+      serverTiming,
+      ...response
+    } = message;
+    if (created && shouldBroadcast) {
       runBackgroundTask("chat_realtime_broadcast", () =>
         broadcastChatMessage({
           roomId,
@@ -99,13 +122,26 @@ export async function POST(
       );
     }
 
-    const {
-      created,
-      shouldBroadcast: _shouldBroadcast,
-      ...response
-    } = message;
-    void _shouldBroadcast;
-    return NextResponse.json(response, { status: created ? 201 : 200 });
+    const totalMs = performance.now() - totalStartedAt;
+    const timing = {
+      authMs,
+      ...serverTiming,
+      totalMs,
+    };
+    const result = NextResponse.json(response, { status: created ? 201 : 200 });
+    result.headers.set("Server-Timing", formatChatServerTiming(timing));
+    if (totalMs >= CHAT_SLOW_REQUEST_MS) {
+      console.info(
+        JSON.stringify({
+          level: "info",
+          msg: "chat_send_slow",
+          roomId,
+          messageId: message.id,
+          ...timing,
+        })
+      );
+    }
+    return result;
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);
     console.error("POST /api/messages/[roomId] failed", error);

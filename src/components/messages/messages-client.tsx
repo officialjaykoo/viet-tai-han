@@ -11,11 +11,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { apiFetch } from "@/lib/api-client";
+import {
+  mergeMessages,
+  updateLocalDeliveryState,
+  type LocalChatMessage,
+} from "@/lib/chat-message-state";
 import { cn } from "@/lib/utils";
 
 type Room = {
   id: string;
   lastMessageAt: string | null;
+  lastMessageId: string | null;
   createdAt: string;
   peer: {
     username: string | null;
@@ -38,14 +44,7 @@ type RequestItem = {
   };
 };
 
-type ChatMessage = {
-  id: string;
-  clientMessageId: string | null;
-  body: string;
-  createdAt: string;
-  isMine: boolean;
-  senderUsername: string | null;
-};
+type ChatMessage = LocalChatMessage;
 
 type ChatHistoryPage = {
   messages: ChatMessage[];
@@ -114,23 +113,6 @@ function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
   };
 }
 
-function compareChatMessages(a: ChatMessage, b: ChatMessage): number {
-  if (a.createdAt < b.createdAt) return -1;
-  if (a.createdAt > b.createdAt) return 1;
-  if (a.id < b.id) return -1;
-  if (a.id > b.id) return 1;
-  return 0;
-}
-
-function mergeMessages(
-  current: ChatMessage[],
-  incoming: ChatMessage[]
-): ChatMessage[] {
-  const byId = new Map<string, ChatMessage>();
-  for (const message of current) byId.set(message.id, message);
-  for (const message of incoming) byId.set(message.id, message);
-  return [...byId.values()].sort(compareChatMessages);
-}
 type ChatReportReason =
   | "spam"
   | "harassment"
@@ -169,9 +151,9 @@ export function MessagesClient() {
     useState<ChatReportReason>("harassment");
   const [reportDetails, setReportDetails] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const roomsRef = useRef<Room[]>([]);
   const messageListRef = useRef<HTMLDivElement>(null);
   const composeClientMessageIdRef = useRef<string | null>(null);
-  const replyClientMessageIdRef = useRef<string | null>(null);
   const beforeCursorRef = useRef<string | null>(null);
   const afterCursorRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
@@ -179,11 +161,13 @@ export function MessagesClient() {
   const catchUpInFlightRef = useRef(false);
   const socketReadyRoomRef = useRef<string | null>(null);
   const activeRoomRef = useRef<string | null>(selectedRoom);
+  const readTimerRef = useRef<number | null>(null);
+  const sendingClientMessageIdsRef = useRef(new Set<string>());
   const [hasMoreBefore, setHasMoreBefore] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
-  const sendingReplyRef = useRef(false);
+  const [composeSending, setComposeSending] = useState(false);
   const shouldStickToBottomRef = useRef(true);
 
   useEffect(() => {
@@ -207,11 +191,50 @@ export function MessagesClient() {
         rooms: Room[];
         requests: RequestItem[];
       };
+      roomsRef.current = data.rooms;
       setRooms(data.rooms);
       setRequests(data.requests);
       setLoaded(true);
     });
   }, [localizeError, router]);
+
+  const applyRoomMessage = useCallback(
+    (roomId: string, message: ChatMessage) => {
+      const room = roomsRef.current.find((item) => item.id === roomId);
+      if (!room) return;
+      const isNewer =
+        !room.lastMessageAt ||
+        message.createdAt > room.lastMessageAt ||
+        (message.createdAt === room.lastMessageAt &&
+          message.id >= (room.lastMessageId ?? ""));
+      if (message.id === room.lastMessageId || !isNewer) return;
+      const shouldIncrementUnread =
+        !message.isMine && !isNearBottomRef.current;
+      setRooms((current) => {
+        const nextRoom = current.find((item) => item.id === roomId);
+        if (!nextRoom) return current;
+        const next = {
+          ...nextRoom,
+          lastBody: message.body,
+          lastMessageAt: message.createdAt,
+          lastMessageId: message.id,
+          unreadCount: shouldIncrementUnread
+            ? nextRoom.unreadCount + 1
+            : nextRoom.unreadCount,
+        };
+        const nextRooms = [
+          next,
+          ...current.filter((item) => item.id !== roomId),
+        ];
+        roomsRef.current = nextRooms;
+        return nextRooms;
+      });
+      if (shouldIncrementUnread) {
+        announceUnreadChanged({ messageDelta: 1 });
+      }
+    },
+    []
+  );
 
   const catchUpRoom = useCallback(
     async (roomId: string) => {
@@ -233,13 +256,13 @@ export function MessagesClient() {
           const page = (await res.json()) as ChatHistoryPage;
           if (page.messages.length === 0) return;
           setMessages((current) => mergeMessages(current, page.messages));
+          for (const message of page.messages) {
+            applyRoomMessage(roomId, message);
+          }
           if (!page.nextAfterCursor) return;
           cursor = page.nextAfterCursor;
           afterCursorRef.current = cursor;
           if (!page.hasMoreAfter) break;
-        }
-        if (activeRoomRef.current === roomId) {
-          loadInbox();
         }
       } catch {
         // D1 catch-up is retried by the next reconnect/ready cycle.
@@ -247,7 +270,7 @@ export function MessagesClient() {
         catchUpInFlightRef.current = false;
       }
     },
-    [loadInbox]
+    [applyRoomMessage]
   );
   const loadOlderMessages = useCallback(async () => {
     const roomId = activeRoomRef.current;
@@ -323,7 +346,10 @@ export function MessagesClient() {
     // A room switch must not display the previous room while the new room loads.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages([]);
-    replyClientMessageIdRef.current = null;
+    if (readTimerRef.current !== null) {
+      window.clearTimeout(readTimerRef.current);
+      readTimerRef.current = null;
+    }
     beforeCursorRef.current = null;
     afterCursorRef.current = null;
     socketReadyRoomRef.current = null;
@@ -361,15 +387,38 @@ export function MessagesClient() {
         });
         if (!res.ok) return;
         const result = (await res.json()) as { updated?: boolean };
-        if (result.updated) {
-          loadInbox();
-          announceUnreadChanged();
+        if (!result.updated) return;
+        const currentRoom = roomsRef.current.find(
+          (room) => room.id === roomId
+        );
+        if (!currentRoom || currentRoom.lastMessageId !== messageId) return;
+        const previousUnread = currentRoom.unreadCount;
+        const nextRooms = roomsRef.current.map((room) =>
+          room.id === roomId ? { ...room, unreadCount: 0 } : room
+        );
+        roomsRef.current = nextRooms;
+        setRooms(nextRooms);
+        if (previousUnread > 0) {
+          announceUnreadChanged({ messageDelta: -previousUnread });
         }
       } catch {
         // The next explicit read or inbox refresh reconciles the boundary.
       }
     },
-    [loadInbox]
+    []
+  );
+
+  const scheduleChatRead = useCallback(
+    (roomId: string, messageId: string) => {
+      if (readTimerRef.current !== null) {
+        window.clearTimeout(readTimerRef.current);
+      }
+      readTimerRef.current = window.setTimeout(() => {
+        readTimerRef.current = null;
+        void markChatRead(roomId, messageId);
+      }, 350);
+    },
+    [markChatRead]
   );
 
   useEffect(() => {
@@ -382,11 +431,15 @@ export function MessagesClient() {
       return;
     }
     const lastMessage = messages[messages.length - 1];
-    const timer = window.setTimeout(() => {
-      void markChatRead(selectedRoom, lastMessage.id);
-    }, 150);
-    return () => window.clearTimeout(timer);
-  }, [isNearBottom, messages, markChatRead, selectedRoom]);
+    scheduleChatRead(selectedRoom, lastMessage.id);
+    return () => {
+      if (readTimerRef.current !== null) {
+        window.clearTimeout(readTimerRef.current);
+        readTimerRef.current = null;
+      }
+    };
+  }, [isNearBottom, messages, scheduleChatRead, selectedRoom]);
+
   useEffect(() => {
     if (!selectedRoom || messages.length === 0) return;
     const handleVisibility = () => {
@@ -397,12 +450,12 @@ export function MessagesClient() {
         return;
       }
       const lastMessage = messages[messages.length - 1];
-      void markChatRead(selectedRoom, lastMessage.id);
+      scheduleChatRead(selectedRoom, lastMessage.id);
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibility);
-  }, [markChatRead, messages, selectedRoom]);
+  }, [messages, scheduleChatRead, selectedRoom]);
 
 
   useEffect(() => {
@@ -470,21 +523,7 @@ export function MessagesClient() {
         }
 
         setMessages((current) => mergeMessages(current, [live.message]));
-        setRooms((current) =>
-          current.map((room) =>
-            room.id === live.roomId
-              ? {
-                  ...room,
-                  lastBody: live.message.body,
-                  lastMessageAt: live.message.createdAt,
-                  unreadCount:
-                    live.message.isMine || isNearBottomRef.current
-                      ? room.unreadCount
-                      : room.unreadCount + 1,
-                }
-              : room
-          )
-        );
+        applyRoomMessage(live.roomId, live.message);
       };
       socket.onerror = () => {
         socket?.close();
@@ -537,42 +576,50 @@ export function MessagesClient() {
       }
       socket?.close(1000, "room changed");
     };
-  }, [selectedRoom, catchUpRoom]);
+  }, [selectedRoom, catchUpRoom, applyRoomMessage]);
 
   function startConversation(e: React.FormEvent) {
     e.preventDefault();
+    const toUsername = composeUser.trim();
+    const openerBody = composeBody.trim();
+    if (composeSending || !toUsername || !openerBody) return;
+    const clientMessageId =
+      composeClientMessageIdRef.current ?? crypto.randomUUID();
+    composeClientMessageIdRef.current = clientMessageId;
+    setComposeSending(true);
     startTransition(async () => {
-      const clientMessageId =
-        composeClientMessageIdRef.current ?? crypto.randomUUID();
-      composeClientMessageIdRef.current = clientMessageId;
-      const res = await apiFetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          toUsername: composeUser,
-          body: composeBody,
-          clientMessageId,
-        }),
-      });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        setError(localizeError(payload?.error, "Couldn't send message"));
-        return;
+      try {
+        const res = await apiFetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toUsername,
+            body: openerBody,
+            clientMessageId,
+          }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          setError(localizeError(payload?.error, "Couldn't send message"));
+          return;
+        }
+        const result = (await res.json()) as {
+          conversationType?: "direct" | "request";
+          roomId?: string;
+        };
+        setComposeUser("");
+        setComposeBody("");
+        composeClientMessageIdRef.current = null;
+        setError(null);
+        if (result.conversationType === "direct" && result.roomId) {
+          router.push(`/messages?room=${encodeURIComponent(result.roomId)}`);
+        }
+        loadInbox();
+      } finally {
+        setComposeSending(false);
       }
-      const result = (await res.json()) as {
-        conversationType?: "direct" | "request";
-        roomId?: string;
-      };
-      setComposeUser("");
-      setComposeBody("");
-      composeClientMessageIdRef.current = null;
-      setError(null);
-      if (result.conversationType === "direct" && result.roomId) {
-        router.push(`/messages?room=${encodeURIComponent(result.roomId)}`);
-      }
-      loadInbox();
     });
   }
 
@@ -599,36 +646,85 @@ export function MessagesClient() {
     });
   }
 
-  function sendReply(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedRoom || !reply.trim() || sendingReplyRef.current) return;
-    sendingReplyRef.current = true;
-    startTransition(async () => {
+  const sendReplyRequest = useCallback(
+    async (roomId: string, body: string, clientMessageId: string) => {
       try {
-        const clientMessageId =
-          replyClientMessageIdRef.current ?? crypto.randomUUID();
-        replyClientMessageIdRef.current = clientMessageId;
-        const res = await apiFetch(`/api/messages/${selectedRoom}`, {
+        const res = await apiFetch(`/api/messages/${roomId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: reply, clientMessageId }),
+          body: JSON.stringify({ body, clientMessageId }),
         });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as {
             error?: string;
           } | null;
-          setError(localizeError(payload?.error, "Couldn't send"));
+          setMessages((current) =>
+            updateLocalDeliveryState(current, clientMessageId, "failed")
+          );
+          setError(localizeError(payload?.error, t("messages.sendFailed")));
           return;
         }
         const message = (await res.json()) as ChatMessage;
-        setMessages((prev) => mergeMessages(prev, [message]));
-        setReply("");
-        replyClientMessageIdRef.current = null;
-        loadInbox();
+        setMessages((current) =>
+          mergeMessages(current, [
+            { ...message, localDeliveryState: "sent" },
+          ])
+        );
+        applyRoomMessage(roomId, message);
+        setError(null);
+      } catch {
+        setMessages((current) =>
+          updateLocalDeliveryState(current, clientMessageId, "failed")
+        );
+        setError(t("messages.sendFailed"));
       } finally {
-        sendingReplyRef.current = false;
+        sendingClientMessageIdsRef.current.delete(clientMessageId);
       }
-    });
+    },
+    [applyRoomMessage, localizeError, t]
+  );
+
+  const retryMessage = useCallback(
+    (message: ChatMessage) => {
+      const roomId = selectedRoom;
+      const clientMessageId = message.clientMessageId;
+      if (
+        !roomId ||
+        !clientMessageId ||
+        message.localDeliveryState !== "failed" ||
+        sendingClientMessageIdsRef.current.has(clientMessageId)
+      ) {
+        return;
+      }
+      sendingClientMessageIdsRef.current.add(clientMessageId);
+      setMessages((current) =>
+        updateLocalDeliveryState(current, clientMessageId, "sending")
+      );
+      void sendReplyRequest(roomId, message.body, clientMessageId);
+    },
+    [selectedRoom, sendReplyRequest]
+  );
+
+  function sendReply(e: React.FormEvent) {
+    e.preventDefault();
+    const roomId = selectedRoom;
+    const body = reply.trim();
+    if (!roomId || !body) return;
+    const clientMessageId = crypto.randomUUID();
+    const optimistic: ChatMessage = {
+      id: `local:${clientMessageId}`,
+      clientMessageId,
+      body,
+      createdAt: new Date().toISOString(),
+      isMine: true,
+      senderUsername: null,
+      localDeliveryState: "sending",
+    };
+    setMessages((current) => mergeMessages(current, [optimistic]));
+    setReply("");
+    setError(null);
+    sendingClientMessageIdsRef.current.add(clientMessageId);
+    void sendReplyRequest(roomId, body, clientMessageId);
   }
   function submitReport(e: React.FormEvent) {
     e.preventDefault();
@@ -694,7 +790,7 @@ export function MessagesClient() {
               <Button
                 type="submit"
                 size="sm"
-                disabled={pending}
+                disabled={composeSending}
                 className="w-full"
               >
                 {t("messages.send")}
@@ -865,6 +961,25 @@ export function MessagesClient() {
                     >
                       {message.body}
                     </div>
+                    {message.localDeliveryState === "sending" ? (
+                      <p className="text-right text-[11px] text-muted-foreground">
+                        {t("messages.sending")}
+                      </p>
+                    ) : null}
+                    {message.localDeliveryState === "failed" &&
+                    message.clientMessageId ? (
+                      <div className="flex items-center justify-end gap-2 text-[11px] text-destructive">
+                        <span role="status">{t("messages.sendFailed")}</span>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => retryMessage(message)}
+                        >
+                          {t("messages.retry")}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -911,7 +1026,7 @@ export function MessagesClient() {
                 rows={1}
                 className="max-h-32 min-h-10 flex-1 overflow-y-auto rounded-lg"
               />
-              <Button type="submit" disabled={pending || !reply.trim()}>
+              <Button type="submit" disabled={!reply.trim()}>
                 {t("messages.send")}
               </Button>
             </form>

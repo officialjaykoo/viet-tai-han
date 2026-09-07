@@ -27,6 +27,20 @@ async function bindingLimit(
     return null;
   }
 }
+/**
+ * Active conversations use the existing colo-local binding keyed by user.
+ * A missing binding is allowed in local Node/test runtimes; production has it.
+ */
+export async function enforceActiveDmRateLimit(userId: string) {
+  const allowed = await bindingLimit(
+    "TUNNEL_IP_RATE_LIMITER",
+    `dm:user:${userId}`
+  );
+  if (allowed === false) {
+    throw new AuthError("You're sending messages too quickly.", 429);
+  }
+}
+
 
 /**
  * Sliding-window rate limit keyed by arbitrary subject (user:… / ip:…).
@@ -122,7 +136,6 @@ type CreateKind =
   | "comment"
   | "like"
   | "dm_request"
-  | "dm_message"
   | "dm_report"
   | "question"
   | "answer"
@@ -158,12 +171,6 @@ const CREATE_DEFAULTS: Record<
     hour: 3,
     burstKey: "max_dm_requests_burst_per_min",
     burst: 1,
-  },
-  dm_message: {
-    hourKey: "max_dm_messages_per_hour",
-    hour: 30,
-    burstKey: "max_dm_messages_burst_per_min",
-    burst: 8,
   },
   dm_report: {
     hourKey: "max_dm_reports_per_hour",

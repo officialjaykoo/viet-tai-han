@@ -102,6 +102,21 @@ describe("chat reliability (D1)", () => {
         .bind(roomId, authorId, clientMessageId)
         .first<{ count: number }>()
     ).toEqual({ count: 1 });
+    expect(first.serverTiming).toMatchObject({
+      d1ReadStatements: 1,
+      d1WriteStatements: 2,
+      d1BatchRoundTrips: 1,
+    });
+    expect(
+      await env.DB
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM security_rate_events
+           WHERE subject = ? AND action IN ('dm_message', 'dm_message:burst')`
+        )
+        .bind(`user:${authorId}`)
+        .first<{ count: number }>()
+    ).toEqual({ count: 0 });
     expect((await getUnreadCounts(actorId)).messageCount).toBe(1);
   });
   it("keeps shadow-hidden sends out of recipient delivery", async () => {
@@ -353,5 +368,8 @@ describe("chat reliability (D1)", () => {
     const rooms = await listChatRooms(actorId);
     expect(rooms.slice(0, 2).map((room) => room.id)).toEqual([roomZ, roomA]);
     expect(rooms.find((room) => room.id === roomA)?.lastBody).toBe("high preview");
+    expect(rooms.find((room) => room.id === roomA)?.lastMessageId).toBe(
+      "preview_99"
+    );
   });
 });
