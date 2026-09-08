@@ -1,182 +1,198 @@
 # VTH 실시간 DM
 
-## 상태
+## 1. 계약
 
-VTH DM은 짧은 주기 조회(polling)가 아니라 Cloudflare Durable Object 기반의
-hibernatable WebSocket으로 새 메시지를 전달한다.
+VTH DM의 canonical state와 write path는 D1과 HTTP API입니다. Cloudflare Durable Object는 연결된 사용자에게 이미 commit된 이벤트를 전달하는 역할만 합니다.
 
-- D1: 대화방·멤버·메시지의 영속적인 source of truth
-- Durable Object: 대화방별 열린 WebSocket 연결 관리와 실시간 fan-out
-- Push API: 사이트를 떠난 사용자에게 OS/브라우저 알림 전달
-- HTTP API: 인증, rate limit, moderation, 메시지 저장의 canonical write path
+- D1: 대화방, 멤버, 요청, 메시지, unread/read state의 source of truth
+- HTTP API: 인증, active-user 확인, rate limit, moderation, 권한, idempotency, D1 canonical write
+- ChatRoom DO: room별 hibernatable WebSocket 연결과 realtime fan-out만 담당
+- Web Push: 화면 밖 사용자에 대한 선택적 알림
 
-## 전체 흐름
+Durable Object 내부에 history를 저장하거나 WebSocket을 메시지 작성 API로 사용하지 않습니다.
+
+## 2. 전체 흐름
 
 ```mermaid
 flowchart LR
-  BrowserA[DM 브라우저 A] -->|POST 메시지| API[Next API /api/messages]
-  API -->|검증·moderation·저장| D1[(D1 chat_messages)]
-  API -->|broadcast| Room[ChatRoom DO<br/>roomId별 1개]
-  Room -->|WebSocket event| BrowserA
-  Room -->|WebSocket event| BrowserB[DM 브라우저 B]
-  API -->|비동기 알림| Push[Web Push / Service Worker]
+  BrowserA[DM 브라우저 A] -->|logical POST /api/messages| Tunnel[/i/api tunnel]
+  Tunnel --> API[Next route handler]
+  API -->|검증·moderation·canonical write| D1[(D1 chat_messages)]
+  API -->|committed event| Room[ChatRoom DO<br/>roomId별 1개]
+  Room -->|WebSocket delivery| BrowserA
+  Room -->|WebSocket delivery| BrowserB[DM 브라우저 B]
+  API -->|best-effort| Push[Web Push]
 ```
 
-## 연결 경로
+브라우저의 일반 API 호출은 `/i/api` signed Protobuf tunnel을 사용하고, route handler에서는 logical `/api/messages` 경로로 처리됩니다. 메시지 history는 항상 D1에서 읽습니다.
 
-브라우저는 대화방을 선택하면 다음 경로에 직접 WebSocket upgrade를 요청한다.
+## 3. WebSocket 연결
+
+대화방을 선택하면 custom Worker entry가 다음 upgrade를 처리합니다.
 
 ```text
 ws://localhost:3000/api/messages/realtime?room=<roomId>
-wss://example.com/api/messages/realtime?room=<roomId>
+wss://vth.kr/api/messages/realtime?room=<roomId>
 ```
 
-`src/worker.ts`가 이 경로를 OpenNext보다 먼저 처리한다.
+`src/worker.ts`의 순서:
 
-1. `Upgrade: websocket` 요청인지 확인한다.
-2. Better Auth 세션 쿠키를 검증한다.
-3. 로그인하지 않았거나 차단/정지된 계정이면 거절한다.
-4. `CHAT_ROOM.idFromName(roomId)`로 해당 대화방 Durable Object를 찾는다.
-5. 검증된 사용자 ID를 내부 헤더로만 전달한다.
-6. `ChatRoom`이 D1에서 양쪽 멤버가 active인지, 서로 차단하지 않았는지 재검증한다.
-7. 검증 성공 시 hibernatable WebSocket을 수락한다.
+1. `GET`과 `Upgrade: websocket`을 확인합니다.
+2. Better Auth session cookie를 검증합니다.
+3. 로그인하지 않았거나 banned 상태인 사용자를 거절합니다.
+4. `CHAT_ROOM.idFromName(roomId)`로 room Durable Object를 찾습니다.
+5. 검증한 immutable user ID를 내부 헤더로 전달합니다.
+6. `ChatRoom`이 D1에서 양쪽 `chat_room_members`가 `active`인지 재검증합니다.
+7. 양방향 block이 없을 때만 hibernatable WebSocket을 수락합니다.
 
-브라우저가 보낸 사용자 ID나 room membership을 신뢰하지 않는다. Worker 인증과
-Durable Object의 D1 membership 검사를 모두 통과해야 연결된다.
+클라이언트가 보낸 user ID나 membership을 신뢰하지 않습니다. Worker session 검증과 DO의 D1 membership/block 검사를 모두 통과해야 연결됩니다.
 
-## 메시지 전송
+## 4. 메시지 작성
 
-메시지 작성은 기존 HTTP 경로를 유지한다.
+새 대화 시작과 기존 대화 메시지 작성은 HTTP canonical path입니다.
 
 ```text
-POST /api/messages/<roomId>
+logical POST /api/messages
+logical POST /api/messages/<roomId>
+POST /api/messages/<requestId>  # request action: accept, decline, cancel
 ```
 
-이 경로가 canonical write path인 이유:
+실제 browser transport는 `/i/api`이며, direct `/api/*` 호출은 기존 public API Bearer 경계를 먼저 통과해야 합니다.
 
-- Better Auth 세션 검증
-- 메시지 길이 검증
-- DM 권한 및 차단 검사
-- rate limit
-- moderation
-- D1 저장
-- unread count 갱신
-- Web Push 알림
+작성 경로는 다음을 서버에서 수행합니다.
 
-D1 저장이 성공한 뒤 `broadcastChatMessage()`가 해당 room Durable Object에
-메시지 이벤트를 best-effort로 전달한다. 연결된 모든 클라이언트는 같은 메시지 ID와
-`clientMessageId`를 받으며, 클라이언트는 ID로 중복을 제거한다. direct conversation
-시작 경로도 동일하게 D1 저장 후 broadcast한다. `clientMessageId`가 같은 재시도는
-기존 canonical row를 반환하고 알림·broadcast를 반복하지 않는다.
+- Better Auth session과 active-user 검증
+- room, membership, recipient, request 상태 확인
+- bilateral block 및 DM relationship 확인
+- body와 client ID 검증
+- rate limit과 moderation
+- D1 canonical insert 또는 idempotent existing-row 반환
+- delivered message의 unread/read state 갱신
+- commit 후 best-effort realtime broadcast와 Push 알림
 
-`requestId`는 구형 클라이언트의 입력 alias로만 유지한다. 새 클라이언트는
-`clientMessageId`를 body에 보낸다.
+D1 write가 성공한 뒤 `broadcastChatMessage()`가 room DO에 이벤트를 전달합니다. delivery나 Push 실패가 이미 성공한 canonical write를 실패로 바꾸지 않습니다. WebSocket은 이 검증·moderation·D1 경로를 우회하지 않습니다.
 
-WebSocket은 메시지 작성 API가 아니다. 메시지 작성은 계속 HTTP API로 수행하여
-기존 보안·moderation 경로를 우회하지 않는다.
+`clientMessageId`가 같은 재시도는 기존 canonical message를 반환하며 message row, unread side effect, notification, broadcast를 중복 생성하지 않습니다. `requestId`는 기존 클라이언트 호환 alias로 허용됩니다.
 
-## 클라이언트 동작
+## 5. Request와 room 불변식
 
-`src/components/messages/messages-client.tsx`가 다음을 담당한다.
+- room은 immutable 두 사용자 ID의 정렬된 pair key로 식별합니다.
+- 한 사용자 pair에는 하나의 DM room만 존재합니다.
+- 한 room에는 최대 하나의 `pending` request만 존재합니다.
+- request opener는 그 request의 `request_id`, sender, room과 일치하는 held message여야 합니다.
+- request-specific opener가 없거나 다른 request에 속하면 request를 열거나 전달할 수 없습니다.
+- `declined` 또는 `cancelled` request의 opener는 나중에 자동으로 release되지 않습니다.
+- 오래된 opener, stale notification, stale retry로 decline/cancel 상태를 우회할 수 없습니다.
+- accept는 recipient가 해당 request를 대상으로 수행할 때만 유효합니다.
+- sender의 cancel은 그 sender가 만든 pending request에만 적용됩니다.
+- direct message는 양쪽 active membership과 현재 block 상태를 다시 확인합니다.
 
-- 대화방 선택 시 D1에서 최신 history page 로드
-- `before` signed cursor로 위로 스크롤할 때 과거 history prepend
-- 같은 room에 WebSocket 연결
-- `ready` 이후 `after` signed cursor로 reconnect catch-up
-- `message` event 수신 및 HTTP 응답을 같은 ID merge 경로로 처리
-- 서버 timestamp와 message ID tuple 순서 유지
-- live event 이후 room 전체 GET을 수행하지 않음
-- viewport가 하단일 때만 명시적인 read endpoint 호출
-- 연결 종료 시 jitter가 있는 exponential backoff 재연결
-  - 1초 → 2초 → 4초 → 8초 → 최대 10초(+jitter)
-- browser offline/hidden 상태에서는 연결·재연결을 멈추고 online/visible 때 복구
-- room 변경 또는 페이지 이탈 시 이전 연결 정리
+관련 D1 제약과 정리는 다음 migration에 있습니다.
 
-이 구현에는 새 메시지를 찾기 위한 `setInterval` 조회가 없다. 재연결용
-`setTimeout`은 데이터 polling이 아니라 끊어진 WebSocket 연결을 복구하기 위한
-backoff timer다. Cloudflare `setWebSocketAutoResponse()`가 protocol-level
-ping/pong을 처리하므로 애플리케이션 heartbeat나 Durable Object 내 history cache를
-추가하지 않는다.
+- `migrations/0036_chat_reliability.sql`: `client_message_id`, read message boundary, tuple index
+- `migrations/0038_chat_request_integrity.sql`: request opener 정리와 room pending unique index
+- `migrations/0039_cancel_orphan_pending_chat_requests.sql`: orphan request/membership 정리
+- `migrations/0040_notification_request_identity.sql`: actionable notification의 request identity
 
-## Push 알림과 실시간의 차이
+## 6. Block과 unread
 
-두 기능은 목적이 다르다.
+Block은 단순 UI 숨김이 아닙니다. D1 transaction/batch 경계에서 다음을 적용합니다.
+
+- 양방향 follow를 삭제합니다.
+- 해당 pair의 friendship을 삭제합니다.
+- 양방향 pending chat request를 `cancelled`로 바꿉니다.
+- pending opener message를 제거하여 재전달되지 않게 합니다.
+- 해당 room의 양쪽 membership을 `left`로 바꿉니다.
+- 관련 actionable notifications를 읽음 처리합니다.
+- unread count를 재계산하여 과거 unread가 다시 나타나지 않게 합니다.
+- 이후 send, request, room connect, unread fanout은 bilateral block을 거부/제외합니다.
+
+기존에 열린 socket은 다음 write/connect 검증에서 계속 차단됩니다. block 이후 stale WebSocket event, old unread row, old request notification이 contact 권한을 복구하지 않습니다.
+
+## 7. Ordering과 history
+
+서버는 message를 `(created_at, id)` tuple로 정렬합니다. timestamp가 같은 두 message도 `id`로 결정적으로 순서가 정해집니다. read boundary와 cursor도 같은 tuple 기준을 사용합니다.
+
+클라이언트는:
+
+- room 선택 시 D1 history page를 로드합니다.
+- `before` signed cursor로 과거 history를 prepend합니다.
+- WebSocket `ready` 후 `after` signed cursor로 reconnect catch-up을 수행합니다.
+- HTTP 응답과 live event를 message ID로 merge/dedupe합니다.
+- live event마다 room 전체 GET을 수행하지 않습니다.
+- 하단 viewport일 때만 명시적인 read endpoint를 호출합니다.
+- 연결이 끊기면 jitter가 있는 exponential backoff로 reconnect합니다: 1초 → 2초 → 4초 → 8초 → 최대 10초.
+- offline/hidden 상태에서 연결을 중지하고 online/visible 상태에서 복구합니다.
+- room 변경 또는 페이지 이탈 시 이전 연결을 정리합니다.
+
+`setInterval` history polling은 없습니다. reconnect `setTimeout`은 끊어진 WebSocket을 복구하는 backoff timer입니다. protocol-level ping/pong은 `setWebSocketAutoResponse()`가 처리합니다.
+
+## 8. Push와 realtime의 차이
 
 | 상황 | 동작 |
-|---|---|
-| DM 화면을 열어둔 상태 | WebSocket으로 새 메시지가 즉시 화면에 추가 |
-| 다른 페이지에 있는 상태 | Push가 활성화되어 있으면 브라우저/OS 알림 수신 |
-| 사이트를 닫은 상태 | Push가 활성화되어 있으면 알림 수신 |
-| Push를 허용하지 않은 상태 | 메시지는 D1에 저장되고 다음 `/messages` 접속 때 표시 |
-| 네트워크 단절 | WebSocket close 감지 후 backoff 재연결 |
+| --- | --- |
+| DM 화면을 연 상태 | WebSocket으로 commit된 새 메시지를 즉시 전달 |
+| 다른 페이지 | Push가 활성화되어 있으면 브라우저/OS 알림 |
+| 사이트를 닫은 상태 | Push가 활성화되어 있으면 알림 |
+| Push 미허용/실패 | 메시지는 D1에 남고 다음 history 조회에서 표시 |
+| 네트워크 단절 | close 감지 후 backoff reconnect와 D1 catch-up |
 
-Push가 실패해도 메시지 저장과 이후 조회에는 영향이 없다. Push는 VAPID 키,
-브라우저 권한, 서비스 워커 구독이 모두 설정되어야 한다.
+Push는 VAPID key, browser permission, service-worker subscription이 모두 필요합니다. Push나 realtime delivery가 실패해도 D1 history는 영향을 받지 않습니다.
 
-## Durable Object 설정
-
-`wrangler.jsonc`에 다음 binding과 migration이 등록되어 있다.
+## 9. Durable Object 설정
 
 ```jsonc
 {
   "durable_objects": {
     "bindings": [
-      {
-        "name": "CHAT_ROOM",
-        "class_name": "ChatRoom"
-      }
+      { "name": "CHAT_ROOM", "class_name": "ChatRoom" }
     ]
   },
   "migrations": [
-    {
-      "tag": "v2",
-      "new_sqlite_classes": ["ChatRoom"]
-    }
+    { "tag": "v2", "new_sqlite_classes": ["ChatRoom"] }
   ]
 }
 ```
 
-Worker entry에서 클래스를 export해야 Wrangler가 migration 대상 클래스를
-확인할 수 있다.
+`src/worker.ts`는 Wrangler가 migration 대상 class를 발견하도록 `ChatRoom`을 export합니다. `ChatRoom`은 내부 token, room/user header, D1 active membership, bilateral block을 검증한 뒤 socket을 관리합니다. broadcast payload에는 이미 D1에 commit된 message ID와 `(createdAt, id)` 순서 정보만 전달합니다.
 
-```ts
-import { ChatRoom } from "./workers/ChatRoom";
+## 10. 개발·배포 확인
 
-export { ChatRoom };
-```
-
-## 개발·배포 확인
-
-실제 WebSocket upgrade는 custom Cloudflare Worker entry인 `src/worker.ts`에서
-처리된다. 따라서 다음 환경에서 확인한다.
+실제 WebSocket upgrade는 custom Worker entry에서 처리하므로 Worker bundle을 먼저 확인합니다.
 
 ```bash
-npm run build
+npm run build:worker
 npm run preview
 ```
 
-또는 배포된 Worker에서 확인한다. `npm run dev`는 Next 개발 서버를 직접 실행하므로
-custom Worker entry의 WebSocket 라우팅을 거치지 않을 수 있다.
+`npm run build`는 Next.js application build이며 Cloudflare Worker bundle 검증을 대체하지 않습니다. `npm run dev`는 custom Worker entry의 realtime routing을 거치지 않을 수 있습니다.
 
-배포 전 확인 항목:
+배포 전 확인:
 
-- `CHAT_ROOM` binding 존재
-- `ChatRoom` Durable Object migration 반영
+- `CHAT_ROOM` binding과 `ChatRoom` export 존재
+- DO migration이 대상 계정에 반영됨
 - `BETTER_AUTH_SECRET` 설정
-- D1에 messaging migrations 적용
-- Web Push를 사용할 경우 VAPID 세 값 설정
-- 브라우저에서 Push 권한과 구독 활성화
+- D1 messaging migrations 적용
+- VAPID 세 값 설정(선택 기능)
+- direct message request/accept/decline/cancel과 block 시나리오
+- reconnect 후 D1 history와 live event dedupe
 
-## 구현 파일
+## 11. 구현 파일
 
-- `src/worker.ts`: WebSocket upgrade, Better Auth 검증, DO 라우팅
+- `src/worker.ts`: WebSocket upgrade, session 검증, DO 라우팅
 - `src/workers/ChatRoom.ts`: room별 hibernatable WebSocket과 fan-out
-- `src/lib/chat-realtime.ts`: Next API에서 DO broadcast 호출
-- `src/lib/security/chat-cursor.ts`: room/user/direction에 묶인 signed cursor
-- `src/app/api/messages/[roomId]/route.ts`: history page와 저장 후 broadcast
-- `src/app/api/messages/[roomId]/read/route.ts`: 명시적인 monotonic read boundary
-- `src/components/messages/messages-client.tsx`: history·catch-up·수신·재연결·중복 제거
-- `migrations/0036_chat_reliability.sql`: client ID, read boundary, tuple index
+- `src/lib/chat-realtime.ts`: D1 commit 후 DO broadcast
+- `src/lib/messages.ts`: room/request/message canonical state transition
+- `src/lib/security/chat-cursor.ts`: room/user/direction signed cursor
+- `src/app/api/messages/route.ts`: room 목록, request 목록, conversation start
+- `src/app/api/messages/[roomId]/route.ts`: history page와 message write
+- `src/app/api/messages/requests/[id]/route.ts`: accept/decline/cancel
+- `src/app/api/messages/[roomId]/read/route.ts`: monotonic read boundary
+- `src/components/messages/messages-client.tsx`: history, catch-up, receive, reconnect, dedupe
+- `migrations/0036_chat_reliability.sql`: retry/read reliability
+- `migrations/0038_chat_request_integrity.sql`: request/room integrity
+- `migrations/0039_cancel_orphan_pending_chat_requests.sql`: orphan request cleanup
+- `migrations/0040_notification_request_identity.sql`: request-specific notifications
 - `wrangler.jsonc`: production DO binding/migration
-- `wrangler.test.jsonc`: Worker 테스트 DO binding/migration
-- `tests/workers/chat-room.test.ts`: 연결 인증, auto-response, fan-out, pending/block 거부 검증
+- `wrangler.test.jsonc`: Worker test DO binding/migration
+- `tests/workers/chat-room.test.ts`: auth, auto-response, fan-out, pending/block rejection

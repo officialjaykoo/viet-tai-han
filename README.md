@@ -1,109 +1,70 @@
 # Việt tại Hàn
 
-**Việt tại Hàn (VTH)** is a full-stack social and community platform built for Cloudflare.
+Việt tại Hàn is a community and social platform for Vietnamese people living in Korea.
 
-Live deployment: **https://vth.kr**
+Production: [vth.kr](https://vth.kr)
+Developer host: [developers.vth.kr](https://developers.vth.kr)
 
-Developer documentation: **https://developers.vth.kr**
+VTH started as a fork of the MIT-licensed [`koval01/red`](https://github.com/koval01/red) project and has been substantially reworked for its product model, identity, authentication, messaging, localization, and Cloudflare deployment. VTH is independent and is not affiliated with Meta, Facebook, Instagram, Kakao, Zalo, Reddit, or Cloudflare.
 
-The software combines a Facebook/Instagram-style social graph with community, messaging, discovery, marketplace, and local-service features in a single application. It started from the MIT-licensed [`koval01/red`](https://github.com/koval01/red) codebase and has since been substantially reworked in product model, identity, authentication, messaging, moderation, localization, and Cloudflare architecture.
+## Core product
 
-> VTH is an independent project. It is not affiliated with Meta, Facebook, Instagram, Kakao, Zalo, Reddit, or Cloudflare.
+- Posts, comments, and likes
+- Communities
+- Questions and answers
+- Marketplace listings
+- Local businesses and services
+- Profiles
+- Follow, friends, and block relationships
+- 1:1 chat and message requests
+- Notifications and browser push
+- Vietnamese/Korean multilingual UI
 
-## What the software provides
+## Design principles
 
-VTH is designed around people and relationships first, rather than around Reddit-style karma or anonymous forum mechanics.
+- **People-first identity:** `user.id` is immutable canonical identity; public usernames are mutable handles.
+- **Explicit privacy:** follow, friend, block, chat, and message-request rules are predictable and enforced server-side.
+- **Retry-safe social actions:** relationship, messaging, notification, and related transitions are idempotent and race-safe.
+- **Edge-first architecture:** the application is designed for Workers, D1, R2, Durable Objects, Turnstile, and related edge services.
+- **Multilingual by design:** Vietnamese and Korean are product requirements, not post-launch decoration.
 
-Core product areas include:
+## Architecture
 
-- **Profiles** with public usernames and display names
-- **Follow, friend, block, and presence** relationships
-- **Direct messages and message requests**
-- **Notifications and browser push**
-- **Communities, posts, comments, and likes**
-- **Questions & answers**
-- **Marketplace**
-- **Local business / service discovery**
-- **Recommendations and discovery**
-- **Multilingual UI**
+VTH keeps canonical state in D1 and uses edge services for narrowly defined responsibilities:
 
-The social model uses immutable `user.id` values internally. Public usernames are mutable handles and are not used as account identity.
+```text
+Next.js UI
+    |
+VTH Worker
+    |
+    +-- D1          canonical persistent state
+    +-- R2          media
+    +-- ChatRoom DO realtime DM delivery only
+    +-- Workers AI  translation only
+```
 
-## Authentication
-
-VTH uses social-only authentication through Better Auth.
-
-Supported providers:
-
-- Facebook
-- Kakao
-- Zalo
-
-A new user completes onboarding after social sign-in. Provider accounts map to an immutable VTH user ID. Email, when available, is contact metadata rather than the canonical identity or an automatic account-merging key.
-
-## Messaging model
-
-For a sender `A` messaging recipient `B`:
-
-- if either side has blocked the other → messaging is prohibited
-- accepted friends → direct message
-- if **B follows A** → A may message B directly
-- otherwise → message request, subject to the recipient's request privacy setting
-
-Existing conversations remain tied to user IDs, not usernames.
-
-## Reputation
-
-VTH retains reputation-related data for profiles, permissions, achievements, and monetization. **Post and comment likes are separate engagement records and do not change reputation.**
-
-A normal new user with zero reputation should still be able to use ordinary social and community features. Abuse prevention should rely on account state, moderation, rate limits, relationship rules, and behavioral signals rather than a single karma threshold.
-
-## Cloudflare architecture
-
-VTH is deployed primarily on Cloudflare.
-
-| Component | Role |
-| --- | --- |
-| **Cloudflare Workers + OpenNext** | Next.js application and API runtime |
-| **D1** | Primary relational database |
-| **R2** | Media storage |
-| **Durable Objects** | Stateful coordination where required |
-| **Workers AI** | Translation only |
-| **Turnstile** | Human / abuse checks |
-| **Workers Rate Limiting** | Request flood protection |
-| **Workers Logs** | Production observability |
-
-Main application stack:
-
-- Next.js 16
-- React 19
-- TypeScript
-- Better Auth
-- Kysely / D1
-- Tailwind CSS
-- OpenNext for Cloudflare
-- Vitest
-- Playwright
+- D1 is the source of truth for users, content, relationships, notifications, and messages.
+- R2 stores uploaded media; media metadata and authorization remain application state.
+- ChatRoom Durable Objects deliver realtime DM events only. They do not persist chat history.
+- Workers AI is used for translation only.
+- Browser application requests use `/i/api`.
+- Direct `/api/*` requests use the existing public API boundary: `Authorization: Bearer <api_key>` is required before route-specific authorization.
 
 ## Repository layout
 
 ```text
-src/app/          Next.js routes and API handlers
-src/components/   UI components
-src/lib/          application, social, auth, security, and data logic
-src/worker.ts     Cloudflare Worker entry
-migrations/       D1 schema migrations
-docs/             deployment and project notes
+src/app/          Next.js pages and API handlers
+src/components/   shared and feature UI
+src/lib/          application, identity, social, auth, security, and data logic
+src/worker.ts     Cloudflare Worker entry point
+migrations/       forward-only D1 schema migrations
+docs/             active architecture and operations documentation
 public/           static assets and service worker
 ```
 
 ## Local development
 
-Requirements:
-
-- Node.js 22+
-- npm
-- Cloudflare account for remote Cloudflare services
+Requirements: Node.js 22+ and npm.
 
 ```bash
 git clone https://github.com/officialjaykoo/viet-tai-han.git
@@ -114,76 +75,45 @@ npm run db:reset:local
 npm run dev
 ```
 
-Then open:
+Open `http://localhost:3000`. Social login requires the corresponding provider credentials in `.dev.vars`. Never copy production credentials or production resource identifiers into another deployment.
 
-```text
-http://localhost:3000
-```
-
-Social login requires the corresponding provider credentials in `.dev.vars`.
-
-## Useful commands
+## Commands
 
 ```bash
-npm run dev
-npm run preview
+npm run lint
+npm run typecheck
 npm test
 npm run test:e2e:chromium
-npm run db:migrate:local
-npm run deploy
+npm run build
+npm run build:worker
+npm run preview
 ```
 
-For the current `vth.kr` Cloudflare setup, see:
+- `npm run build` runs the Next.js application build.
+- `npm run build:worker` creates the production OpenNext Cloudflare Worker bundle.
+- `npm run preview` builds the Worker bundle and starts the Cloudflare preview.
+- `npm run test:e2e:chromium` runs the Chromium Playwright project.
 
-- [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md)
+For local database work, use `npm run db:migrate:local`, `npm run db:seed:local`, or `npm run db:reset:local`. Deploy with `npm run deploy` only after reviewing the production runbook.
 
-Do not reuse production secrets or production resource IDs when creating a separate deployment.
+## Documentation
 
-## Production secrets
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current runtime boundaries and invariants
+- [`docs/CLOUDFLARE_VTH_KR_SETUP.md`](docs/CLOUDFLARE_VTH_KR_SETUP.md) — production resources, deployment, smoke checks, and rollback
+- [`docs/VTH_REALTIME_DM.md`](docs/VTH_REALTIME_DM.md) — DM request, persistence, delivery, and retry rules
+- [`docs/USER_ID_REKEY_RUNBOOK.md`](docs/USER_ID_REKEY_RUNBOOK.md) — dangerous one-off user ID maintenance
+- [`docs/README.md`](docs/README.md) — active documentation index
+- [`SECURITY.md`](SECURITY.md) — security policy and reporting
 
-Never commit production credentials.
+## Security and contribution
 
-Typical production secrets include:
+Never commit secrets. Production secrets belong in Cloudflare Worker secrets or another approved secret store; see [`SECURITY.md`](SECURITY.md).
 
-- `BETTER_AUTH_SECRET`
-- `TURNSTILE_SECRET_KEY`
-- `FACEBOOK_CLIENT_SECRET`
-- `KAKAO_CLIENT_SECRET` when enabled
-- `ZALO_APP_SECRET`
-- `VAPID_PRIVATE_KEY`
-- billing/webhook secrets
-- Cloudflare API credentials
-
-Use Cloudflare Worker secrets or another appropriate secret store. See [`SECURITY.md`](SECURITY.md).
-
-## Development status
-
-VTH is under active development and is being migrated away from several assumptions inherited from the original Reddit-style codebase.
-
-Areas receiving active review include:
-
-- relationship state transitions
-- block/privacy behavior
-- DM request/direct-message rules
-- notification reliability
-- idempotency and race conditions
-- Worker CPU/resource usage
-- mobile UX
-- abuse controls
-
-Bug reports and focused fixes are expected during this stage.
-
-## Contributing
-
-Small, focused changes are preferred. When modifying social behavior, test the full state transition rather than only the happy path—for example follow/unfollow, friend request/accept/remove, block/unblock, pending DM promotion, retries, and concurrent requests.
-
-Security issues should not be posted publicly. See [`SECURITY.md`](SECURITY.md).
+Prefer small, focused changes. Social behavior changes must cover complete state transitions, including block/privacy rules, retries, and concurrent requests. Security issues must not be posted publicly.
 
 ## Fork and attribution
 
-This repository is a fork of [`koval01/red`](https://github.com/koval01/red), originally released under the MIT License.
-
-VTH retains the applicable upstream MIT copyright notice while adding its own modifications and project documentation.
+This repository is a fork of [`koval01/red`](https://github.com/koval01/red), originally released under the MIT License. VTH retains the applicable upstream MIT copyright notice while adding its own modifications and documentation.
 
 ## License
 

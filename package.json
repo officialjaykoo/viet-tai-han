@@ -2,9 +2,14 @@
   "name": "viet-tai-han",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
+    "lint": "eslint .",
     "build": "next build",
+    "build:worker": "opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv /tmp/cloudflare-env.full.d.ts",
@@ -17,6 +22,7 @@
     "id:rekey:remote:dry-run": "node scripts/rekey-users.mjs --remote --dry-run",
     "id:rekey:remote:apply": "node scripts/rekey-users.mjs --remote --apply --confirm-production-rekey",
     "test": "npm run test:unit && npm run test:workers",
+    "check": "npm run lint && npm run typecheck && npm test",
     "test:unit": "vitest run --config vitest.config.mts",
     "test:workers": "vitest run --config vitest.workers.config.mts",
     "test:integration": "vitest run --config vitest.workers.config.mts tests/integration",

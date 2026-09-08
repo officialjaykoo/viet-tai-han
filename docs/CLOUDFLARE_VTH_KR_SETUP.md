@@ -1,457 +1,298 @@
-# vth.kr Cloudflare 운영 설정
+# vth.kr Cloudflare 운영 runbook
 
-이 문서는 `viet-tai-han`을 `vth.kr`에서 운영하기 위해 필요한 Cloudflare 설정과 배포 절차를 정리한 문서입니다.
+이 문서는 `vth.kr` 운영 리소스, 환경 계약, migration, 배포, smoke test, 백업과 rollback 절차를 정의합니다. 운영 명령은 대상 계정과 대상 리소스를 확인한 뒤 실행합니다.
 
-## 현재 상태
+## 1. Resource inventory
 
-### 목표 Cloudflare 계정
+| 항목 | 값 | 역할 |
+| --- | --- | --- |
+| Cloudflare account | `viet-tai-han` (`8cbaf5bd93f2cfcf2a01bcae16cdf2d8`) | 운영 계정 |
+| Worker | `vth` | Next.js/OpenNext 애플리케이션과 API |
+| Public host | `vth.kr` | 사용자 서비스 |
+| Developer host | `developers.vth.kr` | 개발자 문서 라우팅 |
+| D1 | `vth-db` (`DB`) | canonical persistent state |
+| R2 | `vth-media` (`MEDIA_BUCKET`) | media object storage |
+| Durable Object | `CHAT_ROOM` → `ChatRoom` | DM realtime delivery only |
+| Workers AI | `AI` | translation only |
+| Turnstile | `vth.kr production` | bot/human verification |
 
-- Account: `viet-tai-han`
-- Account ID: `8cbaf5bd93f2cfcf2a01bcae16cdf2d8`
-- Worker: `vth`
-- Worker URL: <https://vth.viet-tai-han.workers.dev>
-- Custom Domain: <https://vth.kr>
-- Current Version ID: `342c830d-a785-40dc-89f8-4f6f486b9a30`
-- D1: `vth-db` — 생성 및 원격 migration 적용 완료
-- R2: `vth-media` — 생성 및 Worker binding 완료
-- Workers AI: 번역 전용 binding
-- Turnstile widget: `vth.kr production`
-  - 허용 도메인: `vth.kr`
-  - mode: Managed
-- 운영 Worker secret:
-  - `BETTER_AUTH_SECRET`
-  - `TURNSTILE_SECRET_KEY`
-- 운영 Worker 변수:
-  - `BETTER_AUTH_URL=https://vth.kr`
-  - `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
-  - `NEXTJS_ENV=production`
+`wrangler.jsonc`가 Worker entry, D1 database, R2 bucket, Durable Object, AI binding, custom domain을 선언합니다. 운영 D1에는 `seed.sql`을 실행하지 않습니다. `seed.sql`은 로컬 개발 데이터 전용입니다.
 
-운영 D1에는 로컬 데모 데이터와 `seed.sql`을 넣지 않았습니다. 첫 운영 계정은 실제 가입으로 생성해야 합니다.
+Cloudflare Dashboard 확인 경로:
 
-### 보안 조치
+- **Workers & Pages → vth → Settings → Domains & Routes**
+- **Workers & Pages → vth → Settings → Variables and Secrets**
+- **D1 → vth-db**
+- **R2 → vth-media**
+- **Workers & Pages → vth → Logs**
 
-- 초기 설정 과정에서 노출 가능성이 있었던 운영 `BETTER_AUTH_SECRET`과 `TURNSTILE_SECRET_KEY`를 폐기하고 새 값으로 교체했습니다.
-- 이전 Turnstile 위젯을 삭제하고 `vth.kr` 전용 새 위젯을 생성했습니다.
-- 새 Secret과 새 공개 site key를 반영해 Worker를 재배포했습니다.
-- 실제 사용자 계정이나 개인 로그인 비밀번호는 생성·커밋하지 않았습니다.
+## 2. Public vars
 
-### 배포 완료 상태
+Production public vars are non-secret configuration. Keep the values consistent with the domain being deployed.
 
-`wrangler.jsonc`에 `vth.kr` Custom Domain 자동 연결 설정이 들어 있으며, 목표 계정에서 최종 배포가 성공했습니다.
+| Variable | Production use |
+| --- | --- |
+| `BETTER_AUTH_URL` | `https://vth.kr` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | public Turnstile site key for the `vth.kr` widget |
+| `NEXTJS_ENV` | `production` |
+| `FACEBOOK_CLIENT_ID` | Facebook OAuth client ID, when enabled |
+| `KAKAO_CLIENT_ID` | Kakao OAuth client ID, when enabled |
+| `ZALO_APP_ID` | Zalo OAuth app ID, when enabled |
+| `VTH_AUTH_ORIGINS` | optional comma-separated additional trusted origins |
+| `VAPID_PUBLIC_KEY` | public Web Push key, when push is enabled |
 
-```jsonc
-"routes": [
-  {
-    "pattern": "vth.kr",
-    "custom_domain": true,
-    "zone_name": "vth.kr"
-  }
-]
-```
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` is public but must also be available to the production build process because Next.js client code reads it at build time. Never place secret values in `wrangler.jsonc`, `README.md`, or this runbook.
 
-`https://vth.kr/`, `/login`, `/signup`은 Cloudflare edge에 대한 HTTPS 요청으로 `200`을 확인했습니다. 이 검증은 Cloudflare edge IP를 `vth.kr`에 지정한 HTTPS 요청으로 수행했습니다. 현재 작업 환경의 ISP DNS resolver가 A 응답을 아직 반환하지 않아 일반 `curl https://vth.kr`은 일시적으로 `ENOTFOUND`가 될 수 있습니다. 공용 DNS 조회에서는 `vth.kr` 레코드가 확인됩니다.
-
----
-
-## 0. 목표 계정에서 R2 활성화 (완료)
-
-Cloudflare Dashboard에서 R2 subscription을 활성화한 뒤 아래 명령으로 버킷을 생성했습니다. Worker를 Dashboard에서 수동 생성하지 않았습니다.
+Inspect configured public vars without treating the output as a secret store:
 
 ```bash
-npx wrangler r2 bucket create vth-media
+npx wrangler whoami
+npx wrangler deployments list
 ```
 
-생성 결과:
+Review `wrangler.jsonc` and the Dashboard Variables section for the actual deployed values. Do not copy a production public client ID into another deployment without changing its OAuth configuration.
 
-- R2 bucket: `vth-media`
-- Worker binding: `MEDIA_BUCKET`
-- 최종 Worker 배포에서 R2 binding 연결 확인
+## 3. Secrets
 
-## 1. vth.kr을 Cloudflare Zone으로 추가
-이미 `vth.kr` Zone이 `Active`이면 이 단계는 건너뛰고 2단계로 진행합니다.
+Set secrets through Wrangler or the Cloudflare Dashboard. Values must not be committed or pasted into issue comments, chat, logs, or documentation.
 
+Required for the production authentication and bot paths:
 
-1. Cloudflare Dashboard에 운영 계정으로 로그인합니다.
-2. **Websites → Add a site**를 선택합니다.
-3. 도메인으로 `vth.kr`을 입력합니다.
-4. 요금제는 처음에는 Free로 선택해도 됩니다.
-5. Cloudflare가 지정한 두 개의 Nameserver를 확인합니다.
-6. 도메인을 구매한 등록기관의 DNS/네임서버 화면에서 기존 네임서버를 Cloudflare 네임서버로 교체합니다.
-7. Cloudflare Dashboard에서 Zone 상태가 `Active`가 될 때까지 기다립니다.
+- `BETTER_AUTH_SECRET`
+- `TURNSTILE_SECRET_KEY`
 
-등록기관에서 네임서버를 바꾸는 작업은 Cloudflare Dashboard가 아니라 도메인 등록기관에서 해야 합니다.
+Provider secrets are required only for enabled providers:
 
-### DNS 레코드 주의
+- `FACEBOOK_CLIENT_SECRET`
+- `ZALO_APP_SECRET`
+- `KAKAO_CLIENT_SECRET`
 
-Custom Domain을 연결하면 Cloudflare가 `vth.kr`용 DNS 레코드와 인증서를 관리합니다. 기존에 `vth.kr`에 CNAME이 있다면 Custom Domain을 배포하기 전에 제거해야 합니다.
+Optional operational secrets:
 
-현재 운영 주소는 `vth.kr` 하나만 사용합니다. `www.vth.kr`은 이번 배포에 포함하지 않았습니다.
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT`
+- `BILLING_WEBHOOK_SECRET` when the billing webhook contract is enabled
 
-## 2. Worker에 Custom Domain 연결
-
-Zone이 `Active`라는 전제에서 `wrangler.jsonc`의 설정으로 자동 연결합니다.
-
-```jsonc
-"routes": [
-  {
-    "pattern": "vth.kr",
-    "custom_domain": true,
-    "zone_name": "vth.kr"
-  }
-]
-```
-
-다음 배포 명령이 Custom Domain을 생성합니다.
-
-```powershell
-$env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
-$env:BETTER_AUTH_URL="https://vth.kr"
-$env:NEXTJS_ENV="production"
-npm run deploy
-```
-
-Cloudflare Dashboard에서는 **Workers & Pages → vth → Settings → Domains & Routes**에서 생성 결과만 확인하면 됩니다. 자동 생성이 실패한 경우에만 **Add → Custom Domain → vth.kr**을 사용합니다.
-
-완료 후 아래 주소를 확인합니다.
-
-- <https://vth.kr>
-
-`wrangler.jsonc`의 `BETTER_AUTH_URL`은 이미 `https://vth.kr`로 설정되어 있습니다. Custom Domain을 다른 주소로 정하면 이 값을 바꾸고 다시 배포해야 합니다.
-
----
-
-
-## 3. SSL/TLS 설정
-
-Cloudflare Dashboard에서 다음을 확인합니다.
-
-1. **SSL/TLS → Overview**
-2. 암호화 모드를 `Full (strict)`로 설정
-3. **SSL/TLS → Edge Certificates**
-4. `Always Use HTTPS` 활성화
-5. `Automatic HTTPS Rewrites` 활성화
-
-원본 서버를 따로 운영하지 않고 Worker가 직접 응답하므로 Cloudflare 앞단에서 HTTPS를 종료합니다.
-
----
-
-## 4. 운영 환경 변수와 Secret
-
-### 현재 설정된 값
-
-`wrangler.jsonc`에 다음 공개 변수가 설정되어 있습니다.
-
-```jsonc
-"vars": {
-  "BETTER_AUTH_URL": "https://vth.kr",
-  "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "<Turnstile site key>",
-  "NEXTJS_ENV": "production"
-}
-```
-
-Turnstile site key는 공개값이므로 프론트엔드에 포함되어도 됩니다. Turnstile secret과 Better Auth secret은 절대 Git에 저장하지 않습니다.
-
-현재 Worker에 저장된 secret 목록은 다음 명령으로 확인합니다. 값 자체는 출력되지 않습니다.
+List secret names without printing their values:
 
 ```bash
 npx wrangler secret list
 ```
 
-Secret을 갱신할 때만 다음 명령을 사용합니다.
+Set or rotate a secret interactively:
 
 ```bash
 npx wrangler secret put BETTER_AUTH_SECRET
 npx wrangler secret put TURNSTILE_SECRET_KEY
-```
-
-`BETTER_AUTH_SECRET`을 바꾸면 기존 세션이 무효화될 수 있습니다.
-
-### 추가 OAuth를 사용할 경우
-
-운영 인증은 Facebook, Zalo 또는 Kakao OAuth를 사용하는 social-only 흐름입니다. 이메일/사용자명 + 비밀번호 가입·로그인 엔드포인트와 passkey login은 비활성화되어 있습니다. 새 provider identity는 이름·사용자명·언어 onboarding을 완료해야 하며, 연락 이메일은 선택 사항인 별도 필드입니다.
-
-회원은 Facebook, Zalo 또는 Kakao 중 하나로 가입한 뒤, 로그인 후 **설정 → 계정 → 연결된 계정**에서 다른 provider를 명시적으로 연결할 수 있습니다. 이메일이 같다는 이유만으로 계정을 자동 병합하지 않으며, 마지막 social provider는 연결 해제할 수 없습니다.
-
-비밀값은 채팅이나 GitHub에 보내지 말고, 아래 `wrangler secret put` 프롬프트에 직접 입력합니다.
-
-
-Cloudflare Dashboard의 **Worker → Settings → Variables and Secrets**에서 다음 공개 변수를 추가합니다.
-
-- `FACEBOOK_CLIENT_ID`
-- `ZALO_APP_ID`
-- `KAKAO_CLIENT_ID` — Kakao REST API key
-- `VTH_AUTH_ORIGINS` — preview/custom origin이 추가로 필요할 때만, 쉼표로 구분
-
-`wrangler.jsonc`에 공개 변수를 추가하는 방식도 사용할 수 있습니다. 파일을 변경했다면 아래 배포 절차를 다시 실행합니다.
-
-Secret은 다음 명령으로 등록합니다.
-
-```bash
 npx wrangler secret put FACEBOOK_CLIENT_SECRET
 npx wrangler secret put ZALO_APP_SECRET
 npx wrangler secret put KAKAO_CLIENT_SECRET
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put VAPID_SUBJECT
+npx wrangler secret put BILLING_WEBHOOK_SECRET
 ```
 
-`KAKAO_CLIENT_SECRET`은 Kakao 앱에서 client secret을 활성화한 경우에만 등록합니다.
+Only set optional secrets when the corresponding feature is configured. Rotating `BETTER_AUTH_SECRET` invalidates existing authentication and realtime signing material; plan the user impact before rotation.
 
-OAuth callback URL:
+## 4. OAuth callbacks
+
+Production callback URLs:
 
 ```text
 https://vth.kr/api/auth/callback/facebook
-https://vth.kr/api/auth/oauth2/callback/zalo
 https://vth.kr/api/auth/callback/kakao
+https://vth.kr/api/auth/oauth2/callback/zalo
 ```
 
-### Facebook 설정
+Configure the exact URL in each provider console and keep the provider client ID/secret pair in the same environment. Authentication is social-first/social-only; matching email addresses do not automatically merge provider identities.
 
-1. Meta for Developers에서 앱을 만들고 Facebook Login(Web)을 추가합니다.
-2. 앱의 허용 도메인과 사이트 URL에 `https://vth.kr`을 등록합니다.
-3. Valid OAuth Redirect URI에 다음 주소를 정확히 등록합니다.
+Provider checklist:
 
-   ```text
-   https://vth.kr/api/auth/callback/facebook
-   ```
+- Facebook Login: allow `vth.kr` and register the Facebook callback.
+- Kakao Login: enable Kakao Login and register the Kakao callback.
+- Zalo OAuth: register the Zalo callback when `ZALO_APP_ID` and `ZALO_APP_SECRET` are enabled.
+- Deploy the matching public ID and secret together.
+- Verify a new sign-in and the account-linking flow after provider changes.
 
-4. Cloudflare의 **Worker → Settings → Variables and Secrets**에 `FACEBOOK_CLIENT_ID`를 공개 변수로 저장합니다.
-5. 아래 명령을 실행하고 프롬프트에 Meta App Secret을 직접 입력합니다.
+## 5. D1 migrations
 
-   ```powershell
-   $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-   npx wrangler secret put FACEBOOK_CLIENT_SECRET
-   ```
+Migrations in `migrations/` are forward-only. Never edit or delete a migration that may already have been applied to production. The current messaging/relationship reliability chain includes `0036_chat_reliability.sql`, `0038_chat_request_integrity.sql`, `0039_cancel_orphan_pending_chat_requests.sql`, and `0040_notification_request_identity.sql`.
 
-Meta 앱이 Development mode이면 Facebook 계정을 Tester/Developer로 추가해야 합니다. 일반 사용자가 로그인하려면 앱을 Live 상태로 전환하고 Meta 검토가 필요한 권한을 처리해야 합니다.
+Before a production schema change:
 
-### Zalo 설정
-
-1. Zalo Developers에서 앱을 만들고 Login/OAuth를 활성화합니다.
-2. 앱의 redirect/callback URL에 다음 주소를 정확히 등록합니다.
-
-   ```text
-   https://vth.kr/api/auth/oauth2/callback/zalo
-   ```
-
-3. Cloudflare의 **Worker → Settings → Variables and Secrets**에 `ZALO_APP_ID`를 공개 변수로 저장합니다.
-4. 아래 명령을 실행하고 프롬프트에 Zalo App Secret을 직접 입력합니다.
-
-   ```powershell
-   $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-   npx wrangler secret put ZALO_APP_SECRET
-   ```
-
-### Kakao 설정
-
-1. Kakao Developers에서 앱을 만들고 Kakao Login을 활성화합니다.
-   `KOE004`가 나오면 Client Secret 문제가 아니라 Kakao Developers의 **카카오 로그인 활성화 상태가 꺼진 것**입니다. `제품 설정 → 카카오 로그인 → 일반`에서 활성화 상태를 켜고 저장합니다.
-2. Kakao Login 설정의 Redirect URI에 다음 주소를 정확히 등록합니다.
-
-   ```text
-   https://vth.kr/api/auth/callback/kakao
-   ```
-
-3. 동의항목에서 로그인에 사용할 프로필 닉네임과 프로필 이미지를 활성화합니다. 이메일 동의항목은 선택 사항이며, 현재 앱은 `account_email` scope를 요청하지 않습니다.
-   이메일이 없는 Kakao 계정도 provider ID 기반 synthetic email로 Better Auth 호환성을 유지하면서 가입할 수 있습니다. 이 주소는 UI/API/profile에 노출하지 않습니다.
-4. Cloudflare의 **Worker → Settings → Variables and Secrets**에 Kakao REST API key를 `KAKAO_CLIENT_ID`로 공개 저장합니다.
-5. Kakao 앱에서 client secret을 활성화한 경우에만 아래 명령으로 secret을 등록합니다.
-
-   ```powershell
-   $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-   npx wrangler secret put KAKAO_CLIENT_SECRET
-   ```
-
-설정 후 새 로그인 시도 전에 Worker 배포와 각 provider 콘솔 저장이 완료되었는지 확인합니다.
-
-Facebook, Zalo 또는 Kakao 중 최소 하나를 구성해야 회원가입과 로그인이 가능합니다.
-
-### Web Push를 사용할 경우
-
-다음 세 값이 모두 있어야 Push가 활성화됩니다.
-
-- `VAPID_PUBLIC_KEY` — 공개 변수
-- `VAPID_PRIVATE_KEY` — secret
-- `VAPID_SUBJECT` — secret, 예: `mailto:ops@vth.kr`
+1. Confirm the target account and database.
+2. Create a D1 export backup.
+3. Review the pending migration list and SQL.
+4. Apply the forward migration.
+5. Run foreign-key and application smoke checks.
 
 ```bash
-npx wrangler secret put VAPID_PRIVATE_KEY
-npx wrangler secret put VAPID_SUBJECT
+npx wrangler whoami
+npx wrangler d1 migrations list vth-db --remote
+npx wrangler d1 export vth-db --remote --output="backup-$(date +%Y%m%d-%H%M).sql"
+npx wrangler d1 migrations apply vth-db --remote
+npx wrangler d1 execute vth-db --remote --command="PRAGMA foreign_key_check;"
 ```
 
-`VAPID_PUBLIC_KEY`는 Dashboard 변수 또는 `wrangler.jsonc`에 추가합니다.
+For local development only:
 
-### 결제/광고
+```bash
+npm run db:migrate:local
+npm run db:seed:local
+# or, when a disposable reset is intended:
+npm run db:reset:local
+```
 
-결제 checkout은 구현되어 있지 않습니다. 결제 provider, 가격, 환불, 세금, fraud 정책을 확정하기 전에는 `ads_enabled`를 활성화하지 않습니다.
+Do not use the local seed command against `vth-db --remote`. For immutable user ID maintenance, follow [`USER_ID_REKEY_RUNBOOK.md`](USER_ID_REKEY_RUNBOOK.md) instead of writing ad hoc SQL.
 
----
+## 6. R2
 
-## 5. 배포 절차
+R2 bucket `vth-media` is bound as `MEDIA_BUCKET`.
 
-### 최초 배포 또는 migration 포함 배포
+```bash
+npx wrangler r2 bucket list
+npx wrangler r2 bucket info vth-media
+```
 
-운영 D1 변경 전에는 반드시 export 백업을 생성하고, 적용 대상을 확인한 뒤 migration을 실행합니다. 이 저장소에서는 production D1에 대한 명령을 자동 실행하지 않습니다.
+D1 exports do not contain R2 objects. Maintain a separate media retention/export policy before relying on a rollback plan. D1 media keys, ownership, authorization, and object lifecycle must remain consistent; an object alone is not an authorized application record.
+
+When testing uploads, verify all of the following:
+
+- the request is authorized by the application;
+- the object is written to `vth-media`;
+- the corresponding D1 metadata is present;
+- unauthorized reads and deleted-object paths fail as expected.
+
+## 7. Durable Object
+
+The `CHAT_ROOM` binding maps to the `ChatRoom` class. There is one object identity per active DM room.
+
+ChatRoom Durable Objects:
+
+- accept authenticated WebSocket connections;
+- re-check active D1 membership and bilateral block state;
+- fan out messages already committed by the HTTP/D1 write path;
+- provide no canonical message persistence or history cache.
+
+D1 remains authoritative for rooms, members, requests, messages, and read state. Offline history is recovered through the HTTP API. `wrangler.jsonc` retains the deployed Durable Object migration history; do not restore the retired `PostObject` class.
+
+After a Worker or DO change, verify `CHAT_ROOM` is present, `ChatRoom` is exported from `src/worker.ts`, and the production bundle was built with `npm run build:worker`.
+
+## 8. Build
+
+Use Node.js 22 or newer and install from the lockfile.
 
 ```bash
 npm ci
-npx wrangler login
-export CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-npx wrangler d1 export vth-db --remote --output="backup-$(date +%Y%m%d-%H%M).sql"
-npx wrangler d1 migrations list vth-db --remote
-npx wrangler d1 migrations apply vth-db --remote
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run build:worker
 ```
 
-`seed.sql`은 운영 DB에 실행하지 않습니다.
+Build meanings:
 
-### Windows PowerShell에서 배포
+- `npm run build` runs the Next.js application build.
+- `npm run build:worker` runs the OpenNext Cloudflare production bundle build and creates `.open-next/worker.js` and assets.
+- `npm run preview` builds the Worker bundle and starts the Cloudflare preview.
 
-`NEXT_PUBLIC_*` 값은 Next.js 빌드 시점에 번들에 포함됩니다. `wrangler.jsonc`의 Worker 변수만으로는 Next.js 클라이언트 번들에 값이 들어가지 않을 수 있으므로, 배포할 때 빌드 프로세스에도 공개 Turnstile site key를 전달합니다.
+`npm run build` alone does not verify the Cloudflare Worker bundle. Run `npm run build:worker` before any Worker deployment.
+
+For a production client build, provide the public site key and canonical auth URL to the build environment when they are not already supplied by the shell:
+
+```powershell
+$env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
+$env:BETTER_AUTH_URL="https://vth.kr"
+$env:NEXTJS_ENV="production"
+npm run build:worker
+```
+
+## 9. Deploy
+
+Apply required migrations and configure secrets before deployment. Then build the exact Worker bundle that will be deployed and deploy it through the existing script.
+
+PowerShell:
 
 ```powershell
 $env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
 $env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
 $env:BETTER_AUTH_URL="https://vth.kr"
 $env:NEXTJS_ENV="production"
+npm run build:worker
 npm run deploy
 ```
 
-### macOS/Linux에서 배포
+macOS/Linux:
+
 ```bash
+CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8" \
+NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>" \
+BETTER_AUTH_URL="https://vth.kr" \
+NEXTJS_ENV=production \
+npm run build:worker
 CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8" \
 NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>" \
 BETTER_AUTH_URL="https://vth.kr" \
 NEXTJS_ENV=production \
 npm run deploy
 ```
-### 일반 업데이트
 
-코드 변경 후에도 동일한 빌드 환경을 전달합니다. Migration이 포함된 경우에만 아래의 백업·확인·적용 순서를 먼저 실행합니다.
+`npm run deploy` performs its own OpenNext build before upload. The explicit `npm run build:worker` is the required pre-deploy bundle check; do not replace it with `npm run build`.
 
-```powershell
-$env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-$stamp = Get-Date -Format yyyyMMdd-HHmm
-npx wrangler d1 export vth-db --remote --output="backup-$stamp.sql"
+## 10. Post-deploy smoke
+
+Run these checks against the deployed hosts after every production deployment:
+
+```bash
+curl -I https://vth.kr/
+curl -I https://vth.kr/login
+curl -I https://vth.kr/signup
+curl -I https://developers.vth.kr/
 npx wrangler d1 migrations list vth-db --remote
-npx wrangler d1 migrations apply vth-db --remote
-```
-
-Migration 적용 후 배포합니다.
-
-```powershell
-$env:NEXT_PUBLIC_TURNSTILE_SITE_KEY="<Turnstile site key>"
-$env:BETTER_AUTH_URL="https://vth.kr"
-$env:NEXTJS_ENV="production"
-npm run deploy
-```
-
-Migration은 이미 적용된 항목을 다시 실행하지 않습니다.
-
-Windows에서 OpenNext 빌드가 `.open-next` 파일 잠금으로 실패하면 실행 중인 `wrangler dev` 또는 로컬 미리보기 프로세스를 먼저 종료한 뒤 다시 배포합니다. Windows 호환성 경고가 계속되면 WSL 환경에서 배포하는 편이 안전합니다.
-
----
-
-## 6. 첫 운영 관리자 계정
-
-운영 DB에 데모 관리자 계정은 없습니다.
-여러 Cloudflare 계정이 로그인되어 있으면 D1 명령 전에 목표 계정을 명시합니다.
-
-```powershell
-$env:CLOUDFLARE_ACCOUNT_ID="8cbaf5bd93f2cfcf2a01bcae16cdf2d8"
-```
-
-
-1. `https://vth.kr/signup`에서 첫 계정을 생성합니다.
-2. 계정 정보를 확인합니다.
-
-```bash
-npx wrangler d1 execute vth-db --remote --command="SELECT id, username, email, role FROM \"user\" ORDER BY createdAt ASC LIMIT 10"
-```
-
-3. 본인 계정만 관리자로 승격합니다.
-
-```bash
-npx wrangler d1 execute vth-db --remote --command="UPDATE \"user\" SET role='admin' WHERE username='본인아이디'"
-```
-
-4. 다시 로그인하고 `/admin`에 접속합니다.
-
-운영에서 `seed.sql`을 실행하면 데모 사용자·게시글·인증 데이터가 들어가므로 사용하지 않습니다.
-
----
-
-## 7. 운영 리소스 점검 명령
-
-```bash
-npx wrangler whoami
-npx wrangler d1 list
-npx wrangler r2 bucket list
 npx wrangler secret list
 npx wrangler deployments list
 ```
 
-D1 migration 상태:
+Browser and application checks:
 
-```bash
-npx wrangler d1 migrations list vth-db --remote
-```
+- `vth.kr` serves the home page over HTTPS.
+- `developers.vth.kr` routes to the developer surface.
+- login and signup render the configured Turnstile widget;
+- a configured social provider can complete callback and session creation;
+- a new account can create a profile and a community/content write;
+- posts, comments, likes, follow/friend/block state, and notifications persist in D1;
+- an authorized media upload reaches `vth-media`;
+- a DM request, acceptance, direct message, reconnect, and history reload work;
+- a block prevents new contact and realtime membership delivery;
+- translation works when Workers AI is configured, and content remains available if translation fails;
+- direct `/api/*` requests without the required Bearer public API key are rejected by the documented auth boundary.
 
-D1 백업 예시:
+Record failures with the host, route, deployment, migration state, and redacted error; never record secret values.
+
+## 11. Backup/rollback
+
+D1 backup:
 
 ```bash
 npx wrangler d1 export vth-db --remote --output="backup-$(date +%Y%m%d-%H%M).sql"
+npx wrangler d1 migrations list vth-db --remote
 ```
 
-Windows PowerShell에서는 날짜를 자동으로 만들 수 있습니다.
+PowerShell backup:
 
 ```powershell
 $stamp = Get-Date -Format yyyyMMdd-HHmm
 npx wrangler d1 export vth-db --remote --output="backup-$stamp.sql"
 ```
 
-R2 미디어는 별도 백업 정책을 정해야 합니다. DB 백업만으로 R2 파일은 복구되지 않습니다.
+Rollback rules:
 
----
+- Do not reverse production schema by editing or deleting an applied migration.
+- For a code-only regression, deploy the last reviewed Worker bundle and then repeat the smoke checks.
+- For a schema/data problem, stop further writes when appropriate, preserve a fresh backup, diagnose locally, and use an approved forward repair migration or reviewed restore procedure.
+- Validate any restore against a disposable database before touching `vth-db`.
+- D1 backup does not restore `vth-media`; keep a separate R2 recovery plan.
+- ChatRoom state is delivery coordination, not canonical history; reconnect/history reads recover from D1 after a Worker or DO restart.
 
-## 8. 배포 후 확인 목록
-
-### 기본 화면
-
-- [ ] `https://vth.kr`이 200 응답
-- [ ] 로그인/회원가입 화면에 Turnstile이 표시됨
-- [ ] 로그인 후 세션 cookie가 HTTPS에서 동작함
-- [ ] `/communities`, `/marketplace`, `/friends`, `/messages`가 열림
-- [ ] 프로필의 개요·글·댓글·친구 탭이 동작함
-
-### 데이터/파일
-
-- [ ] 게시글·댓글·친구 관계가 D1에 저장됨
-- [ ] 이미지 업로드가 `vth-media` R2에 저장됨
-- [ ] Workers AI 번역이 동작하고 AI 사용량과 비용을 Cloudflare Dashboard에서 확인함
-
-### 보안
-
-- [ ] `BETTER_AUTH_SECRET`가 로컬 테스트 값이 아님
-- [ ] `TURNSTILE_SECRET_KEY`가 실제 `vth.kr` 위젯 secret임
-- [ ] 비밀값이 Git, README, 브라우저 HTML에 노출되지 않음
-- [ ] SSL/TLS가 `Full (strict)`임
-- [ ] 관리자 계정이 본인 계정 하나로 제한됨
-- [ ] 광고·결제 기능을 정책 검토 전에 활성화하지 않음
-
----
-
-## 관련 명령 요약
-
-```bash
-# 로그인
-npx wrangler login
-
-# 운영 migration
-npx wrangler d1 migrations apply DB --remote
-
-# 운영 배포
-npm run deploy
-
-# 운영 secret 목록(값은 출력되지 않음)
-npx wrangler secret list
-
-# Worker 배포 이력
-npx wrangler deployments list
-```
+A user ID rekey is a destructive one-off operation with separate dry-run, mapping, confirmation, and foreign-key verification requirements. Use [`USER_ID_REKEY_RUNBOOK.md`](USER_ID_REKEY_RUNBOOK.md) and do not combine it with a routine deployment.

@@ -30,6 +30,7 @@ interface CloudflareEnv {
 	VAPID_PUBLIC_KEY?: string;
 	VAPID_PRIVATE_KEY?: string;
 	VAPID_SUBJECT?: string;
+	BILLING_WEBHOOK_SECRET?: string;
 	TURNSTILE_SECRET_KEY: string;
 	NEXT_PUBLIC_TURNSTILE_SITE_KEY: string;
 	NEXTJS_ENV?: string;
@@ -49,8 +50,12 @@ declare namespace NodeJS {
 		VAPID_PUBLIC_KEY?: string;
 		VAPID_PRIVATE_KEY?: string;
 		VAPID_SUBJECT?: string;
+		BILLING_WEBHOOK_SECRET?: string;
 		TURNSTILE_SECRET_KEY?: string;
 		NEXT_PUBLIC_TURNSTILE_SITE_KEY?: string;
+		TURNSTILE_SITE_KEY?: string;
+		E2E_BOT_BYPASS?: string;
+		NEXT_PUBLIC_E2E_BOT_BYPASS?: string;
 		NEXTJS_ENV?: string;
 	}
 }
