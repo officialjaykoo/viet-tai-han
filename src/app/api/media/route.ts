@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { uploadPostImage } from "@/lib/media";
+import { HUMAN_COOKIE, openHumanToken } from "@/lib/security/human-cookie";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { requireSignedHeaders } from "@/lib/security/guard";
 import { getTunnelContext } from "@/lib/security/tunnel-context";
@@ -14,6 +15,12 @@ export async function POST(request: NextRequest) {
     const session = await requireSession();
 
     const tunnel = getTunnelContext();
+    if (tunnel?.verified) {
+      const humanToken = request.cookies.get(HUMAN_COOKIE)?.value ?? null;
+      if (!(await openHumanToken(humanToken))) {
+        throw new AuthError("Could not verify request", 403);
+      }
+    }
     let file: File;
 
     if (tunnel?.verified && tunnel.raw.byteLength > 0) {

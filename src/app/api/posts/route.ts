@@ -4,6 +4,7 @@ import { createPost } from "@/lib/actions";
 import { HUMAN_COOKIE, openHumanToken } from "@/lib/security/human-cookie";
 import { parseCreatePostPayload } from "@/lib/post-payload";
 import { isProfileCommunityName } from "@/lib/profile-community";
+import { getTunnelContext } from "@/lib/security/tunnel-context";
 import { withFeedAds } from "@/lib/ads";
 import {
   getDb,
@@ -79,9 +80,11 @@ export async function POST(request: NextRequest) {
     const session = await requireSession();
     const rawBody = requireBotAttestation(await readApiJson(request));
     const body = parseCreatePostPayload(rawBody);
-    const humanToken = request.cookies.get(HUMAN_COOKIE)?.value ?? null;
-    if (!(await openHumanToken(humanToken))) {
-      throw new AuthError("Could not verify request", 403);
+    if (getTunnelContext()?.verified) {
+      const humanToken = request.cookies.get(HUMAN_COOKIE)?.value ?? null;
+      if (!(await openHumanToken(humanToken))) {
+        throw new AuthError("Could not verify request", 403);
+      }
     }
 
     const user = session.user as {
@@ -112,15 +115,21 @@ export async function POST(request: NextRequest) {
       const db = await getDb();
       const sub = await db
         .prepare(
-          `SELECT id, created_by FROM subreddits WHERE name = ? COLLATE NOCASE AND is_removed = 0`
+          `SELECT id, name, created_by
+           FROM subreddits
+           WHERE name = ? COLLATE NOCASE AND is_removed = 0`
         )
         .bind(body.subreddit)
-        .first<{ id: string; created_by: string | null }>();
+        .first<{
+          id: string;
+          name: string;
+          created_by: string | null;
+        }>();
 
       if (!sub) {
         return await jsonLocalizedError("Community not found", 404);
       }
-      if (isProfileCommunityName(body.subreddit) && sub.created_by !== user.id) {
+      if (isProfileCommunityName(sub.name) && sub.created_by !== user.id) {
         throw new AuthError("Profile community belongs to another user", 403);
       }
       subredditId = sub.id;

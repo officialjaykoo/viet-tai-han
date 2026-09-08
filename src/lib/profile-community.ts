@@ -1,5 +1,6 @@
 import { formatUserHandle } from "@/lib/profile-url";
 import { getDb } from "@/lib/db";
+import { recountSubscribers } from "@/lib/communities";
 import { profileCommunityName } from "@/lib/profile-community-name";
 import { AuthError } from "@/lib/session";
 
@@ -22,7 +23,6 @@ export async function ensureProfileCommunity(input: {
   }
 
   const db = await getDb();
-
   const existing = await db
     .prepare(
       `SELECT id, name, created_by
@@ -31,57 +31,55 @@ export async function ensureProfileCommunity(input: {
     .bind(name)
     .first<{ id: string; name: string; created_by: string | null }>();
 
-  if (existing) {
-    if (existing.created_by !== input.userId) {
-      throw new AuthError("Profile community belongs to another user", 403);
-    }
-    return { id: existing.id, name: existing.name };
-  }
-
-  const id = crypto.randomUUID();
-  const title = formatUserHandle(input.username);
-  try {
-    await db.batch([
-      db
-        .prepare(
-          `INSERT INTO subreddits (
-             id, name, title, description, created_by, subscriber_count
-           ) VALUES (?, ?, ?, ?, ?, 1)`
-        )
-        .bind(
-          id,
-          name,
-          title,
-          "Personal profile posts",
-          input.userId
-        ),
-      db
-        .prepare(
-          `INSERT INTO subscriptions (user_id, subreddit_id) VALUES (?, ?)`
-        )
-        .bind(input.userId, id),
-      db
-        .prepare(
-          `INSERT INTO subreddit_moderators (subreddit_id, user_id) VALUES (?, ?)`
-        )
-        .bind(id, input.userId),
-    ]);
-  } catch (error) {
-    const raced = await db
+  if (!existing) {
+    const id = crypto.randomUUID();
+    const title = formatUserHandle(input.username);
+    await db
       .prepare(
-        `SELECT id, name, created_by FROM subreddits
-         WHERE name = ? COLLATE NOCASE AND is_removed = 0`
+        `INSERT OR IGNORE INTO subreddits (
+           id, name, title, description, created_by, subscriber_count
+         ) VALUES (?, ?, ?, ?, ?, 0)`
       )
-      .bind(name)
-      .first<{ id: string; name: string; created_by: string | null }>();
-    if (raced) {
-      if (raced.created_by !== input.userId) {
-        throw new AuthError("Profile community belongs to another user", 403);
-      }
-      return { id: raced.id, name: raced.name };
-    }
-    throw error;
+      .bind(
+        id,
+        name,
+        title,
+        "Personal profile posts",
+        input.userId
+      )
+      .run();
   }
 
-  return { id, name };
+  const resolved = await db
+    .prepare(
+      `SELECT id, name, created_by
+       FROM subreddits WHERE name = ? COLLATE NOCASE AND is_removed = 0`
+    )
+    .bind(name)
+    .first<{ id: string; name: string; created_by: string | null }>();
+
+  if (!resolved) {
+    throw new AuthError("Could not initialize profile community", 500);
+  }
+  if (resolved.created_by !== input.userId) {
+    throw new AuthError("Profile community belongs to another user", 403);
+  }
+
+  await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO subscriptions (user_id, subreddit_id)
+         VALUES (?, ?)`
+      )
+      .bind(input.userId, resolved.id),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO subreddit_moderators (subreddit_id, user_id)
+         VALUES (?, ?)`
+      )
+      .bind(resolved.id, input.userId),
+  ]);
+  await recountSubscribers(resolved.id);
+
+  return { id: resolved.id, name: resolved.name };
 }

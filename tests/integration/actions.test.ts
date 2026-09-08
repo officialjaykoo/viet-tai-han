@@ -369,7 +369,7 @@ describe("communities", () => {
       })
     ).rejects.toMatchObject({ status: 403 });
   });
-  it("bootstraps profile communities atomically and protects their owner", async () => {
+  it("bootstraps and repairs profile communities atomically", async () => {
     const { authorId, actorId } = await seedUsersAndSubreddit();
     const username = `owner_${crypto.randomUUID().slice(0, 8)}`;
 
@@ -378,6 +378,51 @@ describe("communities", () => {
       ensureProfileCommunity({ userId: authorId, username }),
     ]);
     expect(first.id).toBe(second.id);
+
+    await env.DB.batch([
+      env.DB
+        .prepare(
+          `DELETE FROM subscriptions
+           WHERE user_id = ? AND subreddit_id = ?`
+        )
+        .bind(authorId, first.id),
+      env.DB
+        .prepare(
+          `DELETE FROM subreddit_moderators
+           WHERE user_id = ? AND subreddit_id = ?`
+        )
+        .bind(authorId, first.id),
+      env.DB
+        .prepare(`UPDATE subreddits SET subscriber_count = 99 WHERE id = ?`)
+        .bind(first.id),
+    ]);
+
+    const repaired = await ensureProfileCommunity({
+      userId: authorId,
+      username,
+    });
+    expect(repaired).toEqual(first);
+    const membership = await env.DB
+      .prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM subscriptions
+            WHERE user_id = ? AND subreddit_id = ?) AS subscriptions,
+           (SELECT COUNT(*) FROM subreddit_moderators
+            WHERE user_id = ? AND subreddit_id = ?) AS moderators,
+           subscriber_count
+         FROM subreddits WHERE id = ?`
+      )
+      .bind(authorId, first.id, authorId, first.id, first.id)
+      .first<{
+        subscriptions: number;
+        moderators: number;
+        subscriber_count: number;
+      }>();
+    expect(membership).toMatchObject({
+      subscriptions: 1,
+      moderators: 1,
+      subscriber_count: 1,
+    });
 
     await expect(
       createPost({
@@ -437,6 +482,14 @@ describe("validation edges", () => {
       userId: authorId,
       file: new File([source.data], "test.jpg", { type: "image/jpeg" }),
     });
+    await expect(
+      createPost({
+        userId: authorId,
+        subredditId,
+        title: "Missing image",
+        mediaKey: "media/missing-1.jpg",
+      })
+    ).rejects.toMatchObject({ status: 400 });
 
     await expect(
       createPost({
@@ -454,5 +507,44 @@ describe("validation edges", () => {
       mediaKey: uploaded.mediaKey,
     });
     expect(post.id).toBeTruthy();
+    await editPost({
+      postId: post.id,
+      userId: authorId,
+      title: "Edited image title",
+    });
+    const imageRow = await env.DB
+      .prepare(`SELECT media_key, body, url FROM posts WHERE id = ?`)
+      .bind(post.id)
+      .first<{
+        media_key: string | null;
+        body: string | null;
+        url: string | null;
+      }>();
+    expect(imageRow).toEqual({
+      media_key: uploaded.mediaKey,
+      body: null,
+      url: null,
+    });
+
+    await expect(
+      editPost({
+        postId: post.id,
+        userId: authorId,
+        url: "https://example.com/replace-image",
+      })
+    ).rejects.toMatchObject({ status: 400 });
+    const linkPost = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Owned link",
+      url: "https://example.com/original",
+    });
+    await expect(
+      editPost({
+        postId: linkPost.id,
+        userId: authorId,
+        url: null,
+      })
+    ).rejects.toMatchObject({ status: 400 });
   });
 });

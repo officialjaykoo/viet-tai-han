@@ -100,6 +100,60 @@ test.describe("authenticated flows", () => {
     await page.getByRole("button", { name: /tạo cộng đồng/i }).click();
     await expect(page).toHaveURL(new RegExp(`/r/${name}`), { timeout: 45_000 });
   });
+  test("composer shortcuts preserve post type", async ({ page }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const composer = page.getByTestId("feed-composer");
+    await expect(
+      composer.getByRole("link", { name: /hình ảnh/i })
+    ).toHaveAttribute("href", "/submit?type=image");
+    await expect(
+      composer.getByRole("link", { name: /đường dẫn/i })
+    ).toHaveAttribute("href", "/submit?type=link");
+
+    await page.goto("/submit?type=image", { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
+    await expect(page.getByRole("tab", { name: /hình ảnh/i })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    await page.goto("/submit?type=link", { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
+    await expect(page.getByRole("tab", { name: /đường dẫn/i })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+  });
+
+  test("post detail renders the body exactly once", async ({ page }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    await page.goto("/submit?type=text", { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
+    await warmBotGuard(page);
+    await page.getByRole("button", { name: /cộng đồng/i }).click();
+    await page.getByPlaceholder(/cộng đồng/i).fill("cloudflare");
+    await page
+      .getByRole("option")
+      .filter({ hasText: /cloudflare/i })
+      .first()
+      .click();
+
+    const title = `Detail body ${Date.now()}`;
+    const body = `Unique detail body ${Date.now()}`;
+    await page.getByPlaceholder("Một tiêu đề thú vị").fill(title);
+    await page.getByPlaceholder("Chia sẻ thêm thông tin…").fill(body);
+    await page.getByRole("button", { name: /^đăng$/i }).click();
+
+    await expect(page).toHaveURL(/\/post\//, { timeout: 45_000 });
+    await expect(page.getByText(body, { exact: true })).toHaveCount(1);
+  });
   test("desktop header keeps navigation action order", async ({ page }) => {
     await disguiseAutomation(page);
     await page.setViewportSize({ width: 1440, height: 1000 });

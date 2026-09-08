@@ -65,6 +65,39 @@ const POST_TYPES: {
   { id: "link", icon: Link2Icon },
 ];
 
+type DraftFingerprint = {
+  value: string;
+  imageFile: File | null;
+};
+
+function createDraftFingerprint(input: {
+  postType: PostType;
+  destination: Destination | null;
+  title: string;
+  body: string;
+  url: string;
+  imageFile: File | null;
+}): string {
+  return JSON.stringify([
+    input.postType,
+    input.destination?.kind ?? null,
+    input.destination?.kind === "community"
+      ? input.destination.name
+      : null,
+    input.title,
+    input.postType === "text" ? input.body : "",
+    input.postType === "link" ? input.url : "",
+    input.postType === "image" && input.imageFile
+      ? [
+          input.imageFile.name,
+          input.imageFile.size,
+          input.imageFile.lastModified,
+          input.imageFile.type,
+        ]
+      : null,
+  ]);
+}
+
 const fieldRadius = "rounded-lg";
 
 export function CreatePostForm({
@@ -88,10 +121,11 @@ export function CreatePostForm({
   const pickerRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef<string | null>(null);
   const mediaKeyRef = useRef<string | null>(null);
-  const draftFingerprintRef = useRef<{
-    value: string;
-    imageFile: File | null;
-  } | null>(null);
+  const draftFingerprintRef = useRef<DraftFingerprint | null>(null);
+  const currentDraftRef = useRef<DraftFingerprint>({
+    value: "",
+    imageFile: null,
+  });
   const listId = useId();
 
   const [postType, setPostType] = useState<PostType>(defaultPostType);
@@ -120,33 +154,42 @@ export function CreatePostForm({
     setHydrated(true);
   }, []);
 
+  const currentDraftFingerprint = createDraftFingerprint({
+    postType,
+    destination,
+    title,
+    body,
+    url,
+    imageFile,
+  });
+  currentDraftRef.current = {
+    value: currentDraftFingerprint,
+    imageFile,
+  };
+
   useEffect(() => {
-    const fingerprint = JSON.stringify([
-      postType,
-      destination?.kind ?? null,
-      destination?.kind === "community" ? destination.name : null,
-      title,
-      postType === "text" ? body : "",
-      postType === "link" ? url : "",
-      postType === "image" && imageFile
-        ? [
-            imageFile.name,
-            imageFile.size,
-            imageFile.lastModified,
-            imageFile.type,
-          ]
-        : null,
-    ]);
     const previous = draftFingerprintRef.current;
     if (
       previous !== null &&
-      (previous.value !== fingerprint || previous.imageFile !== imageFile)
+      (previous.value !== currentDraftFingerprint ||
+        previous.imageFile !== imageFile)
     ) {
       requestIdRef.current = null;
       mediaKeyRef.current = null;
     }
-    draftFingerprintRef.current = { value: fingerprint, imageFile };
-  }, [body, destination, imageFile, postType, title, url]);
+    draftFingerprintRef.current = {
+      value: currentDraftFingerprint,
+      imageFile,
+    };
+  }, [
+    body,
+    currentDraftFingerprint,
+    destination,
+    imageFile,
+    postType,
+    title,
+    url,
+  ]);
 
   // Default destination: own profile once session is known (unless community was prefills)
   useEffect(() => {
@@ -268,36 +311,56 @@ export function CreatePostForm({
       return;
     }
 
+    const destinationSnapshot = destination;
+    const postTypeSnapshot = postType;
+    const titleSnapshot = title;
+    const bodySnapshot = body;
+    const urlSnapshot = url;
+    const imageFileSnapshot = imageFile;
+    const draftFingerprint = currentDraftRef.current.value;
+    const mediaKeySnapshot =
+      postTypeSnapshot === "image" ? mediaKeyRef.current : null;
+
     startTransition(async () => {
       const requestId = requestIdRef.current ?? crypto.randomUUID();
       requestIdRef.current = requestId;
+      const isCurrentDraft = () => {
+        const current = currentDraftRef.current;
+        return (
+          current.value === draftFingerprint &&
+          current.imageFile === imageFileSnapshot
+        );
+      };
 
       try {
         const check = await passBotCheck(bot, turnstileToken);
         if (!check.ok) {
           resetTurnstile();
-          setError(localizeError(check.error, t("common.error")));
+          if (isCurrentDraft()) {
+            setError(localizeError(check.error, t("common.error")));
+          }
           return;
         }
         // Siteverify tokens are single-use. Any later retry needs a new token.
         resetTurnstile();
 
-        let mediaKey =
-          postType === "image" ? mediaKeyRef.current ?? undefined : undefined;
+        let mediaKey = mediaKeySnapshot ?? undefined;
 
-        if (postType === "image" && imageFile && !mediaKey) {
+        if (postTypeSnapshot === "image" && imageFileSnapshot && !mediaKey) {
           let prepared: File;
           try {
-            prepared = await prepareImageForUpload(imageFile);
+            prepared = await prepareImageForUpload(imageFileSnapshot);
           } catch (prepareError) {
-            setError(
-              prepareError instanceof Error
-                ? localizeError(
-                    prepareError.message,
-                    t("post.imageProcessError")
-                  )
-                : t("post.imageProcessError")
-            );
+            if (isCurrentDraft()) {
+              setError(
+                prepareError instanceof Error
+                  ? localizeError(
+                      prepareError.message,
+                      t("post.imageProcessError")
+                    )
+                  : t("post.imageProcessError")
+              );
+            }
             return;
           }
 
@@ -308,16 +371,20 @@ export function CreatePostForm({
             body: form,
           });
           if (upload.status === 401) {
-            router.push(`/login?next=${encodeURIComponent("/submit")}`);
+            if (isCurrentDraft()) {
+              router.push(`/login?next=${encodeURIComponent("/submit")}`);
+            }
             return;
           }
           if (!upload.ok) {
             const payload = (await upload.json().catch(() => null)) as {
               error?: string;
             } | null;
-            setError(
-              localizeError(payload?.error, t("post.imageUploadFailed"))
-            );
+            if (isCurrentDraft()) {
+              setError(
+                localizeError(payload?.error, t("post.imageUploadFailed"))
+              );
+            }
             return;
           }
           const uploaded = (await upload.json()) as { mediaKey?: string };
@@ -325,7 +392,9 @@ export function CreatePostForm({
             throw new Error("Image upload failed");
           }
           mediaKey = uploaded.mediaKey;
-          mediaKeyRef.current = mediaKey;
+          if (isCurrentDraft()) {
+            mediaKeyRef.current = mediaKey;
+          }
         }
 
         const res = await apiFetch("/api/posts", {
@@ -334,41 +403,60 @@ export function CreatePostForm({
           body: JSON.stringify(
             bot.attachToPayload({
               subreddit:
-                destination.kind === "profile" ? "profile" : destination.name,
-              title,
-              body: postType === "text" ? body || undefined : undefined,
-              url: postType === "link" ? url || undefined : undefined,
+                destinationSnapshot.kind === "profile"
+                  ? "profile"
+                  : destinationSnapshot.name,
+              title: titleSnapshot,
+              body:
+                postTypeSnapshot === "text"
+                  ? bodySnapshot || undefined
+                  : undefined,
+              url:
+                postTypeSnapshot === "link"
+                  ? urlSnapshot || undefined
+                  : undefined,
               mediaKey,
               requestId,
             })
           ),
         });
         if (res.status === 401) {
-          router.push(`/login?next=${encodeURIComponent("/submit")}`);
+          if (isCurrentDraft()) {
+            router.push(`/login?next=${encodeURIComponent("/submit")}`);
+          }
           return;
         }
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as {
             error?: string;
           } | null;
-          setError(localizeError(payload?.error, t("common.error")));
+          if (isCurrentDraft()) {
+            setError(localizeError(payload?.error, t("common.error")));
+          }
           return;
         }
         const data = (await res.json()) as { id: string };
-        if (requestIdRef.current === requestId) {
-          requestIdRef.current = null;
-          mediaKeyRef.current = null;
+        if (!isCurrentDraft() || requestIdRef.current !== requestId) {
+          return;
         }
+        requestIdRef.current = null;
+        mediaKeyRef.current = null;
         router.push(`/post/${data.id}`);
         router.refresh();
       } catch (submitError) {
         resetTurnstile();
-        setError(
-          localizeError(
-            submitError instanceof Error ? submitError.message : null,
-            t("post.networkError")
-          )
-        );
+        if (isCurrentDraft()) {
+          setError(
+            localizeError(
+              submitError instanceof Error ? submitError.message : null,
+              t("post.networkError")
+            )
+          );
+        }
+      } finally {
+        if (isCurrentDraft() && requestIdRef.current === requestId) {
+          resetTurnstile();
+        }
       }
     });
   }

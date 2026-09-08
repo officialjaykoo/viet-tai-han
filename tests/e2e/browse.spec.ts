@@ -71,6 +71,13 @@ test.describe("public browsing", () => {
       "/businesses",
     ]);
   });
+  test("guest submit routes redirect before rendering a form", async ({ page }) => {
+    await page.goto("/submit?type=image", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/login\?next=%2Fsubmit%3Ftype%3Dimage/);
+
+    await page.goto("/r/u_alice/submit", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/login\?next=%2Fr%2Fu_alice%2Fsubmit/);
+  });
   test("session transport errors stay neutral instead of showing guest CTA", async ({
     page,
   }) => {

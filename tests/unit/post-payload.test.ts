@@ -12,6 +12,9 @@ function expectInvalidPayload(run: () => unknown) {
 describe("post payload parsing", () => {
   it("rejects non-string create fields before action code runs", () => {
     expectInvalidPayload(() =>
+      parseCreatePostPayload({ subreddit: [], title: "Title" })
+    );
+    expectInvalidPayload(() =>
       parseCreatePostPayload({ subreddit: "general", title: {} })
     );
     expectInvalidPayload(() =>
@@ -19,6 +22,13 @@ describe("post payload parsing", () => {
     );
     expectInvalidPayload(() =>
       parseCreatePostPayload({ subreddit: "general", title: "Title", url: [] })
+    );
+    expectInvalidPayload(() =>
+      parseCreatePostPayload({
+        subreddit: "general",
+        title: "Title",
+        mediaKey: [],
+      })
     );
   });
 

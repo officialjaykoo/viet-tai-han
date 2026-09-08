@@ -651,7 +651,8 @@ export async function editPost(input: {
   const db = await getDb();
   const post = await db
     .prepare(
-      `SELECT id, author_id, title, body, url FROM posts WHERE id = ? AND is_removed = 0`
+      `SELECT id, author_id, title, body, url, media_key
+       FROM posts WHERE id = ? AND is_removed = 0`
     )
     .bind(input.postId)
     .first<{
@@ -660,6 +661,7 @@ export async function editPost(input: {
       title: string;
       body: string | null;
       url: string | null;
+      media_key: string | null;
     }>();
 
   if (!post) throw new AuthError("Post not found", 404);
@@ -688,6 +690,16 @@ export async function editPost(input: {
     throw new AuthError("Invalid post payload", 400);
   }
 
+  const postType = post.media_key ? "image" : post.url ? "link" : "text";
+  if (
+    (postType === "text" && input.url !== undefined) ||
+    (postType === "link" && input.body !== undefined) ||
+    (postType === "image" &&
+      (input.body !== undefined || input.url !== undefined))
+  ) {
+    throw new AuthError("Post type cannot be changed while editing", 400);
+  }
+
   const title = (input.title ?? post.title).trim();
   if (
     title.length < MIN_POST_TITLE_LENGTH ||
@@ -696,23 +708,27 @@ export async function editPost(input: {
     throw new AuthError("Title must be 3–300 characters", 400);
   }
   const body =
-    input.body === undefined ? post.body : input.body?.trim() || null;
-  if (
-    input.body !== undefined &&
-    body &&
-    body.length > MAX_POST_BODY_LENGTH
-  ) {
+    postType === "text"
+      ? input.body === undefined
+        ? post.body
+        : input.body?.trim() || null
+      : null;
+  if (body && body.length > MAX_POST_BODY_LENGTH) {
     throw new AuthError(
       "Post body must be 20,000 characters or fewer",
       400
     );
   }
-  const url = input.url === undefined ? post.url : input.url?.trim() || null;
-  if (
-    input.url !== undefined &&
-    url &&
-    url.length > MAX_POST_URL_LENGTH
-  ) {
+  const url =
+    postType === "link"
+      ? input.url === undefined
+        ? post.url
+        : input.url?.trim() || null
+      : null;
+  if (postType === "link" && !url) {
+    throw new AuthError("Link posts require a URL", 400);
+  }
+  if (url && url.length > MAX_POST_URL_LENGTH) {
     throw new AuthError("Post URL must be 2,048 characters or fewer", 400);
   }
   if (url) {
@@ -749,9 +765,13 @@ export async function editPost(input: {
     .run();
 
   if (!moderation.shadow) {
-    void import("@/lib/translation").then(({ schedulePostTranslation }) =>
-      schedulePostTranslation(input.postId)
-    );
+    void import("@/lib/translation")
+      .then(({ schedulePostTranslation }) =>
+        schedulePostTranslation(input.postId)
+      )
+      .catch((error) => {
+        console.error("post_translation_schedule_failed", error);
+      });
   }
 
   return { id: input.postId, title, body, url };
