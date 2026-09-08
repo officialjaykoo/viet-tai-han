@@ -3,7 +3,9 @@ import { Suspense, type ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 
 import { PostCard } from "@/components/feed/post-card";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ProfileCommentCard } from "@/components/user/profile-comment-card";
 import { ProfileFriends } from "@/components/user/profile-friends";
@@ -118,10 +120,7 @@ export default async function ProfilePage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_12%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="wide" className="py-4 sm:py-6">
           <ProfileHeader
             profile={user}
@@ -222,11 +221,7 @@ function ProfileFeed({
   empty: string;
 }) {
   if (items.length === 0) {
-    return (
-      <p className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-        {empty}
-      </p>
-    );
+    return <EmptyState>{empty}</EmptyState>;
   }
 
   return <div className="space-y-3">{items}</div>;

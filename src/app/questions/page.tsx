@@ -1,7 +1,11 @@
 import Link from "next/link";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -24,45 +28,33 @@ export default async function QuestionsPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_16%,transparent),transparent_68%)]"
-        />
+        <PageBackdrop />
         <PageShell width="standard" className="space-y-8">
-          <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-                {tLocale(locale, "questions.eyebrow")}
-              </p>
-              <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-                {tLocale(locale, "questions.titlePage")}
-              </h1>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-                {tLocale(locale, "questions.blurb")}
-              </p>
-            </div>
-            <Link
-              href="/ask"
-              className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-            >
-              {tLocale(locale, "questions.ask")}
-            </Link>
-          </section>
+          <PageHero
+            eyebrow={tLocale(locale, "questions.eyebrow")}
+            title={tLocale(locale, "questions.titlePage")}
+            description={tLocale(locale, "questions.blurb")}
+            actions={
+              <Link href="/ask" className={buttonVariants({ size: "sm" })}>
+                {tLocale(locale, "questions.ask")}
+              </Link>
+            }
+          />
 
           <section className="space-y-3" aria-labelledby="question-list-title">
             <h2 id="question-list-title" className="font-heading text-xl font-semibold">
               {tLocale(locale, "questions.latest")}
             </h2>
             {questions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-                <p>{tLocale(locale, "questions.empty")}</p>
-                <Link
-                  href="/ask"
-                  className="mt-3 inline-flex font-medium text-[var(--brand)] hover:underline"
-                >
-                  {tLocale(locale, "questions.askFirst")}
-                </Link>
-              </div>
+              <EmptyState
+                action={
+                  <Link href="/ask" className={buttonVariants({ size: "sm" })}>
+                    {tLocale(locale, "questions.askFirst")}
+                  </Link>
+                }
+              >
+                {tLocale(locale, "questions.empty")}
+              </EmptyState>
             ) : (
               <ul className="space-y-3">
                 {questions.map((question) => (

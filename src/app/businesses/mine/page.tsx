@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
+import { EmptyState } from "@/components/ui/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -29,27 +33,22 @@ export default async function MyBusinessesPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href="/businesses" className="text-sm font-medium text-[var(--brand)] hover:underline">
-              ← {tLocale(locale, "business.titlePage")}
-            </Link>
-            <Link
-              href="/businesses/new"
-              className="inline-flex min-h-9 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-            >
-              {tLocale(locale, "business.createProfile")}
-            </Link>
-          </div>
-          <section>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "business.myBusinesses")}
-            </h1>
-          </section>
+          <PageHero
+            eyebrow={tLocale(locale, "business.eyebrow")}
+            title={tLocale(locale, "business.myBusinesses")}
+            actions={
+              <Link
+                href="/businesses/new"
+                className={buttonVariants({ size: "sm" })}
+              >
+                {tLocale(locale, "business.createProfile")}
+              </Link>
+            }
+          />
           {businesses.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-              {tLocale(locale, "business.emptyMine")}
-            </p>
+            <EmptyState>{tLocale(locale, "business.emptyMine")}</EmptyState>
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2">
               {businesses.map((business) => (

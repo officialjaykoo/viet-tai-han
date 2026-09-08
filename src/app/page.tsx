@@ -15,6 +15,7 @@ import { Feed } from "@/components/feed/feed";
 import { FeedComposer } from "@/components/feed/feed-composer";
 import { FeedShortcutRail } from "@/components/feed/feed-shortcut-rail";
 import { FeedModeTabs } from "@/components/feed/feed-controls";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { OnlinePeopleList } from "@/components/online/online-people-list";
@@ -37,8 +38,8 @@ function parseSort(_value: string | undefined): FeedSort {
 }
 
 function parseMode(value: string | undefined): "home" | "popular" {
-  if (value === "home") return "home";
-  return "popular";
+  if (value === "popular") return "popular";
+  return "home";
 }
 
 async function loadInitialFeed(options: {
@@ -92,8 +93,12 @@ export default async function HomePage({
     username ?? onboarding?.name ?? session?.user?.name ?? tLocale(locale, "nav.logIn");
   const image = session?.user?.image ?? null;
   const desktopLinks = [
-    { href: "/", label: tLocale(locale, "nav.popular"), icon: FlameIcon },
-    { href: "/?feed=home", label: tLocale(locale, "nav.home"), icon: HomeIcon },
+    {
+      href: "/?feed=popular",
+      label: tLocale(locale, "nav.popular"),
+      icon: FlameIcon,
+    },
+    { href: "/", label: tLocale(locale, "nav.home"), icon: HomeIcon },
     {
       href: "/communities",
       label: tLocale(locale, "nav.communities"),
@@ -169,6 +174,7 @@ export default async function HomePage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
+        <PageBackdrop />
         <PageShell width="wide" className="grid py-4 sm:py-6 xl:grid-cols-[228px_minmax(0,680px)_280px] xl:gap-5">
           <aside className="hidden xl:block">
             <nav
@@ -189,8 +195,8 @@ export default async function HomePage({
               <div className="mb-2 h-px bg-border/70" />
               {desktopLinks.map(({ href, label, icon: Icon }) => {
                 const active =
-                  (href === "/" && mode === "popular") ||
-                  (href === "/?feed=home" && mode === "home");
+                  (href === "/?feed=popular" && mode === "popular") ||
+                  (href === "/" && mode === "home");
                 return (
                   <Link
                     key={href}

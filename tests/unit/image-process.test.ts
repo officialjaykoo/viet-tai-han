@@ -152,6 +152,15 @@ describe("image-process", () => {
       assertSourceImageDimensions(makeJpegHeader(8192, 1), "jpeg")
     ).not.toThrow();
   });
+  it("rejects Worker-risky RGBA pixel counts before decode", () => {
+    expect(() =>
+      assertSourceImageDimensions(makeJpegHeader(4001, 3000), "jpeg")
+    ).toThrow(/dimensions/i);
+    expect(() =>
+      assertSourceImageDimensions(makeJpegHeader(4000, 3000), "jpeg")
+    ).not.toThrow();
+  });
+
   it("rejects oversized PNG and WebP dimensions from headers", () => {
     expect(() =>
       assertSourceImageDimensions(makePngHeader(8193, 1), "png")

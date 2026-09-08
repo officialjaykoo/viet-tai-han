@@ -679,6 +679,7 @@ export const vi: Messages = {
   communities: {
     title: "Cộng đồng",
     browseBlurb: "Khám phá các cộng đồng.",
+    empty: "Chưa có cộng đồng nào.",
     submitBlurb: "Chia sẻ điều gì đó với cộng đồng này.",
     members: "thành viên",
     member: "thành viên",

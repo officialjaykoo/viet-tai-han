@@ -19,6 +19,40 @@ import {
 import { MAX_COMMENT_DEPTH } from "@/lib/comment-constants";
 import { isProfileCommunityName } from "@/lib/profile-community";
 
+type ExistingPostIdempotencyRow = {
+  id: string;
+  subreddit_id: string;
+  title: string;
+  body: string | null;
+  url: string | null;
+  media_key: string | null;
+};
+
+function resolveExistingPost(
+  existing: ExistingPostIdempotencyRow,
+  input: {
+    subredditId: string;
+    title: string;
+    body: string | null;
+    url: string | null;
+    mediaKey: string | null;
+  }
+) {
+  if (
+    existing.subreddit_id !== input.subredditId ||
+    existing.title !== input.title ||
+    existing.body !== input.body ||
+    existing.url !== input.url ||
+    existing.media_key !== input.mediaKey
+  ) {
+    throw new AuthError(
+      "Request ID was already used for a different post",
+      409
+    );
+  }
+  return { id: existing.id };
+}
+
 export async function createPost(input: {
   userId: string;
   userStatus?: string | null;
@@ -103,11 +137,20 @@ export async function createPost(input: {
   if (requestId) {
     const existing = await db
       .prepare(
-        `SELECT id FROM posts WHERE author_id = ? AND request_id = ?`
+        `SELECT id, subreddit_id, title, body, url, media_key
+         FROM posts WHERE author_id = ? AND request_id = ?`
       )
       .bind(input.userId, requestId)
-      .first<{ id: string }>();
-    if (existing) return { id: existing.id };
+      .first<ExistingPostIdempotencyRow>();
+    if (existing) {
+      return resolveExistingPost(existing, {
+        subredditId: input.subredditId,
+        title,
+        body,
+        url,
+        mediaKey,
+      });
+    }
   }
 
   const subreddit = await db
@@ -171,11 +214,20 @@ export async function createPost(input: {
     if (!requestId) throw error;
     const existing = await db
       .prepare(
-        `SELECT id FROM posts WHERE author_id = ? AND request_id = ?`
+        `SELECT id, subreddit_id, title, body, url, media_key
+         FROM posts WHERE author_id = ? AND request_id = ?`
       )
       .bind(input.userId, requestId)
-      .first<{ id: string }>();
-    if (existing) return { id: existing.id };
+      .first<ExistingPostIdempotencyRow>();
+    if (existing) {
+      return resolveExistingPost(existing, {
+        subredditId: input.subredditId,
+        title,
+        body,
+        url,
+        mediaKey,
+      });
+    }
     throw error;
   }
 

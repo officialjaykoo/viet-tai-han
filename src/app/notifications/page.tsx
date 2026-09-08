@@ -1,3 +1,5 @@
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { NotificationsClient } from "@/components/notifications/notifications-client";
@@ -21,16 +23,14 @@ export default async function NotificationsPage() {
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-6">
-          <div>
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "notifications.activity")}
-            </p>
-            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "notifications.title")}
-            </h1>
-          </div>
+          <PageHero
+            eyebrow={tLocale(locale, "notifications.activity")}
+            title={tLocale(locale, "notifications.title")}
+            description={tLocale(locale, "notifications.description")}
+          />
           <NotificationsClient />
         </PageShell>
       </main>

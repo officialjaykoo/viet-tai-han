@@ -13,6 +13,7 @@ import {
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-client";
 import { LISTING_KINDS, type ListingKind } from "@/lib/marketplace-constants";
@@ -105,11 +106,10 @@ export function ListingForm() {
         <label htmlFor="listing-kind" className="text-sm font-medium">
           {t("marketplace.kind")}
         </label>
-        <select
+        <Select
           id="listing-kind"
           value={kind}
           onChange={(event) => setKind(event.target.value as ListingKind)}
-          className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm"
           disabled={pending}
         >
           {LISTING_KINDS.map((value) => (
@@ -117,7 +117,7 @@ export function ListingForm() {
               {kindLabels[value]}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">

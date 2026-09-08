@@ -6,7 +6,10 @@ import Link from "next/link";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { BusinessBooking, BusinessService } from "@/lib/businesses";
 import { apiFetch } from "@/lib/api-client";
@@ -115,7 +118,7 @@ export function BusinessBookingPanel({
         <p className="text-sm text-muted-foreground">{t("business.bookingHint")}</p>
         <Link
           href={`/login?next=${encodeURIComponent(pathname)}`}
-          className="inline-flex min-h-9 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+          className={buttonVariants({ size: "default" })}
         >
           {t("nav.logIn")}
         </Link>
@@ -143,12 +146,11 @@ export function BusinessBookingPanel({
               <label htmlFor="booking-service" className="text-sm font-medium">
                 {t("business.bookingService")}
               </label>
-              <select
+              <Select
                 id="booking-service"
                 value={serviceId}
                 onChange={(event) => setServiceId(event.target.value)}
                 disabled={pending}
-                className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 sm:h-9 sm:text-sm"
               >
                 <option value="">{t("business.chooseService")}</option>
                 {services.map((service) => (
@@ -156,7 +158,7 @@ export function BusinessBookingPanel({
                     {service.name} · {service.durationMinutes} min
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t("business.noServices")}</p>
@@ -165,7 +167,7 @@ export function BusinessBookingPanel({
             <label htmlFor="booking-start" className="text-sm font-medium">
               {t("business.bookingTime")}
             </label>
-            <input
+            <Input
               id="booking-start"
               type="datetime-local"
               value={startAt}
@@ -173,7 +175,6 @@ export function BusinessBookingPanel({
               onChange={(event) => setStartAt(event.target.value)}
               required
               disabled={pending}
-              className="flex h-11 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 sm:h-9 sm:text-sm"
             />
           </div>
           <div className="space-y-1.5">
@@ -207,7 +208,7 @@ export function BusinessBookingPanel({
       ) : null}
 
       {bookings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("business.noBookings")}</p>
+        <EmptyState>{t("business.noBookings")}</EmptyState>
       ) : (
         <ul className="space-y-2">
           {bookings.map((booking) => (

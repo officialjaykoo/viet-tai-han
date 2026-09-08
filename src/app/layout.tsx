@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import "./globals.css";
 
 const manrope = Manrope({
-  subsets: ["latin", "cyrillic"],
+  subsets: ["latin", "vietnamese", "cyrillic"],
   variable: "--font-sans",
   display: "swap",
 });

@@ -33,8 +33,8 @@ test.describe("public browsing", () => {
       links.map((link) => link.getAttribute("href"))
     );
     expect(sideHrefs.slice(1, 9)).toEqual([
+      "/?feed=popular",
       "/",
-      "/?feed=home",
       "/communities",
       "/questions",
       "/marketplace",
@@ -63,13 +63,7 @@ test.describe("public browsing", () => {
     const mobileHrefs = await page
       .locator("nav.safe-pb-nav a")
       .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
-    expect(mobileHrefs).toEqual([
-      "/",
-      "/communities",
-      "/questions",
-      "/marketplace",
-      "/businesses",
-    ]);
+    expect(mobileHrefs).toEqual(["/", "/questions", "/marketplace"]);
   });
   test("guest submit routes redirect before rendering a form", async ({ page }) => {
     await page.goto("/submit?type=image", { waitUntil: "domcontentloaded" });

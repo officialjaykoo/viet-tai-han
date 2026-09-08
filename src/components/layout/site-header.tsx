@@ -24,6 +24,7 @@ import {
   UsersRoundIcon,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { buttonVariants } from "@/components/ui/button";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
@@ -42,6 +43,7 @@ import {
 import { UserAvatar } from "@/components/user/user-avatar";
 import { signOut, useSession } from "@/lib/auth-client";
 import { resolveAuthUiState } from "@/lib/auth-ui";
+import { isNavSectionActive } from "@/lib/navigation";
 import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
@@ -120,12 +122,32 @@ export function SiteHeader() {
   }
 
   const primaryNav = [
-    { href: "/", label: t("nav.popular"), icon: FlameIcon },
-    { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
-    { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
-    { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
-    { href: "/recommended", label: t("nav.forYou"), icon: SparklesIcon },
-  ];
+    { href: "/", section: "home" as const, label: t("nav.home"), icon: HomeIcon },
+    {
+      href: "/communities",
+      section: "communities" as const,
+      label: t("nav.communities"),
+      icon: UsersRoundIcon,
+    },
+    {
+      href: "/questions",
+      section: "questions" as const,
+      label: t("nav.questions"),
+      icon: CircleHelpIcon,
+    },
+    {
+      href: "/marketplace",
+      section: "marketplace" as const,
+      label: t("nav.marketplace"),
+      icon: ShoppingBagIcon,
+    },
+    {
+      href: "/recommended",
+      section: "recommended" as const,
+      label: t("nav.forYou"),
+      icon: SparklesIcon,
+    },
+  ] as const;
 
   return (
     <header
@@ -150,8 +172,8 @@ export function SiteHeader() {
           aria-label={t("nav.menu")}
           className="hidden min-w-0 flex-1 items-stretch justify-center gap-1 xl:order-2 xl:flex"
         >
-          {primaryNav.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
+          {primaryNav.map(({ href, section, label, icon: Icon }) => {
+            const active = isNavSectionActive(pathname, section);
             return (
               <Link
                 key={href}
@@ -238,14 +260,14 @@ export function SiteHeader() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"
-                  render={<Link href="/" />}
+                  render={<Link href="/?feed=popular" />}
                 >
                   <FlameIcon />
                   {t("nav.popular")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"
-                  render={<Link href="/?feed=home" />}
+                  render={<Link href="/" />}
                 >
                   <HomeIcon />
                   {t("nav.home")}
@@ -412,15 +434,27 @@ export function SiteHeader() {
               >
                 <PlusIcon className="size-5" strokeWidth={2.25} />
               </Link>
-              <MessagesNavIcon className="order-3 sm:order-none" />
-              <NotificationsBell className="hidden order-4 sm:order-none sm:inline-flex" />
+              <MessagesNavIcon
+                className={cn(
+                  "order-3 sm:order-none",
+                  isNavSectionActive(pathname, "messages") &&
+                    "bg-[color-mix(in_oklch,var(--brand)_10%,transparent)] text-[var(--brand)]"
+                )}
+              />
+              <NotificationsBell
+                className={cn(
+                  "hidden order-4 sm:order-none sm:inline-flex",
+                  isNavSectionActive(pathname, "notifications") &&
+                    "bg-[color-mix(in_oklch,var(--brand)_10%,transparent)] text-[var(--brand)]"
+                )}
+              />
             </>
           ) : null}
           {authState === "anonymous" ? (
             <div className="mr-0.5 hidden items-center gap-1 sm:flex">
               <Link
                 href="/login"
-                className="inline-flex min-h-9 items-center rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+                className={buttonVariants({ size: "sm" })}
               >
                 {t("nav.logIn")}
               </Link>

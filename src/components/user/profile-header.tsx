@@ -7,6 +7,7 @@ import { resolveAccountBadges } from "@/lib/achievement-levels";
 import { ProfileActions } from "@/components/user/profile-actions";
 import { ProfileAvatarEditor } from "@/components/user/profile-avatar-editor";
 import { UserAvatar } from "@/components/user/user-avatar";
+import { buttonVariants } from "@/components/ui/button";
 import {
   formatAccountAge,
   formatCakeDayDate,
@@ -87,7 +88,7 @@ export async function ProfileHeader({
             {isOwner ? (
               <Link
                 href="/settings"
-                className="inline-flex min-h-9 items-center justify-center rounded-4xl border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 {tLocale(locale, "profile.editProfile")}
               </Link>

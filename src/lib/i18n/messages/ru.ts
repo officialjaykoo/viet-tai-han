@@ -681,6 +681,7 @@ export const ru: Messages = {
   communities: {
     title: "Сообщества",
     browseBlurb: "Просматривайте сообщества.",
+    empty: "Сообществ пока нет.",
     submitBlurb: "Поделитесь чем-нибудь с этим сообществом.",
     members: "участников",
     member: "участник",

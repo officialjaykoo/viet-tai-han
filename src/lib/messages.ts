@@ -4,7 +4,12 @@ import {
   getDmRelationship,
   type DmRelationship,
 } from "@/lib/dm-relationships";
-import { canNotifyChat, notifyQuietly } from "@/lib/notifications";
+import {
+  actionableNotificationReadStatements,
+  canNotifyChat,
+  notifyQuietly,
+  reconcileActionableNotification,
+} from "@/lib/notifications";
 import { formatUserHandle } from "@/lib/profile-url";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
@@ -331,6 +336,7 @@ async function notifyChatRequest(input: {
   recipientId: string;
   senderId: string;
   body: string;
+  requestId: string;
 }) {
   const actor = await input.db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
@@ -340,6 +346,7 @@ async function notifyChatRequest(input: {
     userId: input.recipientId,
     actorId: input.senderId,
     kind: "chat_request",
+    requestId: input.requestId,
     title: `${formatUserHandle(actor?.username)} wants to message you`,
     body: input.body.slice(0, 140),
     href: "/messages",
@@ -382,16 +389,16 @@ function notifyDeliveredChatMessage(input: {
     incrementChatUnread(input.recipientId, input.senderId)
   );
   runBackgroundTask("chat_push_notification", async () => {
-    if (!(await canNotifyChat(input.recipientId))) return;
+    if (!(await canNotifyChat(input.recipientId, input.senderId))) return;
     const actor = await input.db
       .prepare(`SELECT username FROM "user" WHERE id = ?`)
       .bind(input.senderId)
       .first<{ username: string | null }>();
-    const label = formatUserHandle(actor?.username);
     queuePushDelivery({
       userId: input.recipientId,
+      blockedActorId: input.senderId,
       payload: {
-        title: `${label} sent you a message`,
+        title: `${formatUserHandle(actor?.username)} sent you a message`,
         body: input.body.slice(0, 140),
         href: `/messages?room=${input.roomId}`,
         tag: `chat-${input.roomId}`,
@@ -750,8 +757,12 @@ function acceptedChatRepairStatements(
       .prepare(
         `UPDATE chat_room_members
          SET membership_status = 'active',
-             joined_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+             joined_at = COALESCE(
+               joined_at,
+               strftime('%Y-%m-%d %H:%M:%f', 'now')
+             )
          WHERE room_id = ? AND user_id IN (?, ?)
+           AND membership_status IN ('pending', 'active')
            AND EXISTS (
              SELECT 1 FROM chat_requests
              WHERE id = ? AND status = 'accepted'
@@ -788,6 +799,14 @@ function acceptedChatRepairStatements(
              SELECT 1 FROM chat_requests
              WHERE id = ? AND status = 'accepted'
            )
+           AND EXISTS (
+             SELECT 1 FROM chat_room_members
+             WHERE room_id = ? AND user_id = ? AND membership_status = 'active'
+           )
+           AND EXISTS (
+             SELECT 1 FROM chat_room_members
+             WHERE room_id = ? AND user_id = ? AND membership_status = 'active'
+           )
            AND NOT EXISTS (
              SELECT 1 FROM user_blocks
              WHERE (blocker_id = ? AND blocked_id = ?)
@@ -801,6 +820,10 @@ function acceptedChatRepairStatements(
         request.request_id,
         request.request_id,
         request.id,
+        request.room_id,
+        request.from_user_id,
+        request.room_id,
+        request.to_user_id,
         request.from_user_id,
         request.to_user_id,
         request.to_user_id,
@@ -882,6 +905,12 @@ async function promotePendingRequest(
       )
       .bind(request.id),
     ...acceptedChatRepairStatements(db, request),
+    ...actionableNotificationReadStatements(db, {
+      recipientId: request.to_user_id,
+      actorId: request.from_user_id,
+      kind: "chat_request",
+      requestId: request.id,
+    }),
   ]);
 
   if (Number(requestUpdate?.meta.changes ?? 0) === 1) {
@@ -912,8 +941,13 @@ async function promotePendingRequest(
   if (current?.status !== "accepted") return false;
 
   await assertNotBlocked(request.from_user_id, request.to_user_id);
+  await reconcileActionableNotification({
+    recipientId: request.to_user_id,
+    actorId: request.from_user_id,
+    kind: "chat_request",
+    requestId: request.id,
+  });
   const retryPendingMessages = await countPendingRequestMessages(db, request);
-  await repairAcceptedChatRequest(db, request);
   const retryCount = Number(retryPendingMessages?.count ?? 0);
   if (retryCount > 0) {
     runBackgroundTask("chat_unread_fanout", () =>
@@ -1007,33 +1041,86 @@ async function createChatRequest(context: ConversationStartContext) {
 
   if (!context.existingRoom) {
     try {
-      await context.db.batch([
+      const roomWrites = await context.db.batch([
         context.db
           .prepare(
             `INSERT INTO chat_rooms
              (id, kind, pair_key, created_by, last_message_at, created_at)
-             VALUES (?, 'dm', ?, ?, NULL, strftime('%Y-%m-%d %H:%M:%f', 'now'))`
+             SELECT ?, 'dm', ?, ?, NULL, strftime('%Y-%m-%d %H:%M:%f', 'now')
+             WHERE NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )`
           )
           .bind(
             roomId,
             pairKey(context.input.fromUserId, context.toUser.id),
+            context.input.fromUserId,
+            context.input.fromUserId,
+            context.toUser.id,
+            context.toUser.id,
             context.input.fromUserId
           ),
         context.db
           .prepare(
             `INSERT INTO chat_room_members
              (room_id, user_id, role, membership_status, joined_at)
-             VALUES (?, ?, 'owner', 'active', strftime('%Y-%m-%d %H:%M:%f', 'now'))`
+             SELECT ?, ?, 'owner', 'active',
+                    strftime('%Y-%m-%d %H:%M:%f', 'now')
+             WHERE EXISTS (
+               SELECT 1 FROM chat_rooms WHERE id = ?
+             )
+               AND NOT EXISTS (
+                 SELECT 1 FROM user_blocks
+                 WHERE (blocker_id = ? AND blocked_id = ?)
+                    OR (blocker_id = ? AND blocked_id = ?)
+               )`
           )
-          .bind(roomId, context.input.fromUserId),
+          .bind(
+            roomId,
+            context.input.fromUserId,
+            roomId,
+            context.input.fromUserId,
+            context.toUser.id,
+            context.toUser.id,
+            context.input.fromUserId
+          ),
         context.db
           .prepare(
             `INSERT INTO chat_room_members
              (room_id, user_id, role, membership_status)
-             VALUES (?, ?, 'member', 'pending')`
+             SELECT ?, ?, 'member', 'pending'
+             WHERE EXISTS (
+               SELECT 1 FROM chat_rooms WHERE id = ?
+             )
+               AND NOT EXISTS (
+                 SELECT 1 FROM user_blocks
+                 WHERE (blocker_id = ? AND blocked_id = ?)
+                    OR (blocker_id = ? AND blocked_id = ?)
+               )`
           )
-          .bind(roomId, context.toUser.id),
+          .bind(
+            roomId,
+            context.toUser.id,
+            roomId,
+            context.input.fromUserId,
+            context.toUser.id,
+            context.toUser.id,
+            context.input.fromUserId
+          ),
       ]);
+      if (
+        roomWrites.some(
+          (result) => Number(result?.meta.changes ?? 0) !== 1
+        )
+      ) {
+        await assertNotBlocked(
+          context.input.fromUserId,
+          context.toUser.id
+        );
+        throw new AuthError("Chat is no longer available", 403);
+      }
       roomCreated = true;
     } catch (error) {
       if (!isUniqueConstraint(error)) throw error;
@@ -1162,15 +1249,27 @@ async function createChatRequest(context: ConversationStartContext) {
       )
       .bind(messageId, roomId, messageId)
   );
+  const requestStatementOffset =
+    context.existingRoom || !roomCreated ? 2 : 0;
 
   try {
-    await context.db.batch(statements);
-    const opener = await context.db
-      .prepare(`SELECT created_at FROM chat_messages WHERE id = ?`)
-      .bind(messageId)
-      .first<{ created_at: string }>();
-    if (!opener) {
-      await assertNotBlocked(context.input.fromUserId, context.toUser.id);
+    const writeResults = await context.db.batch(statements);
+    const activationFailed =
+      requestStatementOffset === 2 &&
+      writeResults
+        .slice(0, requestStatementOffset)
+        .some((result) => Number(result?.meta.changes ?? 0) !== 1);
+    const requestInsert = writeResults[requestStatementOffset];
+    const openerInsert = writeResults[requestStatementOffset + 1];
+    if (
+      activationFailed ||
+      Number(requestInsert?.meta.changes ?? 0) !== 1 ||
+      Number(openerInsert?.meta.changes ?? 0) !== 1
+    ) {
+      await assertNotBlocked(
+        context.input.fromUserId,
+        context.toUser.id
+      );
       const retry = await findExistingConversation(
         context.db,
         context.input.fromUserId,
@@ -1207,6 +1306,7 @@ async function createChatRequest(context: ConversationStartContext) {
         recipientId: context.toUser.id,
         senderId: context.input.fromUserId,
         body: context.body,
+        requestId: requestEntityId,
       })
     );
   }
@@ -1241,33 +1341,87 @@ async function startDirectConversation(
   let createdRoom = false;
   if (!context.existingRoom) {
     try {
-      await context.db.batch([
+      const roomWrites = await context.db.batch([
         context.db
           .prepare(
             `INSERT INTO chat_rooms
              (id, kind, pair_key, created_by, last_message_at, created_at)
-             VALUES (?, 'dm', ?, ?, NULL, strftime('%Y-%m-%d %H:%M:%f', 'now'))`
+             SELECT ?, 'dm', ?, ?, NULL, strftime('%Y-%m-%d %H:%M:%f', 'now')
+             WHERE NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )`
           )
           .bind(
             roomId,
             pairKey(context.input.fromUserId, context.toUser.id),
+            context.input.fromUserId,
+            context.input.fromUserId,
+            context.toUser.id,
+            context.toUser.id,
             context.input.fromUserId
           ),
         context.db
           .prepare(
             `INSERT INTO chat_room_members
              (room_id, user_id, role, membership_status, joined_at)
-             VALUES (?, ?, 'owner', 'active', strftime('%Y-%m-%d %H:%M:%f', 'now'))`
+             SELECT ?, ?, 'owner', 'active',
+                    strftime('%Y-%m-%d %H:%M:%f', 'now')
+             WHERE EXISTS (
+               SELECT 1 FROM chat_rooms WHERE id = ?
+             )
+               AND NOT EXISTS (
+                 SELECT 1 FROM user_blocks
+                 WHERE (blocker_id = ? AND blocked_id = ?)
+                    OR (blocker_id = ? AND blocked_id = ?)
+               )`
           )
-          .bind(roomId, context.input.fromUserId),
+          .bind(
+            roomId,
+            context.input.fromUserId,
+            roomId,
+            context.input.fromUserId,
+            context.toUser.id,
+            context.toUser.id,
+            context.input.fromUserId
+          ),
         context.db
           .prepare(
             `INSERT INTO chat_room_members
              (room_id, user_id, role, membership_status, joined_at)
-             VALUES (?, ?, 'member', 'active', strftime('%Y-%m-%d %H:%M:%f', 'now'))`
+             SELECT ?, ?, 'member', 'active',
+                    strftime('%Y-%m-%d %H:%M:%f', 'now')
+             WHERE EXISTS (
+               SELECT 1 FROM chat_rooms WHERE id = ?
+             )
+               AND NOT EXISTS (
+                 SELECT 1 FROM user_blocks
+                 WHERE (blocker_id = ? AND blocked_id = ?)
+                    OR (blocker_id = ? AND blocked_id = ?)
+               )`
           )
-          .bind(roomId, context.toUser.id),
+          .bind(
+            roomId,
+            context.toUser.id,
+            roomId,
+            context.input.fromUserId,
+            context.toUser.id,
+            context.toUser.id,
+            context.input.fromUserId
+          ),
       ]);
+      if (
+        roomWrites.some(
+          (result) => Number(result?.meta.changes ?? 0) !== 1
+        )
+      ) {
+        await assertNotBlocked(
+          context.input.fromUserId,
+          context.toUser.id
+        );
+        throw new AuthError("Chat is no longer available", 403);
+      }
       createdRoom = true;
     } catch (error) {
       if (!isUniqueConstraint(error)) throw error;
@@ -1281,7 +1435,7 @@ async function startDirectConversation(
   }
 
   if (context.existingRoom || !createdRoom) {
-    await context.db
+    const activation = await context.db
       .prepare(
         `UPDATE chat_room_members
          SET membership_status = 'active',
@@ -1289,10 +1443,27 @@ async function startDirectConversation(
                joined_at,
                strftime('%Y-%m-%d %H:%M:%f', 'now')
              )
-         WHERE room_id = ? AND user_id IN (?, ?)`
+         WHERE room_id = ? AND user_id IN (?, ?)
+           AND NOT EXISTS (
+             SELECT 1 FROM user_blocks
+             WHERE (blocker_id = ? AND blocked_id = ?)
+                OR (blocker_id = ? AND blocked_id = ?)
+           )`
       )
-      .bind(roomId, context.input.fromUserId, context.toUser.id)
+      .bind(
+        roomId,
+        context.input.fromUserId,
+        context.toUser.id,
+        context.input.fromUserId,
+        context.toUser.id,
+        context.toUser.id,
+        context.input.fromUserId
+      )
       .run();
+    if (Number(activation.meta.changes ?? 0) !== 2) {
+      await assertNotBlocked(context.input.fromUserId, context.toUser.id);
+      throw new AuthError("Chat is no longer available", 403);
+    }
     await promotePendingRequestsForRoom(
       context.db,
       roomId,
@@ -1421,12 +1592,17 @@ export async function listIncomingRequests(userId: string) {
            WHERE (b.blocker_id = r.from_user_id AND b.blocked_id = r.to_user_id)
               OR (b.blocker_id = r.to_user_id AND b.blocked_id = r.from_user_id)
          )
-         AND NOT EXISTS (
+         AND EXISTS (
            SELECT 1 FROM chat_messages m
            WHERE m.room_id = r.room_id
              AND m.sender_id = r.from_user_id
-             AND m.is_shadow_hidden = 1
              AND m.delivery_status = 'pending'
+             AND m.is_shadow_hidden = 0
+             AND m.is_moderation_hidden = 0
+             AND (
+               (r.request_id IS NOT NULL AND m.request_id = r.request_id)
+               OR (r.request_id IS NULL AND m.request_id IS NULL)
+             )
          )
        ORDER BY r.created_at DESC, r.id DESC
        LIMIT 50`
@@ -1592,6 +1768,12 @@ export async function respondToChatRequest(input: {
         request.request_id,
         request.id
       ),
+    ...actionableNotificationReadStatements(db, {
+      recipientId: request.to_user_id,
+      actorId: request.from_user_id,
+      kind: "chat_request",
+      requestId: request.id,
+    }),
   ]);
   if (!Number(requestUpdate?.meta.changes ?? 0)) {
     const current = await db
@@ -1631,6 +1813,12 @@ export async function cancelChatRequest(input: {
   }
   if (request.status !== "pending") {
     if (request.status === "cancelled") {
+      await reconcileActionableNotification({
+        recipientId: request.to_user_id,
+        actorId: request.from_user_id,
+        kind: "chat_request",
+        requestId: request.id,
+      });
       return { roomId: request.room_id, status: "cancelled" as const };
     }
     throw new AuthError("Request already handled", 409);
@@ -1679,6 +1867,12 @@ export async function cancelChatRequest(input: {
            )`
       )
       .bind(request.room_id, request.to_user_id, request.id),
+    ...actionableNotificationReadStatements(db, {
+      recipientId: request.to_user_id,
+      actorId: request.from_user_id,
+      kind: "chat_request",
+      requestId: request.id,
+    }),
   ]);
   if (!Number(requestUpdate?.meta.changes ?? 0)) {
     const current = await db

@@ -9,6 +9,7 @@ import { announceUnreadChanged } from "@/components/notifications/use-unread-cou
 import { RelativeTime } from "@/components/time/relative-time";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
@@ -167,9 +168,7 @@ export function NotificationsClient() {
           </li>
         ))}
         {items.length === 0 && !error ? (
-          <li className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-            {t("notifications.empty")}
-          </li>
+          <EmptyState as="li">{t("notifications.empty")}</EmptyState>
         ) : null}
       </ul>
 

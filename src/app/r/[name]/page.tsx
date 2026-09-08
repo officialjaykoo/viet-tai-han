@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 
 import { SubscribeButton } from "@/components/communities/subscribe-button";
 import { Feed } from "@/components/feed/feed";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
+import { buttonVariants } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/site-header";
 import { withFeedAds } from "@/lib/ads";
 import { isSubscribed } from "@/lib/communities";
@@ -55,35 +58,34 @@ export default async function SubredditPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
+        <PageBackdrop />
         <PageShell width="standard">
-          <div className="max-w-[760px]">
-          <section className="mb-6 space-y-3">
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "communities.title")}
-            </p>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              {sub.name}
-            </h1>
-            <p className="text-lg text-muted-foreground">{sub.title}</p>
-            {sub.description ? (
-              <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-                {sub.description}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-3">
-              <SubscribeButton
-                name={sub.name}
-                initialSubscribed={joined}
-                initialCount={sub.subscriber_count}
-              />
-              <Link
-                href={`/r/${sub.name}/submit`}
-                className="inline-flex h-9 items-center justify-center rounded-4xl bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80"
-              >
-                {tLocale(locale, "nav.createPost")}
-              </Link>
-            </div>
-          </section>
+          <div className="max-w-[760px] space-y-6">
+          <PageHero
+            eyebrow={tLocale(locale, "communities.title")}
+            title={sub.name}
+            description={
+              <>
+                <p>{sub.title}</p>
+                {sub.description ? <p className="mt-2">{sub.description}</p> : null}
+              </>
+            }
+            actions={
+              <>
+                <SubscribeButton
+                  name={sub.name}
+                  initialSubscribed={joined}
+                  initialCount={sub.subscriber_count}
+                />
+                <Link
+                  href={`/r/${sub.name}/submit`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {tLocale(locale, "nav.createPost")}
+                </Link>
+              </>
+            }
+          />
           <Feed
             initialFeed={initialFeed}
             subreddit={sub.name}

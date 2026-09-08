@@ -6,6 +6,7 @@ import { Cake } from "lucide-react";
 import { AchievementsShowcase } from "@/components/user/achievements-showcase";
 import { AccountBadges } from "@/components/user/account-badges";
 import { useI18n } from "@/components/i18n/i18n-provider";
+import { buttonVariants } from "@/components/ui/button";
 import type { UserAchievement } from "@/lib/achievements";
 import { resolveAccountBadges } from "@/lib/achievement-levels";
 import {
@@ -134,7 +135,7 @@ export function ProfileSidebar({
           <div className="mt-3 space-y-3">
             <Link
               href="/settings"
-              className="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/85"
+              className={buttonVariants({ className: "w-full" })}
             >
               {t("profile.settings")}
             </Link>

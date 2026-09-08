@@ -667,6 +667,7 @@ export const ko: Messages = {
   communities: {
     title: "커뮤니티",
     browseBlurb: "커뮤니티를 둘러보세요.",
+    empty: "아직 커뮤니티가 없습니다.",
     submitBlurb: "이 커뮤니티에 내용을 공유해 보세요.",
     members: "멤버",
     member: "멤버",

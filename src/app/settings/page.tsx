@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -61,19 +63,14 @@ export default async function SettingsPage({
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-6">
-          <div>
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "settings.pageEyebrow")}
-            </p>
-            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "settings.pageTitle")}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {tLocale(locale, "settings.pageDescription")}
-            </p>
-          </div>
+          <PageHero
+            eyebrow={tLocale(locale, "settings.pageEyebrow")}
+            title={tLocale(locale, "settings.pageTitle")}
+            description={tLocale(locale, "settings.pageDescription")}
+          />
           <SettingsClient
             initialSettings={settings}
             initialBlocked={blocked}

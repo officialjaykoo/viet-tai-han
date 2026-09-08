@@ -60,6 +60,7 @@
   --brand: var(--flag-red);
   --brand-foreground: #ffffff;
   --foreground: oklch(0.22 0.015 30);
+  --background: #faf9f7;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.22 0.015 30);
   --popover: oklch(1 0 0);

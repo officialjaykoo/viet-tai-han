@@ -5,7 +5,9 @@ import { ListingReportForm } from "@/components/marketplace/listing-report-form"
 import { ListingSaveButton } from "@/components/marketplace/listing-save-button";
 import { ListingStatusControls } from "@/components/marketplace/listing-status-controls";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
+import { buttonVariants } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { Locale } from "@/lib/i18n/config";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -62,10 +64,7 @@ export default async function MarketplaceListingPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-6">
           <Link
             href="/marketplace"
@@ -119,7 +118,7 @@ export default async function MarketplaceListingPage({
               {messageHref && !listing.seller.isOwner ? (
                 <Link
                   href={messageHref}
-                  className="inline-flex min-h-9 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+                  className={buttonVariants({ size: "sm" })}
                 >
                   {tLocale(locale, "marketplace.messageSeller")}
                 </Link>

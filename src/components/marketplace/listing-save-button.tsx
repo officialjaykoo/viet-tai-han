@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-client";
 
 export function ListingSaveButton({
@@ -65,7 +65,7 @@ export function ListingSaveButton({
     return (
       <Link
         href={`/login?next=${encodeURIComponent(`/marketplace/${listingId}`)}`}
-        className="inline-flex min-h-9 items-center rounded-full border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
+        className={buttonVariants({ variant: "outline", size: "sm" })}
       >
         {t("marketplace.loginToSave")}
       </Link>

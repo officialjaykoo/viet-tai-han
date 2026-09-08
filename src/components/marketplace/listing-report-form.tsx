@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-client";
 import {
@@ -115,12 +116,11 @@ export function ListingReportForm({
       {open ? (
         <form onSubmit={submit} className="space-y-3 rounded-2xl border border-border/60 bg-muted/30 p-3">
           <h3 className="text-sm font-semibold">{t("marketplace.reportTitle")}</h3>
-          <select
+          <Select
             value={reason}
             onChange={(event) =>
               setReason(event.target.value as ListingReportReason | "")
             }
-            className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
             disabled={pending}
             required
           >
@@ -130,7 +130,7 @@ export function ListingReportForm({
                 {reasonLabel(value, t)}
               </option>
             ))}
-          </select>
+          </Select>
           <Textarea
             value={details}
             onChange={(event) => setDetails(event.target.value)}

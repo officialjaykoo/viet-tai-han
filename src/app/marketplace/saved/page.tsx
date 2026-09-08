@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ListingSaveButton } from "@/components/marketplace/listing-save-button";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SiteHeader } from "@/components/layout/site-header";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -24,6 +27,7 @@ export default async function SavedMarketplaceListingsPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-6">
           <Link
             href="/marketplace"
@@ -31,18 +35,13 @@ export default async function SavedMarketplaceListingsPage() {
           >
             ← {tLocale(locale, "marketplace.backToMarketplace")}
           </Link>
-          <section>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "marketplace.savedListings")}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {tLocale(locale, "marketplace.blurb")}
-            </p>
-          </section>
+          <PageHero
+            eyebrow={tLocale(locale, "marketplace.eyebrow")}
+            title={tLocale(locale, "marketplace.savedListings")}
+            description={tLocale(locale, "marketplace.blurb")}
+          />
           {listings.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-              {tLocale(locale, "marketplace.noSaved")}
-            </div>
+            <EmptyState>{tLocale(locale, "marketplace.noSaved")}</EmptyState>
           ) : (
             <ul className="grid gap-3 lg:grid-cols-2">
               {listings.map((listing) => (

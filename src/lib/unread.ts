@@ -30,7 +30,7 @@ export async function ensureUnreadFanout(userId: string) {
              ON rm.room_id = cm.room_id AND rm.user_id = ?
            INNER JOIN chat_room_members peer
              ON peer.room_id = cm.room_id
-            AND peer.user_id != cm.sender_id
+            AND peer.user_id != rm.user_id
             AND peer.membership_status = 'active'
            WHERE rm.membership_status = 'active'
              AND cm.sender_id != ?
@@ -149,7 +149,7 @@ export async function refreshUnreadCounts(userId: string) {
              ON rm.room_id = cm.room_id AND rm.user_id = unread_fanout.user_id
            INNER JOIN chat_room_members peer
              ON peer.room_id = cm.room_id
-            AND peer.user_id != cm.sender_id
+            AND peer.user_id != rm.user_id
             AND peer.membership_status = 'active'
            WHERE rm.membership_status = 'active'
              AND cm.sender_id != unread_fanout.user_id
@@ -197,7 +197,7 @@ export async function getUnreadCounts(userId: string): Promise<UnreadCounts> {
              ON rm.room_id = cm.room_id AND rm.user_id = ?
            INNER JOIN chat_room_members peer
              ON peer.room_id = cm.room_id
-            AND peer.user_id != cm.sender_id
+            AND peer.user_id != rm.user_id
             AND peer.membership_status = 'active'
            WHERE rm.membership_status = 'active'
              AND cm.sender_id != ?

@@ -11,6 +11,7 @@ import {
 } from "@/lib/friends";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
+import { parseFriendActionPayload } from "@/lib/relationship-payload";
 import { readApiJson } from "@/lib/security/guard";
 
 export async function GET() {
@@ -32,11 +33,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
-    const body = (await readApiJson(request).catch(() => ({}))) as {
-      action?: "accept" | "decline" | "cancel" | "remove";
-      requestId?: string;
-      userId?: string;
-    };
+    const body = parseFriendActionPayload(await readApiJson(request));
 
     switch (body.action) {
       case "accept":

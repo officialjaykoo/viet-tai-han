@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { MessagesClient } from "@/components/messages/messages-client";
@@ -19,10 +20,7 @@ export default async function MessagesPage() {
     <>
       <SiteHeader />
       <main data-testid="messages-page" className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="wide" className="py-3 sm:py-4">
           <Suspense
             fallback={

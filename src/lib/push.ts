@@ -556,11 +556,36 @@ async function runInBackground(task: () => Promise<void>) {
   void safeTask();
 }
 
+async function isBlockedPair(firstUserId: string, secondUserId: string) {
+  const db = await getDb();
+  const row = await db
+    .prepare(
+      `SELECT 1 AS blocked
+       FROM user_blocks
+       WHERE (blocker_id = ? AND blocked_id = ?)
+          OR (blocker_id = ? AND blocked_id = ?)
+       LIMIT 1`
+    )
+    .bind(firstUserId, secondUserId, secondUserId, firstUserId)
+    .first();
+  return Boolean(row);
+}
+
 export function queuePushDelivery(input: {
   userId: string;
   payload: PushPayload;
+  blockedActorId?: string | null;
 }) {
   void runInBackground(async () => {
-    await deliverPushToUser(input);
+    if (
+      input.blockedActorId &&
+      (await isBlockedPair(input.userId, input.blockedActorId))
+    ) {
+      return;
+    }
+    await deliverPushToUser({
+      userId: input.userId,
+      payload: input.payload,
+    });
   });
 }

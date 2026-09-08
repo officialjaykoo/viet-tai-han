@@ -1,7 +1,12 @@
 import Link from "next/link";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -47,40 +52,35 @@ export default async function BusinessesPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_16%,transparent),transparent_68%)]"
-        />
+        <PageBackdrop />
         <PageShell width="standard" className="space-y-8">
-          <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-                {tLocale(locale, "business.eyebrow")}
-              </p>
-              <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-                {tLocale(locale, "business.titlePage")}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-                {tLocale(locale, "business.blurb")}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={session ? "/businesses/new" : `/login?next=${encodeURIComponent(loginNext)}`}
-                className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-              >
-                {tLocale(locale, "business.createProfile")}
-              </Link>
-              {session ? (
+          <PageHero
+            eyebrow={tLocale(locale, "business.eyebrow")}
+            title={tLocale(locale, "business.titlePage")}
+            description={tLocale(locale, "business.blurb")}
+            actions={
+              <div className="flex flex-wrap gap-2">
                 <Link
-                  href="/businesses/mine"
-                  className="inline-flex min-h-10 items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
+                  href={
+                    session
+                      ? "/businesses/new"
+                      : `/login?next=${encodeURIComponent(loginNext)}`
+                  }
+                  className={buttonVariants({ size: "sm" })}
                 >
-                  {tLocale(locale, "business.myBusinesses")}
+                  {tLocale(locale, "business.createProfile")}
                 </Link>
-              ) : null}
-            </div>
-          </section>
+                {session ? (
+                  <Link
+                    href="/businesses/mine"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    {tLocale(locale, "business.myBusinesses")}
+                  </Link>
+                ) : null}
+              </div>
+            }
+          />
 
           <section className="rounded-3xl border border-border/60 bg-card/75 p-4 shadow-sm backdrop-blur-sm sm:p-5">
             <form method="get" className="grid gap-3 sm:grid-cols-3">
@@ -88,24 +88,22 @@ export default async function BusinessesPage({
                 <label htmlFor="business-q" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "business.search")}
                 </label>
-                <input
+                <Input
                   id="business-q"
                   name="q"
                   defaultValue={query}
                   placeholder={tLocale(locale, "business.searchPlaceholder")}
-                  className="flex h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 />
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="business-category" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "business.category")}
                 </label>
-                <input
+                <Input
                   id="business-category"
                   name="category"
                   defaultValue={category}
                   placeholder={tLocale(locale, "business.categoryPlaceholder")}
-                  className="flex h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 />
               </div>
               <div className="flex items-end gap-2">
@@ -113,20 +111,16 @@ export default async function BusinessesPage({
                   <label htmlFor="business-location" className="text-xs font-medium text-muted-foreground">
                     {tLocale(locale, "business.location")}
                   </label>
-                  <input
+                  <Input
                     id="business-location"
                     name="location"
                     defaultValue={location}
                     placeholder={tLocale(locale, "business.locationPlaceholder")}
-                    className="flex h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                   />
                 </div>
-                <button
-                  type="submit"
-                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-                >
+                <Button type="submit" variant="secondary" size="sm">
                   {tLocale(locale, "business.filter")}
-                </button>
+                </Button>
               </div>
             </form>
           </section>
@@ -139,9 +133,7 @@ export default async function BusinessesPage({
               <span className="text-sm text-muted-foreground">{businesses.length}</span>
             </div>
             {businesses.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-                {tLocale(locale, "business.empty")}
-              </div>
+              <EmptyState>{tLocale(locale, "business.empty")}</EmptyState>
             ) : (
               <ul className="grid gap-3 lg:grid-cols-2">
                 {businesses.map((business) => (
@@ -174,7 +166,7 @@ export default async function BusinessesPage({
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-border/50 pt-3">
                         <Link
                           href={`/businesses/${business.slug}`}
-                          className="inline-flex min-h-9 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+                          className={buttonVariants({ size: "sm" })}
                         >
                           {tLocale(locale, "business.viewProfile")}
                         </Link>
@@ -182,7 +174,7 @@ export default async function BusinessesPage({
                           href={mapHref(business)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex min-h-9 items-center rounded-full border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
+                          className={buttonVariants({ variant: "outline", size: "sm" })}
                         >
                           {tLocale(locale, "business.openMap")}
                         </a>

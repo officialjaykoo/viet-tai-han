@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createComment, createPost, createSubreddit } from "@/lib/actions";
 import { getDmRelationship } from "@/lib/dm-relationships";
 import {
+  cancelChatRequest,
   listChatRooms,
   listIncomingRequests,
   respondToChatRequest,
@@ -20,8 +21,13 @@ import {
   acceptFriendRequest,
   sendFriendRequest,
 } from "@/lib/friends";
-import { listNotifications } from "@/lib/notifications";
+import {
+  canNotifyChat,
+  createNotification,
+  listNotifications,
+} from "@/lib/notifications";
 import { likePost } from "@/lib/likes";
+import { getUnreadCounts } from "@/lib/unread";
 
 async function insertUser(
   id: string,
@@ -146,6 +152,61 @@ describe("DM relationship policy (D1)", () => {
     expect(
       notifications.filter((notification) => notification.kind === "chat_request")
     ).toHaveLength(1);
+  });
+
+  it("reads only the cancelled chat request notification in a request race", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    await setSiteSetting("max_dm_requests_burst_per_min", "10");
+    await setSiteSetting("max_dm_requests_per_hour", "50");
+    const senderId = `dm_notify_race_sender_${suffix}`;
+    const recipientId = `dm_notify_race_recipient_${suffix}`;
+    await Promise.all([
+      insertUser(senderId, senderId),
+      insertUser(recipientId, recipientId),
+    ]);
+
+    const first = await start(senderId, recipientId, "R1 request");
+    await flushBackgroundWork();
+    const firstNotification = await env.DB
+      .prepare(
+        `SELECT request_id, is_read
+         FROM notifications
+         WHERE user_id = ? AND kind = 'chat_request' AND request_id = ?`
+      )
+      .bind(recipientId, first.requestId)
+      .first<{ request_id: string; is_read: number }>();
+    expect(firstNotification?.is_read).toBe(0);
+
+    const [, second] = await Promise.all([
+      cancelChatRequest({
+        requestId: first.requestId!,
+        userId: senderId,
+      }),
+      start(senderId, recipientId, "R2 request"),
+    ]);
+    await flushBackgroundWork();
+
+    const notifications = await env.DB
+      .prepare(
+        `SELECT request_id, is_read
+         FROM notifications
+         WHERE user_id = ? AND kind = 'chat_request'
+           AND request_id IN (?, ?)
+         ORDER BY request_id`
+      )
+      .bind(recipientId, first.requestId, second.requestId)
+      .all<{ request_id: string; is_read: number }>();
+    expect(
+      notifications.results?.find(
+        (notification) => notification.request_id === first.requestId
+      )?.is_read
+    ).toBe(1);
+    expect(
+      notifications.results?.find(
+        (notification) => notification.request_id === second.requestId
+      )?.is_read
+    ).toBe(0);
+    expect((await getUnreadCounts(recipientId)).notificationCount).toBe(1);
   });
 
   it("uses opposite follow directions for direct access and request privacy", async () => {
@@ -476,5 +537,40 @@ describe("DM relationship policy (D1)", () => {
 
     const liked = await likePost(post.id, actorId);
     expect(liked.liked).toBe(true);
+  });
+  it("suppresses delayed actor notifications after a block", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const actorId = `notify_actor_${suffix}`;
+    const recipientId = `notify_recipient_${suffix}`;
+    await Promise.all([
+      insertUser(actorId, actorId),
+      insertUser(recipientId, recipientId),
+    ]);
+    await blockUser(recipientId, actorId);
+
+    expect(await canNotifyChat(recipientId, actorId)).toBe(false);
+    const kinds = [
+      "follow",
+      "friend_request",
+      "friend_accepted",
+      "chat_request",
+      "chat_accepted",
+    ] as const;
+    for (const kind of kinds) {
+      await expect(
+        createNotification({
+          userId: recipientId,
+          actorId,
+          kind,
+          title: `Delayed ${kind}`,
+        })
+      ).resolves.toBeNull();
+    }
+
+    const notifications = await listNotifications(recipientId);
+    expect(
+      notifications.filter((notification) => notification.actor?.username === actorId)
+    ).toHaveLength(0);
+    expect((await getUnreadCounts(recipientId)).notificationCount).toBe(0);
   });
 });

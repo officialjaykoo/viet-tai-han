@@ -681,6 +681,7 @@ export const en = {
   communities: {
     title: "Communities",
     browseBlurb: "Browse communities.",
+    empty: "No communities yet.",
     submitBlurb: "Share something with this community.",
     members: "members",
     member: "member",

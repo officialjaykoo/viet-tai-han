@@ -2,10 +2,7 @@ import { getDb } from "@/lib/db";
 import { runBackgroundTask } from "@/lib/background-task";
 
 import { queuePushDelivery } from "@/lib/push";
-import {
-  decrementUnread,
-  getUnreadCounts,
-} from "@/lib/unread";
+import { decrementUnread, getUnreadCounts } from "@/lib/unread";
 import { AuthError } from "@/lib/session";
 
 export type NotificationKind =
@@ -18,13 +15,37 @@ export type NotificationKind =
   | "chat_accepted"
   | "warning"
   | "mention";
-export async function canNotifyChat(userId: string): Promise<boolean> {
+
+const BLOCK_GUARDED_NOTIFICATION_KINDS: ReadonlySet<NotificationKind> = new Set([
+  "follow",
+  "friend_request",
+  "friend_accepted",
+  "chat_request",
+  "chat_accepted",
+]);
+export async function canNotifyChat(
+  userId: string,
+  actorId?: string | null
+): Promise<boolean> {
   const db = await getDb();
   const row = await db
     .prepare(`SELECT notifyChat FROM "user" WHERE id = ?`)
     .bind(userId)
     .first<{ notifyChat: number }>();
-  return row ? Boolean(row.notifyChat) : true;
+  if (row && !row.notifyChat) return false;
+  if (!actorId) return true;
+
+  const blocked = await db
+    .prepare(
+      `SELECT 1 AS blocked
+       FROM user_blocks
+       WHERE (blocker_id = ? AND blocked_id = ?)
+          OR (blocker_id = ? AND blocked_id = ?)
+       LIMIT 1`
+    )
+    .bind(userId, actorId, actorId, userId)
+    .first();
+  return !blocked;
 }
 
 export type NotificationItem = {
@@ -51,6 +72,7 @@ export async function createNotification(input: {
   href?: string | null;
   postId?: string | null;
   commentId?: string | null;
+  requestId?: string | null;
 }) {
   // Never notify yourself
   if (input.actorId && input.actorId === input.userId) return null;
@@ -94,12 +116,55 @@ export async function createNotification(input: {
   }
 
   const id = crypto.randomUUID();
-  await db.batch([
+  const blockGuarded = Boolean(
+    input.actorId &&
+      BLOCK_GUARDED_NOTIFICATION_KINDS.has(input.kind)
+  );
+  const requestGuarded =
+    input.kind === "friend_request" || input.kind === "chat_request";
+  const [notificationInsert] = await db.batch([
     db
       .prepare(
         `INSERT INTO notifications (
-           id, user_id, actor_id, kind, title, body, href, post_id, comment_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           id, user_id, actor_id, kind, title, body, href, post_id, comment_id,
+           request_id
+         )
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE (
+           ? = 0
+           OR (
+             NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )
+             AND (
+               ? = 0
+               OR (
+                 (
+                   ? = 'friend_request'
+                   AND EXISTS (
+                     SELECT 1 FROM user_friendships
+                     WHERE id = ?
+                       AND requester_id = ?
+                       AND addressee_id = ?
+                       AND status = 'pending'
+                   )
+                 )
+                 OR (
+                   ? = 'chat_request'
+                   AND EXISTS (
+                     SELECT 1 FROM chat_requests
+                     WHERE id = ?
+                       AND from_user_id = ?
+                       AND to_user_id = ?
+                       AND status = 'pending'
+                   )
+                 )
+               )
+             )
+           )
+         )`
       )
       .bind(
         id,
@@ -110,20 +175,58 @@ export async function createNotification(input: {
         input.body?.slice(0, 500) ?? null,
         input.href?.slice(0, 400) ?? null,
         input.postId ?? null,
-        input.commentId ?? null
+        input.commentId ?? null,
+        input.requestId ?? null,
+        blockGuarded ? 1 : 0,
+        input.userId,
+        input.actorId ?? null,
+        input.actorId ?? null,
+        input.userId,
+        requestGuarded ? 1 : 0,
+        input.kind,
+        input.requestId ?? null,
+        input.actorId ?? null,
+        input.userId,
+        input.kind,
+        input.requestId ?? null,
+        input.actorId ?? null,
+        input.userId
       ),
     db
       .prepare(
         `INSERT INTO unread_fanout (user_id, notification_count, updated_at)
-         VALUES (?, 1, datetime('now'))
+         SELECT ?, 1, datetime('now')
+         WHERE EXISTS (
+           SELECT 1 FROM notifications
+           WHERE id = ? AND user_id = ?
+         )
+           AND (
+             ? = 0
+             OR NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )
+           )
          ON CONFLICT(user_id) DO UPDATE SET
            notification_count = notification_count + 1,
            updated_at = datetime('now')`
       )
-      .bind(input.userId),
+      .bind(
+        input.userId,
+        id,
+        input.userId,
+        blockGuarded ? 1 : 0,
+        input.userId,
+        input.actorId ?? null,
+        input.actorId ?? null,
+        input.userId
+      ),
   ]);
+  if (Number(notificationInsert?.meta.changes ?? 0) !== 1) return null;
   queuePushDelivery({
     userId: input.userId,
+    blockedActorId: blockGuarded ? input.actorId : null,
     payload: {
       title: input.title,
       body: input.body,
@@ -132,6 +235,65 @@ export async function createNotification(input: {
     },
   });
   return id;
+}
+
+export function actionableNotificationReadStatements(
+  db: D1Database,
+  input: {
+    recipientId: string;
+    actorId: string;
+    kind: "friend_request" | "chat_request";
+    requestId: string;
+  }
+) {
+  return [
+    db
+      .prepare(
+        `UPDATE notifications
+         SET is_read = 1
+         WHERE user_id = ?
+           AND actor_id = ?
+           AND kind = ?
+           AND is_read = 0
+           AND (request_id = ? OR request_id IS NULL)`
+      )
+      .bind(
+        input.recipientId,
+        input.actorId,
+        input.kind,
+        input.requestId
+      ),
+    db
+      .prepare(
+        `INSERT INTO unread_fanout (user_id, notification_count, updated_at)
+         VALUES (
+           ?,
+           (
+             SELECT COUNT(*)
+             FROM notifications
+             WHERE user_id = ? AND is_read = 0
+           ),
+           datetime('now')
+         )
+         ON CONFLICT(user_id) DO UPDATE SET
+           notification_count = excluded.notification_count,
+           updated_at = excluded.updated_at`
+      )
+      .bind(input.recipientId, input.recipientId),
+  ];
+}
+
+export async function reconcileActionableNotification(input: {
+  recipientId: string;
+  actorId: string;
+  kind: "friend_request" | "chat_request";
+  requestId: string;
+}) {
+  const db = await getDb();
+  const [result] = await db.batch(
+    actionableNotificationReadStatements(db, input)
+  );
+  return Number(result?.meta.changes ?? 0);
 }
 
 export async function listNotifications(

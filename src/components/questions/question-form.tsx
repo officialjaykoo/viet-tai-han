@@ -13,6 +13,7 @@ import {
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-client";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
@@ -102,11 +103,10 @@ export function QuestionForm({
         <label htmlFor="question-community" className="text-sm font-medium">
           {t("questions.community")}
         </label>
-        <select
+        <Select
           id="question-community"
           value={community}
           onChange={(event) => setCommunity(event.target.value)}
-          className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm"
           disabled={pending || communities.length === 0}
         >
           {communities.length === 0 ? (
@@ -118,7 +118,7 @@ export function QuestionForm({
               </option>
             ))
           )}
-        </select>
+        </Select>
       </div>
 
       <div className="space-y-2">

@@ -1,7 +1,11 @@
 import { scheduleChatPromotion } from "@/lib/chat-promotion";
 import { getDb } from "@/lib/db";
 import { createPublicId } from "@/lib/id";
-import { notifyQuietly } from "@/lib/notifications";
+import {
+  actionableNotificationReadStatements,
+  notifyQuietly,
+  reconcileActionableNotification,
+} from "@/lib/notifications";
 import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
 import { AuthError } from "@/lib/session";
 
@@ -248,6 +252,7 @@ export async function sendFriendRequest(
     userId: addresseeId,
     actorId: requesterId,
     kind: "friend_request",
+    requestId,
     title: `${formatUserHandle(requester?.username)} sent you a friend request`,
     href: getUsernameProfileHref(requester?.username) ?? "/friends",
   });
@@ -281,6 +286,12 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
       .bind(request.requester_id, userId, userId, request.requester_id)
       .first();
     if (blocked) throw new AuthError("Can't connect with this user", 403);
+    await reconcileActionableNotification({
+      recipientId: userId,
+      actorId: request.requester_id,
+      kind: "friend_request",
+      requestId: request.id,
+    });
     scheduleChatPromotion({
       firstUserId: request.requester_id,
       secondUserId: userId,
@@ -294,20 +305,27 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     return { friendStatus: "friends" as const, requestId: null, friend };
   }
 
-  const result = await db
-    .prepare(
-      `UPDATE user_friendships
-       SET status = 'accepted', updated_at = datetime('now')
-       WHERE id = ? AND addressee_id = ? AND status = 'pending'
-         AND NOT EXISTS (
-           SELECT 1 FROM user_blocks
-           WHERE (blocker_id = requester_id AND blocked_id = addressee_id)
-              OR (blocker_id = addressee_id AND blocked_id = requester_id)
-         )`
-    )
-    .bind(requestId, userId)
-    .run();
-  if (Number(result.meta.changes ?? 0) !== 1) {
+  const [result] = await db.batch([
+    db
+      .prepare(
+        `UPDATE user_friendships
+         SET status = 'accepted', updated_at = datetime('now')
+         WHERE id = ? AND addressee_id = ? AND status = 'pending'
+           AND NOT EXISTS (
+             SELECT 1 FROM user_blocks
+             WHERE (blocker_id = requester_id AND blocked_id = addressee_id)
+                OR (blocker_id = addressee_id AND blocked_id = requester_id)
+           )`
+      )
+      .bind(requestId, userId),
+    ...actionableNotificationReadStatements(db, {
+      recipientId: userId,
+      actorId: request.requester_id,
+      kind: "friend_request",
+      requestId: request.id,
+    }),
+  ]);
+  if (Number(result?.meta.changes ?? 0) !== 1) {
     const blocked = await db
       .prepare(
         `SELECT 1 AS ok FROM user_blocks
@@ -325,6 +343,12 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
       .bind(requestId)
       .first<FriendshipRow>();
     if (latest?.status === "accepted") {
+      await reconcileActionableNotification({
+        recipientId: userId,
+        actorId: request.requester_id,
+        kind: "friend_request",
+        requestId: request.id,
+      });
       scheduleChatPromotion({
         firstUserId: request.requester_id,
         secondUserId: userId,
@@ -374,18 +398,36 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
   };
 }
 
-
 export async function declineFriendRequest(userId: string, requestId: string) {
   const db = await getDb();
-  const result = await db
+  const request = await db
     .prepare(
-      `UPDATE user_friendships
-       SET status = 'declined', updated_at = datetime('now')
+      `SELECT id, requester_id
+       FROM user_friendships
        WHERE id = ? AND addressee_id = ? AND status = 'pending'`
     )
     .bind(requestId, userId)
-    .run();
-  if (!result.meta.changes) {
+    .first<{ id: string; requester_id: string }>();
+  if (!request) {
+    throw new AuthError("Friend request not found", 404);
+  }
+
+  const [result] = await db.batch([
+    db
+      .prepare(
+        `UPDATE user_friendships
+         SET status = 'declined', updated_at = datetime('now')
+         WHERE id = ? AND addressee_id = ? AND status = 'pending'`
+      )
+      .bind(requestId, userId),
+    ...actionableNotificationReadStatements(db, {
+      recipientId: userId,
+      actorId: request.requester_id,
+      kind: "friend_request",
+      requestId: request.id,
+    }),
+  ]);
+  if (!Number(result?.meta.changes ?? 0)) {
     throw new AuthError("Friend request not found", 404);
   }
   return { friendStatus: "none" as const, requestId: null };
@@ -393,14 +435,33 @@ export async function declineFriendRequest(userId: string, requestId: string) {
 
 export async function cancelFriendRequest(userId: string, requestId: string) {
   const db = await getDb();
-  const result = await db
+  const request = await db
     .prepare(
-      `DELETE FROM user_friendships
+      `SELECT id, addressee_id
+       FROM user_friendships
        WHERE id = ? AND requester_id = ? AND status = 'pending'`
     )
     .bind(requestId, userId)
-    .run();
-  if (!result.meta.changes) {
+    .first<{ id: string; addressee_id: string }>();
+  if (!request) {
+    throw new AuthError("Friend request not found", 404);
+  }
+
+  const [result] = await db.batch([
+    db
+      .prepare(
+        `DELETE FROM user_friendships
+         WHERE id = ? AND requester_id = ? AND status = 'pending'`
+      )
+      .bind(requestId, userId),
+    ...actionableNotificationReadStatements(db, {
+      recipientId: request.addressee_id,
+      actorId: userId,
+      kind: "friend_request",
+      requestId: request.id,
+    }),
+  ]);
+  if (!Number(result?.meta.changes ?? 0)) {
     throw new AuthError("Friend request not found", 404);
   }
   return { friendStatus: "none" as const, requestId: null };

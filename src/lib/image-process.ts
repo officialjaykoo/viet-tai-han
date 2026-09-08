@@ -4,7 +4,8 @@ import { PNG } from "pngjs";
 export const MAX_UPLOAD_BYTES = 1 * 1024 * 1024; // 1 MiB
 const MAX_DIMENSION = 2048;
 export const MAX_SOURCE_IMAGE_DIMENSION = 8192;
-export const MAX_SOURCE_IMAGE_PIXELS = 40_000_000;
+// Keep the pre-decode RGBA buffer near 48 MiB; decoder overhead remains Worker-safe.
+export const MAX_SOURCE_IMAGE_PIXELS = 12_000_000;
 const MIN_QUALITY = 0.45;
 const START_QUALITY = 0.82;
 

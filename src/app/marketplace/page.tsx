@@ -1,9 +1,15 @@
 import Link from "next/link";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { ListingAlertButton } from "@/components/marketplace/listing-alert-button";
 import { ListingSaveButton } from "@/components/marketplace/listing-save-button";
 import { SiteHeader } from "@/components/layout/site-header";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { Locale } from "@/lib/i18n/config";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -87,48 +93,43 @@ export default async function MarketplacePage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_16%,transparent),transparent_68%)]"
-        />
+        <PageBackdrop />
         <PageShell width="standard" className="space-y-8">
-          <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-                {tLocale(locale, "marketplace.eyebrow")}
-              </p>
-              <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-                {tLocale(locale, "marketplace.titlePage")}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-                {tLocale(locale, "marketplace.blurb")}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={session ? "/marketplace/new" : `/login?next=${encodeURIComponent(loginNext)}`}
-                className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-              >
-                {tLocale(locale, "marketplace.newListing")}
-              </Link>
-              {session ? (
-                <>
-                  <Link
-                    href="/marketplace/saved"
-                    className="inline-flex min-h-10 items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
-                  >
-                    {tLocale(locale, "marketplace.saved")}
-                  </Link>
-                  <Link
-                    href="/marketplace/alerts"
-                    className="inline-flex min-h-10 items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
-                  >
-                    {tLocale(locale, "marketplace.alerts")}
-                  </Link>
-                </>
-              ) : null}
-            </div>
-          </section>
+          <PageHero
+            eyebrow={tLocale(locale, "marketplace.eyebrow")}
+            title={tLocale(locale, "marketplace.titlePage")}
+            description={tLocale(locale, "marketplace.blurb")}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={
+                    session
+                      ? "/marketplace/new"
+                      : `/login?next=${encodeURIComponent(loginNext)}`
+                  }
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {tLocale(locale, "marketplace.newListing")}
+                </Link>
+                {session ? (
+                  <>
+                    <Link
+                      href="/marketplace/saved"
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      {tLocale(locale, "marketplace.saved")}
+                    </Link>
+                    <Link
+                      href="/marketplace/alerts"
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      {tLocale(locale, "marketplace.alerts")}
+                    </Link>
+                  </>
+                ) : null}
+              </div>
+            }
+          />
 
           <section className="rounded-3xl border border-border/60 bg-card/75 p-4 shadow-sm backdrop-blur-sm sm:p-5">
             <form method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -136,78 +137,66 @@ export default async function MarketplacePage({
                 <label htmlFor="marketplace-q" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "nav.search")}
                 </label>
-                <input
+                <Input
                   id="marketplace-q"
                   name="q"
                   defaultValue={query}
                   placeholder={tLocale(locale, "search.placeholderCompact")}
-                  className="flex h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 />
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="marketplace-kind" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "marketplace.kind")}
                 </label>
-                <select
-                  id="marketplace-kind"
-                  name="kind"
-                  defaultValue={kind ?? ""}
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-                >
+                <Select id="marketplace-kind" name="kind" defaultValue={kind ?? ""}>
                   <option value="">{tLocale(locale, "marketplace.allKinds")}</option>
                   {LISTING_KINDS.map((value) => (
                     <option key={value} value={value}>
                       {kindLabel(locale, value)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="marketplace-status" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "marketplace.status")}
                 </label>
-                <select
+                <Select
                   id="marketplace-status"
                   name="status"
                   defaultValue={status ?? "active"}
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 >
                   <option value="active">{tLocale(locale, "marketplace.active")}</option>
                   <option value="all">{tLocale(locale, "marketplace.allStatuses")}</option>
                   <option value="sold">{tLocale(locale, "marketplace.sold")}</option>
                   <option value="closed">{tLocale(locale, "marketplace.closed")}</option>
-                </select>
+                </Select>
               </div>
               <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 w-full items-center justify-center rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-                >
+                <Button type="submit" variant="secondary" size="sm" className="w-full">
                   {tLocale(locale, "marketplace.filter")}
-                </button>
+                </Button>
               </div>
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
                 <label htmlFor="marketplace-category" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "marketplace.category")}
                 </label>
-                <input
+                <Input
                   id="marketplace-category"
                   name="category"
                   defaultValue={category}
                   placeholder={tLocale(locale, "marketplace.categoryPlaceholder")}
-                  className="flex h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
                 <label htmlFor="marketplace-location" className="text-xs font-medium text-muted-foreground">
                   {tLocale(locale, "marketplace.location")}
                 </label>
-                <input
+                <Input
                   id="marketplace-location"
                   name="location"
                   defaultValue={location}
                   placeholder={tLocale(locale, "marketplace.locationPlaceholder")}
-                  className="flex h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 />
               </div>
             </form>
@@ -231,9 +220,7 @@ export default async function MarketplacePage({
               <span className="text-sm text-muted-foreground">{listings.length}</span>
             </div>
             {listings.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-                {tLocale(locale, "marketplace.empty")}
-              </div>
+              <EmptyState>{tLocale(locale, "marketplace.empty")}</EmptyState>
             ) : (
               <ul className="grid gap-3 lg:grid-cols-2">
                 {listings.map((listing) => (

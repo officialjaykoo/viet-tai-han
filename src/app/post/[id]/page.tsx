@@ -4,6 +4,7 @@ import { AdSlot } from "@/components/ads/ad-slot";
 import { CommentComposer } from "@/components/comments/comment-composer";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
 import { PostCard } from "@/components/feed/post-card";
 import { TunneledOutboundLink } from "@/components/media/tunneled-outbound-link";
@@ -40,6 +41,7 @@ export default async function PostPage({
       <SiteHeader />
       <PostViewBeacon postId={post.id} discoverySource={discoverySource} />
       <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-6">
 
           <PostCard

@@ -97,23 +97,27 @@ vi.mock("@/lib/session", () => ({
 import { POST as postPOST } from "@/app/api/posts/route";
 import { POST as mediaPOST } from "@/app/api/media/route";
 
-function postsRequest(cookie?: string) {
+function postsRequest(cookie?: string, authorization?: string) {
   return new NextRequest("http://localhost/api/posts", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...(cookie ? { cookie } : {}),
+      ...(authorization ? { authorization } : {}),
     },
     body: "{}",
   });
 }
 
-function mediaRequest(cookie?: string) {
+function mediaRequest(cookie?: string, authorization?: string) {
   const form = new FormData();
   form.set("file", new File(["image"], "image.jpg", { type: "image/jpeg" }));
   return new NextRequest("http://localhost/api/media", {
     method: "POST",
-    headers: cookie ? { cookie } : undefined,
+    headers: {
+      ...(cookie ? { cookie } : {}),
+      ...(authorization ? { authorization } : {}),
+    },
     body: form,
   });
 }
@@ -188,11 +192,25 @@ describe("browser human proof on canonical post and media writes", () => {
     expect(createPost).not.toHaveBeenCalled();
   });
 
-  it("does not require a human cookie on the direct public API path", async () => {
-    const response = await postPOST(postsRequest());
+  it("does not require a human cookie after the direct API key guard", async () => {
+    const response = await postPOST(
+      postsRequest(undefined, "Bearer valid-api-key")
+    );
 
     expect(response.status).toBe(201);
     expect(createPost).toHaveBeenCalledOnce();
+  });
+
+  it("still requires a Better Auth session after the direct API key guard", async () => {
+    mockRequireSession.mockRejectedValueOnce(
+      new AuthError("Unauthorized", 401)
+    );
+    const response = await postPOST(
+      postsRequest(undefined, "Bearer valid-api-key")
+    );
+
+    expect(response.status).toBe(401);
+    expect(createPost).not.toHaveBeenCalled();
   });
 
   it("accepts a tunnel media upload with a valid human cookie", async () => {
@@ -214,7 +232,9 @@ describe("browser human proof on canonical post and media writes", () => {
   });
 
   it("does not require a human cookie on direct public media uploads", async () => {
-    const response = await mediaPOST(mediaRequest());
+    const response = await mediaPOST(
+      mediaRequest(undefined, "Bearer valid-api-key")
+    );
 
     expect(response.status).toBe(201);
     expect(mockUploadPostImage).toHaveBeenCalledOnce();

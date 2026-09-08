@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   acceptFriendRequest,
+  cancelFriendRequest,
   declineFriendRequest,
   getFriendRelation,
   listFriends,
@@ -16,6 +17,7 @@ import {
   getProfileRelation,
   unblockUser,
 } from "@/lib/user-actions";
+import { getUnreadCounts } from "@/lib/unread";
 import { listNotifications } from "@/lib/notifications";
 
 async function seedFriendUsers() {
@@ -182,7 +184,31 @@ describe("friend relationships (D1)", () => {
     expect(
       notifications.filter((item) => item.kind === "friend_accepted")
     ).toHaveLength(1);
+    const stale = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND kind = 'friend_request'
+           AND request_id = ? AND is_read = 0`
+      )
+      .bind(secondId, sent.requestId)
+      .first<{ count: number }>();
+    expect(Number(stale?.count)).toBe(0);
   });
+  it("clears friend request notifications on decline and cancel", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    const declined = await sendFriendRequest(firstId, secondId);
+    await flushBackgroundWork();
+    await declineFriendRequest(secondId, declined.requestId!);
+    expect((await getUnreadCounts(secondId)).notificationCount).toBe(0);
+
+    const cancelled = await sendFriendRequest(firstId, secondId);
+    await flushBackgroundWork();
+    expect((await getUnreadCounts(secondId)).notificationCount).toBe(1);
+    await cancelFriendRequest(firstId, cancelled.requestId!);
+    expect((await getUnreadCounts(secondId)).notificationCount).toBe(0);
+  });
+
 
   it("never leaves an accepted friendship after concurrent block", async () => {
     const { firstId, secondId } = await seedFriendUsers();

@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import { AcceptAnswerButton } from "@/components/questions/accept-answer-button";
 import { AnswerForm } from "@/components/questions/answer-form";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
+import { EmptyState } from "@/components/ui/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -30,10 +33,7 @@ export default async function QuestionPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-8">
           <Link
             href="/questions"
@@ -98,9 +98,7 @@ export default async function QuestionPage({
             </div>
 
             {question.answers.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground">
-                {tLocale(locale, "questions.noAnswers")}
-              </p>
+              <EmptyState>{tLocale(locale, "questions.noAnswers")}</EmptyState>
             ) : (
               <ol className="space-y-4">
                 {question.answers.map((answer) => (
@@ -172,7 +170,7 @@ export default async function QuestionPage({
             ) : (
               <Link
                 href={`/login?next=${encodeURIComponent(`/questions/${question.id}`)}`}
-                className="inline-flex min-h-10 items-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+                className={buttonVariants({ size: "sm" })}
               >
                 {tLocale(locale, "questions.loginToAnswer")}
               </Link>

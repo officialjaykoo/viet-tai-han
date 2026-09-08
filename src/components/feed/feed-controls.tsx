@@ -14,15 +14,11 @@ export function FeedModeTabs({
 }) {
   const { t } = useI18n();
   const router = useRouter();
-  const sort = "new";
 
   if (!signedIn) return null;
 
   function hrefFor(mode: "home" | "popular") {
-    const params = new URLSearchParams();
-    params.set("feed", mode);
-    params.set("sort", sort);
-    return `/?${params.toString()}`;
+    return mode === "home" ? "/" : "/?feed=popular";
   }
 
   return (

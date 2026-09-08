@@ -125,6 +125,73 @@ export async function blockUser(blockerId: string, blockedId: string) {
            )`
       )
       .bind(blockerId, blockedId, pair),
+    db
+      .prepare(
+        `UPDATE chat_room_members
+         SET (last_read_at, last_read_message_id) = (
+           SELECT
+             CASE
+               WHEN chat_room_members.last_read_at IS NULL
+                 OR cm.created_at > chat_room_members.last_read_at
+                 OR (
+                   cm.created_at = chat_room_members.last_read_at
+                   AND (
+                     chat_room_members.last_read_message_id IS NULL
+                     OR cm.id > chat_room_members.last_read_message_id
+                   )
+                 )
+               THEN cm.created_at
+               ELSE chat_room_members.last_read_at
+             END,
+             CASE
+               WHEN chat_room_members.last_read_at IS NULL
+                 OR cm.created_at > chat_room_members.last_read_at
+                 OR (
+                   cm.created_at = chat_room_members.last_read_at
+                   AND (
+                     chat_room_members.last_read_message_id IS NULL
+                     OR cm.id > chat_room_members.last_read_message_id
+                   )
+                 )
+               THEN cm.id
+               ELSE chat_room_members.last_read_message_id
+             END
+           FROM chat_messages cm
+           WHERE cm.room_id = chat_room_members.room_id
+             AND cm.delivery_status = 'delivered'
+           ORDER BY cm.created_at DESC, cm.id DESC
+           LIMIT 1
+         )
+         WHERE user_id IN (?, ?)
+           AND room_id IN (
+             SELECT id FROM chat_rooms WHERE pair_key = ?
+           )
+           AND EXISTS (
+             SELECT 1
+             FROM chat_messages cm
+             WHERE cm.room_id = chat_room_members.room_id
+               AND cm.delivery_status = 'delivered'
+           )`
+      )
+      .bind(blockerId, blockedId, pair),
+    db
+      .prepare(
+        `UPDATE notifications
+         SET is_read = 1
+         WHERE is_read = 0
+           AND kind IN (
+             'follow',
+             'friend_request',
+             'friend_accepted',
+             'chat_request',
+             'chat_accepted'
+           )
+           AND (
+             (user_id = ? AND actor_id = ?)
+             OR (user_id = ? AND actor_id = ?)
+           )`
+      )
+      .bind(blockerId, blockedId, blockedId, blockerId),
   ]);
 
   runBackgroundTask("blocked_unread_reconcile", async () => {

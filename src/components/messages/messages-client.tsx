@@ -7,7 +7,9 @@ import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { announceUnreadChanged } from "@/components/notifications/use-unread-count";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { apiFetch } from "@/lib/api-client";
@@ -867,7 +869,7 @@ export function MessagesClient() {
   };
 
   return (
-    <div className="grid min-w-0 gap-3 lg:grid-cols-[17rem_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <aside
         className={cn(
           "min-w-0 space-y-3",
@@ -891,14 +893,14 @@ export function MessagesClient() {
         </div>
 
         {composeOpen ? (
-          <section className="rounded-xl border border-border/60 bg-card/70 p-2.5">
+          <section className="rounded-2xl border border-border/60 bg-card/70 p-3">
             <form onSubmit={startConversation} className="space-y-1.5">
               <Input
                 value={composeUser}
                 onChange={(e) => setComposeUser(e.target.value)}
                 placeholder={t("messages.username")}
                 required
-                className="h-10 rounded-lg text-sm sm:h-9"
+                className="sm:text-sm"
               />
               <Textarea
                 value={composeBody}
@@ -906,7 +908,7 @@ export function MessagesClient() {
                 placeholder={t("messages.openerPlaceholder")}
                 rows={2}
                 required
-                className="min-h-14 rounded-lg px-3 py-2 text-sm"
+                className="sm:min-h-14"
               />
               <Button
                 type="submit"
@@ -932,7 +934,7 @@ export function MessagesClient() {
               {requests.map((req) => (
                 <li
                   key={req.id}
-                  className="rounded-xl border border-border/60 bg-card/70 p-2.5"
+                  className="rounded-2xl border border-border/60 bg-card/70 p-2.5"
                 >
                   <div className="flex items-center gap-2">
                     <UserAvatar
@@ -981,7 +983,7 @@ export function MessagesClient() {
               {outgoingRequests.map((req) => (
                 <li
                   key={req.id}
-                  className="rounded-xl border border-border/60 bg-card/70 p-2.5"
+                  className="rounded-2xl border border-border/60 bg-card/70 p-2.5"
                 >
                   <div className="flex items-center gap-2">
                     <UserAvatar
@@ -1019,9 +1021,7 @@ export function MessagesClient() {
           {!loaded ? (
             <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           ) : rooms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("messages.noOpenChats")}
-            </p>
+            <EmptyState>{t("messages.noOpenChats")}</EmptyState>
           ) : (
             <ul className="space-y-0.5">
               {rooms.map((room) => (
@@ -1067,7 +1067,7 @@ export function MessagesClient() {
 
       <section
         className={cn(
-          "relative min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 h-[calc(100dvh-8rem)] min-h-[28rem]",
+          "relative min-w-0 flex-col rounded-3xl border border-border/60 bg-card/70 h-[calc(100dvh-8rem)] min-h-[28rem]",
           selectedRoom ? "flex" : "hidden lg:flex",
           "lg:h-[calc(100dvh-6rem)] lg:min-h-0 lg:max-h-none"
         )}
@@ -1214,7 +1214,7 @@ export function MessagesClient() {
                 }}
                 placeholder={t("messages.placeholder")}
                 rows={1}
-                className="max-h-32 min-h-10 flex-1 overflow-y-auto rounded-lg px-3 py-2 text-sm"
+                className="max-h-32 min-h-11 flex-1 overflow-y-auto sm:min-h-9"
               />
               <Button type="submit" size="sm" disabled={!reply.trim()}>
                 {t("messages.send")}
@@ -1240,8 +1240,7 @@ export function MessagesClient() {
                       {t("messages.reportConversationPrompt")}
                     </p>
                   </div>
-                  <select
-                    className="h-10 w-full rounded-lg border border-input bg-background px-2 text-sm"
+                  <Select
                     value={reportReason}
                     onChange={(e) =>
                       setReportReason(e.target.value as ChatReportReason)
@@ -1253,13 +1252,13 @@ export function MessagesClient() {
                         {reportReasonLabels[reason]}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Textarea
                     value={reportDetails}
                     onChange={(e) => setReportDetails(e.target.value)}
                     placeholder={t("messages.reportDetails")}
                     rows={3}
-                    className="rounded-lg text-sm"
+                    className="text-sm"
                   />
                   <div className="flex justify-end gap-2">
                     <Button
@@ -1282,9 +1281,9 @@ export function MessagesClient() {
             ) : null}
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          <EmptyState className="m-4 flex flex-1 items-center justify-center">
             {t("messages.selectChat")}
-          </div>
+          </EmptyState>
         )}
       </section>
 

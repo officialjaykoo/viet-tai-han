@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SearchForm } from "@/components/search/search-form";
 import { AccountTags } from "@/components/user/account-tags";
@@ -36,29 +39,24 @@ export default async function SearchPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-8">
-          <section>
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "search.title")}
-            </p>
-            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-              {query ? (
+          <PageHero
+            eyebrow={tLocale(locale, "search.title")}
+            title={
+              query ? (
                 <>
                   {tLocale(locale, "pages.searchResultsFor")}{" "}
                   <span className="text-[var(--brand)]">“{query}”</span>
                 </>
               ) : (
                 tLocale(locale, "pages.findBlurb")
-              )}
-            </h1>
-            <div className="mt-5 max-w-xl">
-              <SearchForm initialQuery={query} autoFocus={!query} />
-            </div>
-          </section>
+              )
+            }
+          />
+          <div className="max-w-xl">
+            <SearchForm initialQuery={query} autoFocus={!query} />
+          </div>
 
           {query && results ? (
             <div className="space-y-10">
@@ -253,7 +251,7 @@ function SearchSection({
     <section className="space-y-3">
       <h2 className="font-heading text-xl font-semibold">{title}</h2>
       {count === 0 ? (
-        <p className="text-sm text-muted-foreground">{empty}</p>
+        <EmptyState>{empty}</EmptyState>
       ) : (
         children
       )}

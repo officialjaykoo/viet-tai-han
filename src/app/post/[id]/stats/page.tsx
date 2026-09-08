@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PostStatsClient } from "@/components/posts/post-stats-client";
@@ -41,7 +42,8 @@ export default async function PostStatsPage({
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">

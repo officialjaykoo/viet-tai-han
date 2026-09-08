@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { CreatePostForm } from "@/components/posts/create-post-form";
@@ -27,22 +29,13 @@ export default async function SubmitPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_16%,transparent),transparent_68%)]"
-        />
-        <PageShell width="narrow">
-          <section className="mb-6">
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "pages.compose")}
-            </p>
-            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-              {tLocale(locale, "post.submitTitle")}
-            </h1>
-            <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
-              {tLocale(locale, "pages.submitBlurb")}
-            </p>
-          </section>
+        <PageBackdrop />
+        <PageShell width="narrow" className="space-y-6">
+          <PageHero
+            eyebrow={tLocale(locale, "pages.compose")}
+            title={tLocale(locale, "post.submitTitle")}
+            description={tLocale(locale, "pages.submitBlurb")}
+          />
 
           <div className="rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6">
             <CreatePostForm defaultPostType={defaultPostType} />

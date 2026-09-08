@@ -163,8 +163,8 @@ describe("content lifecycle (D1)", () => {
     const firstPost = await createPost({
       userId: authorId,
       subredditId,
-      title: "Retry-safe post",
-      body: "The same request must not create two posts.",
+      title: "  Retry-safe post  ",
+      body: "  The same request must not create two posts.  ",
       requestId: postRequestId,
     });
     const retriedPost = await createPost({
@@ -175,6 +175,18 @@ describe("content lifecycle (D1)", () => {
       requestId: postRequestId,
     });
     expect(retriedPost).toEqual(firstPost);
+    await expect(
+      createPost({
+        userId: authorId,
+        subredditId,
+        title: "Different retry payload",
+        body: "The same request must not create two posts.",
+        requestId: postRequestId,
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      message: "Request ID was already used for a different post",
+    });
 
     const postCount = await env.DB
       .prepare(`SELECT COUNT(*) AS count FROM posts WHERE id = ?`)

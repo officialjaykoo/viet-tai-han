@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { BusinessForm } from "@/components/business/business-form";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -31,6 +33,7 @@ export default async function EditBusinessPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-6">
           <Link
             href={`/businesses/${business.slug}`}
@@ -38,15 +41,14 @@ export default async function EditBusinessPage({
           >
             ← {business.name}
           </Link>
-          <section>
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "business.eyebrow")}
-            </p>
-            <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "business.edit")}
-            </h1>
-          </section>
-          <BusinessForm initial={business} />
+          <PageHero
+            eyebrow={tLocale(locale, "business.eyebrow")}
+            title={tLocale(locale, "business.edit")}
+            description={business.name}
+          />
+          <div className="rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+            <BusinessForm initial={business} />
+          </div>
         </PageShell>
       </main>
     </>

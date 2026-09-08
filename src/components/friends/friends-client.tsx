@@ -7,13 +7,13 @@ import {
   CheckIcon,
   UserMinusIcon,
   UserRoundPlusIcon,
-  UsersRoundIcon,
   XIcon,
 } from "lucide-react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { RelativeTime } from "@/components/time/relative-time";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { apiFetch } from "@/lib/api-client";
 import { getUsernameProfileHref } from "@/lib/profile-url";
@@ -159,24 +159,6 @@ export function FriendsClient({
 
   return (
     <div className="space-y-5">
-      <header className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-sm sm:p-6">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_oklch,var(--brand)_12%,transparent)] text-[var(--brand)]">
-            <UsersRoundIcon className="size-5" aria-hidden />
-          </span>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand)]">
-              {t("friends.title")}
-            </p>
-            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-              {t("friends.list")}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("friends.description")}
-            </p>
-          </div>
-        </div>
-      </header>
 
       {error ? (
         <p className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-sm text-destructive" role="alert">
@@ -185,7 +167,7 @@ export function FriendsClient({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm">
+        <section className="rounded-3xl border border-border/60 bg-card/75 p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-heading text-base font-semibold">
               {t("friends.incoming")}
@@ -230,14 +212,12 @@ export function FriendsClient({
               />
             ))}
             {!incoming.length ? (
-              <li className="rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-sm text-muted-foreground">
-                {t("friends.emptyIncoming")}
-              </li>
+              <EmptyState as="li">{t("friends.emptyIncoming")}</EmptyState>
             ) : null}
           </ul>
         </section>
 
-        <section className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm">
+        <section className="rounded-3xl border border-border/60 bg-card/75 p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-heading text-base font-semibold">
               {t("friends.outgoing")}
@@ -270,14 +250,12 @@ export function FriendsClient({
               />
             ))}
             {!outgoing.length ? (
-              <li className="rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-sm text-muted-foreground">
-                {t("friends.emptyOutgoing")}
-              </li>
+              <EmptyState as="li">{t("friends.emptyOutgoing")}</EmptyState>
             ) : null}
           </ul>
         </section>
 
-        <section className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm">
+        <section className="rounded-3xl border border-border/60 bg-card/75 p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-heading text-base font-semibold">
               {t("friends.list")}
@@ -310,10 +288,10 @@ export function FriendsClient({
               />
             ))}
             {!friends.length ? (
-              <li className="rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-sm text-muted-foreground">
+              <EmptyState as="li">
                 <UserRoundPlusIcon className="mx-auto mb-2 size-5" aria-hidden />
                 {t("friends.emptyFriends")}
-              </li>
+              </EmptyState>
             ) : null}
           </ul>
         </section>

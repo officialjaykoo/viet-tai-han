@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ListingAlertList } from "@/components/marketplace/listing-alert-list";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -23,6 +25,7 @@ export default async function MarketplaceAlertsPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-6">
           <Link
             href="/marketplace"
@@ -30,14 +33,11 @@ export default async function MarketplaceAlertsPage() {
           >
             ← {tLocale(locale, "marketplace.backToMarketplace")}
           </Link>
-          <section>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "marketplace.alerts")}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {tLocale(locale, "marketplace.alertNeedsFilter")}
-            </p>
-          </section>
+          <PageHero
+            eyebrow={tLocale(locale, "marketplace.eyebrow")}
+            title={tLocale(locale, "marketplace.alerts")}
+            description={tLocale(locale, "marketplace.alertNeedsFilter")}
+          />
           <ListingAlertList initialAlerts={alerts} />
         </PageShell>
       </main>

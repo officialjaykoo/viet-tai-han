@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ListingForm } from "@/components/marketplace/listing-form";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -23,10 +25,7 @@ export default async function NewMarketplaceListingPage() {
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="narrow" className="space-y-6">
           <Link
             href="/marketplace"
@@ -34,20 +33,14 @@ export default async function NewMarketplaceListingPage() {
           >
             ← {tLocale(locale, "marketplace.backToMarketplace")}
           </Link>
-          <section className="rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-            <p className="font-heading text-sm font-medium tracking-wide text-[var(--brand)] uppercase">
-              {tLocale(locale, "marketplace.eyebrow")}
-            </p>
-            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-              {tLocale(locale, "marketplace.newListing")}
-            </h1>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {tLocale(locale, "marketplace.contactPolicy")}
-            </p>
-            <div className="mt-6">
-              <ListingForm />
-            </div>
-          </section>
+          <PageHero
+            eyebrow={tLocale(locale, "marketplace.eyebrow")}
+            title={tLocale(locale, "marketplace.newListing")}
+            description={tLocale(locale, "marketplace.contactPolicy")}
+          />
+          <div className="rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+            <ListingForm />
+          </div>
         </PageShell>
       </main>
     </>

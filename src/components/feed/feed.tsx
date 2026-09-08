@@ -7,6 +7,7 @@ import { AdFeedCard } from "@/components/ads/ad-feed-card";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { PostCard } from "@/components/feed/post-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { apiFetch } from "@/lib/api-client";
 import type { FeedMode, FeedSort } from "@/lib/db";
 import type { FeedItem, PaginatedFeed } from "@/lib/types";
@@ -85,14 +86,14 @@ export function Feed({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border/80 bg-card/50 px-6 py-16 text-center">
+      <EmptyState className="bg-card/50 px-6 py-16">
         <p className="font-heading text-lg font-semibold">{t("feed.noPosts")}</p>
         <p className="mt-2 text-sm text-muted-foreground">
           {mode === "home"
             ? t("feed.emptyHomeHint")
             : t("feed.emptyPopularHint")}
         </p>
-      </div>
+      </EmptyState>
     );
   }
 

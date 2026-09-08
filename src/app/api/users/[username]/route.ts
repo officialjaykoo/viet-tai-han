@@ -15,6 +15,7 @@ import {
 } from "@/lib/user-actions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
+import { parseUserActionPayload } from "@/lib/relationship-payload";
 import { readApiJson } from "@/lib/security/guard";
 
 async function resolveUserId(username: string) {
@@ -37,19 +38,7 @@ export async function POST(
       return await jsonLocalizedError("User not found", 404);
     }
 
-    const body = (await readApiJson(request).catch(() => ({}))) as {
-      action?:
-        | "follow"
-        | "unfollow"
-        | "block"
-        | "unblock"
-        | "report"
-        | "friend_request"
-        | "friend_remove"
-        | "friend_cancel";
-      reason?: string;
-      details?: string;
-    };
+    const body = parseUserActionPayload(await readApiJson(request));
 
     switch (body.action) {
       case "follow":

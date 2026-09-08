@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { Feed } from "@/components/feed/feed";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
+import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { withFeedAds } from "@/lib/ads";
@@ -34,16 +36,14 @@ export default async function RecommendedPage() {
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
-        <PageShell width="standard">
-          <section className="mb-6">
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              {tLocale(locale, "pages.recommended")}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {tLocale(locale, "pages.recommendedBlurb")}
-            </p>
-          </section>
+      <main className="relative flex-1">
+        <PageBackdrop variant="subtle" />
+        <PageShell width="standard" className="space-y-6">
+          <PageHero
+            eyebrow={tLocale(locale, "nav.forYou")}
+            title={tLocale(locale, "pages.recommended")}
+            description={tLocale(locale, "pages.recommendedBlurb")}
+          />
           <Feed initialFeed={initialFeed} />
         </PageShell>
       </main>

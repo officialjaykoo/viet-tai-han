@@ -5,7 +5,10 @@ import { BusinessBookingPanel } from "@/components/business/business-booking-pan
 import { BusinessStatusControls } from "@/components/business/business-status-controls";
 import { BusinessVerificationForm } from "@/components/business/business-verification-form";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
+import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/user/user-avatar";
 import type { Locale } from "@/lib/i18n/config";
 import {
@@ -74,10 +77,7 @@ export default async function BusinessDetailPage({
     <>
       <SiteHeader />
       <main className="relative flex-1">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"
-        />
+        <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-6">
           <Link href="/businesses" className="text-sm font-medium text-[var(--brand)] hover:underline">
             ← {tLocale(locale, "business.titlePage")}
@@ -136,14 +136,14 @@ export default async function BusinessDetailPage({
                 href={mapHref(business)}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-9 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+                className={buttonVariants({ size: "sm" })}
               >
                 {tLocale(locale, "business.openMap")}
               </a>
               {business.owner.username && !business.owner.isOwner ? (
                 <Link
                   href={`/messages?to=${encodeURIComponent(business.owner.username)}`}
-                  className="inline-flex min-h-9 items-center rounded-full border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   {tLocale(locale, "business.messageOwner")}
                 </Link>
@@ -151,7 +151,7 @@ export default async function BusinessDetailPage({
               {business.owner.isOwner ? (
                 <Link
                   href={`/businesses/${business.slug}/edit`}
-                  className="inline-flex min-h-9 items-center rounded-full border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   {tLocale(locale, "business.edit")}
                 </Link>
@@ -172,7 +172,7 @@ export default async function BusinessDetailPage({
           <section className="space-y-3">
             <h2 className="font-heading text-xl font-semibold">{tLocale(locale, "business.services")}</h2>
             {business.services.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{tLocale(locale, "business.noServices")}</p>
+              <EmptyState>{tLocale(locale, "business.noServices")}</EmptyState>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2">
                 {business.services.map((service) => (

@@ -243,7 +243,7 @@ test.describe("authenticated flows", () => {
     await expect(
       mobileNav.locator('a[aria-label="Đăng bài"]')
     ).toHaveCount(0);
-    await expect(mobileNav.getByRole("link")).toHaveCount(7);
+    await expect(mobileNav.getByRole("link")).toHaveCount(5);
 
     const positions = await Promise.all(
       [menu, logo, create, search, messages].map(async (locator) => {

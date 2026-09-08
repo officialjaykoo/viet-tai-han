@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cancelChatRequest, respondToChatRequest } from "@/lib/messages";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
+import { parseChatRequestActionPayload } from "@/lib/relationship-payload";
 import { readApiJson } from "@/lib/security/guard";
 
 export async function POST(
@@ -12,7 +13,7 @@ export async function POST(
   try {
     const session = await requireSession();
     const { id } = await context.params;
-    const body = (await readApiJson(request)) as { action?: string };
+    const body = parseChatRequestActionPayload(await readApiJson(request));
     if (
       body.action !== "accept" &&
       body.action !== "decline" &&
