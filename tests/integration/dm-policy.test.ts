@@ -169,12 +169,12 @@ describe("DM relationship policy (D1)", () => {
     await flushBackgroundWork();
     const firstNotification = await env.DB
       .prepare(
-        `SELECT request_id, is_read
+        `SELECT source_request_id, is_read
          FROM notifications
-         WHERE user_id = ? AND kind = 'chat_request' AND request_id = ?`
+         WHERE user_id = ? AND kind = 'chat_request' AND source_request_id = ?`
       )
       .bind(recipientId, first.requestId)
-      .first<{ request_id: string; is_read: number }>();
+      .first<{ source_request_id: string; is_read: number }>();
     expect(firstNotification?.is_read).toBe(0);
 
     const [, second] = await Promise.all([
@@ -188,26 +188,135 @@ describe("DM relationship policy (D1)", () => {
 
     const notifications = await env.DB
       .prepare(
-        `SELECT request_id, is_read
+        `SELECT source_request_id, is_read
          FROM notifications
          WHERE user_id = ? AND kind = 'chat_request'
-           AND request_id IN (?, ?)
-         ORDER BY request_id`
+           AND source_request_id IN (?, ?)
+         ORDER BY source_request_id`
       )
       .bind(recipientId, first.requestId, second.requestId)
-      .all<{ request_id: string; is_read: number }>();
+      .all<{ source_request_id: string; is_read: number }>();
     expect(
       notifications.results?.find(
-        (notification) => notification.request_id === first.requestId
+        (notification) => notification.source_request_id === first.requestId
       )?.is_read
     ).toBe(1);
     expect(
       notifications.results?.find(
-        (notification) => notification.request_id === second.requestId
+        (notification) => notification.source_request_id === second.requestId
       )?.is_read
     ).toBe(0);
     expect((await getUnreadCounts(recipientId)).notificationCount).toBe(1);
   });
+  it("drops a delayed chat request notification after cancellation", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const senderId = `dm_delayed_sender_${suffix}`;
+    const recipientId = `dm_delayed_recipient_${suffix}`;
+    await Promise.all([
+      insertUser(senderId, senderId),
+      insertUser(recipientId, recipientId),
+    ]);
+
+    const request = await start(senderId, recipientId, "Delayed request");
+    await cancelChatRequest({
+      requestId: request.requestId!,
+      userId: senderId,
+    });
+    const before = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND kind = 'chat_request'
+           AND actor_id = ?`
+      )
+      .bind(recipientId, senderId)
+      .first<{ count: number }>();
+
+    await expect(
+      createNotification({
+        userId: recipientId,
+        actorId: senderId,
+        kind: "chat_request",
+        sourceRequestId: request.requestId!,
+        title: "Delayed chat request",
+      })
+    ).resolves.toBeNull();
+    const after = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND kind = 'chat_request'
+           AND actor_id = ?`
+      )
+      .bind(recipientId, senderId)
+      .first<{ count: number }>();
+
+    expect(Number(after?.count ?? 0)).toBe(Number(before?.count ?? 0));
+    expect((await getUnreadCounts(recipientId)).notificationCount).toBe(0);
+  });
+
+  it("keeps the second chat notification unread after the first is cancelled", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const recipientId = `dm_fanout_recipient_${suffix}`;
+    const senderOneId = `dm_fanout_sender_one_${suffix}`;
+    const senderTwoId = `dm_fanout_sender_two_${suffix}`;
+    await setSiteSetting("max_dm_requests_burst_per_min", "10");
+    await setSiteSetting("max_dm_requests_per_hour", "50");
+    await Promise.all([
+      insertUser(senderOneId, senderOneId),
+      insertUser(senderTwoId, senderTwoId),
+      insertUser(recipientId, recipientId),
+    ]);
+
+    const first = await start(senderOneId, recipientId, "First request");
+    const second = await start(senderTwoId, recipientId, "Second request");
+    await flushBackgroundWork();
+    expect((await getUnreadCounts(recipientId)).notificationCount).toBe(2);
+
+    await cancelChatRequest({
+      requestId: first.requestId!,
+      userId: senderOneId,
+    });
+    const notifications = await env.DB
+      .prepare(
+        `SELECT source_request_id, is_read
+         FROM notifications
+         WHERE user_id = ? AND kind = 'chat_request'
+           AND source_request_id IN (?, ?)
+         ORDER BY source_request_id`
+      )
+      .bind(recipientId, first.requestId, second.requestId)
+      .all<{ source_request_id: string; is_read: number }>();
+    expect(notifications.results).toEqual(
+      expect.arrayContaining([
+        { source_request_id: first.requestId, is_read: 1 },
+        { source_request_id: second.requestId, is_read: 0 },
+      ])
+    );
+
+    const canonical = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND is_read = 0`
+      )
+      .bind(recipientId)
+      .first<{ count: number }>();
+    const fanout = await env.DB
+      .prepare(
+        `SELECT notification_count
+         FROM unread_fanout
+         WHERE user_id = ?`
+      )
+      .bind(recipientId)
+      .first<{ notification_count: number }>();
+    expect(Number(canonical?.count ?? 0)).toBe(1);
+    expect(Number(fanout?.notification_count ?? 0)).toBe(
+      Number(canonical?.count ?? 0)
+    );
+    expect((await getUnreadCounts(recipientId)).notificationCount).toBe(1);
+  });
+
 
   it("uses opposite follow directions for direct access and request privacy", async () => {
     const cases: Array<{

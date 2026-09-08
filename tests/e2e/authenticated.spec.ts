@@ -20,7 +20,7 @@ test.describe("authenticated flows", () => {
     await seedLocaleCookie(page);
   });
 
-  test("account can post, comment, like, hide, open settings, create community", async ({
+  test("account can post, comment, like, hide, open settings, browse communities", async ({
     page,
   }) => {
     await disguiseAutomation(page);
@@ -85,20 +85,14 @@ test.describe("authenticated flows", () => {
       page.getByRole("heading", { name: /cài đặt/i }).first()
     ).toBeVisible({ timeout: 20_000 });
 
-    // Create community
+    // Browse the communities directory.
     await page.goto("/communities", { waitUntil: "domcontentloaded" });
-    await waitForHydration(page);
-    await page.getByRole("button", { name: /tạo cộng đồng/i }).click();
-    await waitForHydration(page);
-    await warmBotGuard(page);
-    const name = `e2e${Date.now().toString(36).slice(-6)}`;
-    await page.getByPlaceholder(/tên \(ví dụ/i).fill(name);
-    await page.getByPlaceholder(/tên hiển thị/i).fill(`E2E ${name}`);
-    await page
-      .getByPlaceholder(/giới thiệu về cộng đồng này/i)
-      .fill("Playwright community");
-    await page.getByRole("button", { name: /tạo cộng đồng/i }).click();
-    await expect(page).toHaveURL(new RegExp(`/r/${name}`), { timeout: 45_000 });
+    await expect(
+      page.getByRole("heading", { name: /cộng đồng/i, level: 1 })
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole("button", { name: /tạo cộng đồng/i })
+    ).toHaveCount(0);
   });
   test("composer shortcuts preserve post type", async ({ page }) => {
     await disguiseAutomation(page);
@@ -216,7 +210,7 @@ test.describe("authenticated flows", () => {
     expect(ordered).toEqual([...ordered].sort((a, b) => a - b));
   });
 
-  test("mobile chrome follows scroll direction and account menu", async ({
+  test("mobile chrome stays visible during scroll and account menu", async ({
     page,
   }) => {
     await disguiseAutomation(page);
@@ -263,10 +257,14 @@ test.describe("authenticated flows", () => {
     await page.keyboard.press("Escape");
 
     await page.evaluate(() => window.scrollTo(0, 800));
-    await expect(header).toHaveClass(/-translate-y-full/);
-    await expect(mobileNav).toHaveClass(/translate-y-full/);
+    await expect(header).toBeVisible();
+    await expect(mobileNav).toBeVisible();
+    await expect(header).not.toHaveClass(/-translate-y-full/);
+    await expect(mobileNav).not.toHaveClass(/translate-y-full/);
 
     await page.evaluate(() => window.scrollTo(0, 500));
+    await expect(header).toBeVisible();
+    await expect(mobileNav).toBeVisible();
     await expect(header).not.toHaveClass(/-translate-y-full/);
     await expect(mobileNav).not.toHaveClass(/translate-y-full/);
   });

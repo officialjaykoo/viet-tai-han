@@ -653,18 +653,27 @@ describe("DM integrity invariants (D1)", () => {
       )
       .bind(room.roomId)
       .first<{ id: string; created_at: string }>();
-    const boundary = await env.DB
+    const boundaries = await env.DB
       .prepare(
-        `SELECT last_read_at, last_read_message_id
+        `SELECT user_id, last_read_at, last_read_message_id
          FROM chat_room_members
-         WHERE room_id = ? AND user_id = ?`
+         WHERE room_id = ? AND user_id IN (?, ?)
+         ORDER BY user_id`
       )
-      .bind(room.roomId, pair.recipientId)
-      .first<{ last_read_at: string | null; last_read_message_id: string | null }>();
-    expect(boundary).toEqual({
-      last_read_at: latest?.created_at,
-      last_read_message_id: latest?.id,
-    });
+      .bind(room.roomId, pair.recipientId, pair.senderId)
+      .all<{
+        user_id: string;
+        last_read_at: string | null;
+        last_read_message_id: string | null;
+      }>();
+    const expectedBoundaries = [pair.recipientId, pair.senderId]
+      .sort()
+      .map((user_id) => ({
+        user_id,
+        last_read_at: latest?.created_at,
+        last_read_message_id: latest?.id,
+      }));
+    expect(boundaries.results ?? []).toEqual(expectedBoundaries);
     expect(first.id).not.toBe(second.id);
   });
 
@@ -724,29 +733,41 @@ describe("DM integrity invariants (D1)", () => {
       userId: pair.senderId,
       body: "Old unread history",
     });
+    await sendChatMessage({
+      roomId: first.roomId,
+      userId: pair.recipientId,
+      body: "Old unread reply",
+    });
     expect((await getUnreadCounts(pair.recipientId)).messageCount).toBeGreaterThan(0);
+    expect((await getUnreadCounts(pair.senderId)).messageCount).toBeGreaterThan(0);
 
     await blockUser(pair.recipientId, pair.senderId);
+    await Promise.all([
+      refreshUnreadCounts(pair.recipientId),
+      refreshUnreadCounts(pair.senderId),
+    ]);
     expect((await getUnreadCounts(pair.recipientId)).messageCount).toBe(0);
+    expect((await getUnreadCounts(pair.senderId)).messageCount).toBe(0);
     await unblockUser(pair.recipientId, pair.senderId);
+    expect((await getUnreadCounts(pair.recipientId)).messageCount).toBe(0);
+    expect((await getUnreadCounts(pair.senderId)).messageCount).toBe(0);
 
+    await allowDirectAccess(pair.senderId, pair.recipientId);
     const replacement = await start(
       pair.senderId,
       pair.recipientUsername,
       "Second epoch"
     );
-    await respondToChatRequest({
-      requestId: replacement.requestId!,
-      userId: pair.recipientId,
-      accept: true,
-    });
+    expect(replacement.conversationType).toBe("direct");
     expect((await getUnreadCounts(pair.recipientId)).messageCount).toBe(1);
+    expect((await getUnreadCounts(pair.senderId)).messageCount).toBe(0);
 
     await sendChatMessage({
       roomId: replacement.roomId,
-      userId: pair.senderId,
+      userId: pair.recipientId,
       body: "New unread history",
     });
-    expect((await getUnreadCounts(pair.recipientId)).messageCount).toBe(2);
+    expect((await getUnreadCounts(pair.recipientId)).messageCount).toBe(1);
+    expect((await getUnreadCounts(pair.senderId)).messageCount).toBe(1);
   });
 });

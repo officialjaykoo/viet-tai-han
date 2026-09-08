@@ -166,13 +166,13 @@ export async function sendFriendRequest(
     };
   }
 
-  const requestId = current?.id ?? createPublicId();
+  const requestId = createPublicId();
   let changed = 0;
   if (current) {
     const result = await db
       .prepare(
         `UPDATE user_friendships
-         SET requester_id = ?, addressee_id = ?, status = 'pending',
+         SET id = ?, requester_id = ?, addressee_id = ?, status = 'pending',
              created_at = datetime('now'), updated_at = datetime('now')
          WHERE id = ? AND status = 'declined'
            AND NOT EXISTS (
@@ -182,9 +182,10 @@ export async function sendFriendRequest(
            )`
       )
       .bind(
+        requestId,
         requesterId,
         addresseeId,
-        requestId,
+        current.id,
         requesterId,
         addresseeId,
         addresseeId,
@@ -252,7 +253,7 @@ export async function sendFriendRequest(
     userId: addresseeId,
     actorId: requesterId,
     kind: "friend_request",
-    requestId,
+    sourceRequestId: requestId,
     title: `${formatUserHandle(requester?.username)} sent you a friend request`,
     href: getUsernameProfileHref(requester?.username) ?? "/friends",
   });
@@ -290,7 +291,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
       recipientId: userId,
       actorId: request.requester_id,
       kind: "friend_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     });
     scheduleChatPromotion({
       firstUserId: request.requester_id,
@@ -322,7 +323,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
       recipientId: userId,
       actorId: request.requester_id,
       kind: "friend_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     }),
   ]);
   if (Number(result?.meta.changes ?? 0) !== 1) {
@@ -347,7 +348,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
         recipientId: userId,
         actorId: request.requester_id,
         kind: "friend_request",
-        requestId: request.id,
+        sourceRequestId: request.id,
       });
       scheduleChatPromotion({
         firstUserId: request.requester_id,
@@ -424,7 +425,7 @@ export async function declineFriendRequest(userId: string, requestId: string) {
       recipientId: userId,
       actorId: request.requester_id,
       kind: "friend_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     }),
   ]);
   if (!Number(result?.meta.changes ?? 0)) {
@@ -458,7 +459,7 @@ export async function cancelFriendRequest(userId: string, requestId: string) {
       recipientId: request.addressee_id,
       actorId: userId,
       kind: "friend_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     }),
   ]);
   if (!Number(result?.meta.changes ?? 0)) {

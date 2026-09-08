@@ -18,7 +18,7 @@ import {
   unblockUser,
 } from "@/lib/user-actions";
 import { getUnreadCounts } from "@/lib/unread";
-import { listNotifications } from "@/lib/notifications";
+import { createNotification, listNotifications } from "@/lib/notifications";
 
 async function seedFriendUsers() {
   const suffix = crypto.randomUUID().slice(0, 8);
@@ -189,7 +189,7 @@ describe("friend relationships (D1)", () => {
         `SELECT COUNT(*) AS count
          FROM notifications
          WHERE user_id = ? AND kind = 'friend_request'
-           AND request_id = ? AND is_read = 0`
+           AND source_request_id = ? AND is_read = 0`
       )
       .bind(secondId, sent.requestId)
       .first<{ count: number }>();
@@ -208,6 +208,126 @@ describe("friend relationships (D1)", () => {
     await cancelFriendRequest(firstId, cancelled.requestId!);
     expect((await getUnreadCounts(secondId)).notificationCount).toBe(0);
   });
+  it("allocates a new entity id when reopening a declined friend request", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    const first = await sendFriendRequest(firstId, secondId);
+    await declineFriendRequest(secondId, first.requestId!);
+
+    const second = await sendFriendRequest(firstId, secondId);
+    expect(second.requestId).toBeTruthy();
+    expect(second.requestId).not.toBe(first.requestId);
+
+    const row = await env.DB
+      .prepare(
+        `SELECT id, pair_key, status
+         FROM user_friendships
+         WHERE id = ?`
+      )
+      .bind(second.requestId)
+      .first<{ id: string; pair_key: string; status: string }>();
+    expect(row).toEqual({
+      id: second.requestId,
+      pair_key: [firstId, secondId].sort().join(":"),
+      status: "pending",
+    });
+    await expect(
+      acceptFriendRequest(secondId, first.requestId!)
+    ).rejects.toMatchObject({ status: 404 });
+    expect(await getFriendRelation(secondId, firstId)).toMatchObject({
+      status: "incoming",
+      requestId: second.requestId,
+    });
+  });
+
+  it("drops a delayed friend request notification after decline", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    const request = await sendFriendRequest(firstId, secondId);
+    await declineFriendRequest(secondId, request.requestId!);
+
+    const before = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND kind = 'friend_request'
+           AND actor_id = ?`
+      )
+      .bind(secondId, firstId)
+      .first<{ count: number }>();
+    await expect(
+      createNotification({
+        userId: secondId,
+        actorId: firstId,
+        kind: "friend_request",
+        sourceRequestId: request.requestId!,
+        title: "Delayed friend request",
+      })
+    ).resolves.toBeNull();
+    const after = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND kind = 'friend_request'
+           AND actor_id = ?`
+      )
+      .bind(secondId, firstId)
+      .first<{ count: number }>();
+
+    expect(Number(after?.count ?? 0)).toBe(Number(before?.count ?? 0));
+    expect((await getUnreadCounts(secondId)).notificationCount).toBe(0);
+  });
+
+  it("keeps the second friend notification unread after the first declines", async () => {
+    const firstPair = await seedFriendUsers();
+    const secondPair = await seedFriendUsers();
+    const first = await sendFriendRequest(firstPair.firstId, firstPair.secondId);
+    const second = await sendFriendRequest(
+      secondPair.firstId,
+      firstPair.secondId
+    );
+    await flushBackgroundWork();
+    expect((await getUnreadCounts(firstPair.secondId)).notificationCount).toBe(2);
+
+    await declineFriendRequest(firstPair.secondId, first.requestId!);
+    const notifications = await env.DB
+      .prepare(
+        `SELECT source_request_id, is_read
+         FROM notifications
+         WHERE user_id = ? AND kind = 'friend_request'
+           AND source_request_id IN (?, ?)
+         ORDER BY source_request_id`
+      )
+      .bind(firstPair.secondId, first.requestId, second.requestId)
+      .all<{ source_request_id: string; is_read: number }>();
+    expect(notifications.results).toEqual(
+      expect.arrayContaining([
+        { source_request_id: first.requestId, is_read: 1 },
+        { source_request_id: second.requestId, is_read: 0 },
+      ])
+    );
+
+    const canonical = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM notifications
+         WHERE user_id = ? AND is_read = 0`
+      )
+      .bind(firstPair.secondId)
+      .first<{ count: number }>();
+    const fanout = await env.DB
+      .prepare(
+        `SELECT notification_count
+         FROM unread_fanout
+         WHERE user_id = ?`
+      )
+      .bind(firstPair.secondId)
+      .first<{ notification_count: number }>();
+    expect(Number(canonical?.count ?? 0)).toBe(1);
+    expect(Number(fanout?.notification_count ?? 0)).toBe(
+      Number(canonical?.count ?? 0)
+    );
+    expect((await getUnreadCounts(firstPair.secondId)).notificationCount).toBe(1);
+  });
+
 
 
   it("never leaves an accepted friendship after concurrent block", async () => {

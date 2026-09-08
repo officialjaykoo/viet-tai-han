@@ -336,7 +336,7 @@ async function notifyChatRequest(input: {
   recipientId: string;
   senderId: string;
   body: string;
-  requestId: string;
+  sourceRequestId: string;
 }) {
   const actor = await input.db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
@@ -346,7 +346,7 @@ async function notifyChatRequest(input: {
     userId: input.recipientId,
     actorId: input.senderId,
     kind: "chat_request",
-    requestId: input.requestId,
+    sourceRequestId: input.sourceRequestId,
     title: `${formatUserHandle(actor?.username)} wants to message you`,
     body: input.body.slice(0, 140),
     href: "/messages",
@@ -909,7 +909,7 @@ async function promotePendingRequest(
       recipientId: request.to_user_id,
       actorId: request.from_user_id,
       kind: "chat_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     }),
   ]);
 
@@ -945,7 +945,7 @@ async function promotePendingRequest(
     recipientId: request.to_user_id,
     actorId: request.from_user_id,
     kind: "chat_request",
-    requestId: request.id,
+    sourceRequestId: request.id,
   });
   const retryPendingMessages = await countPendingRequestMessages(db, request);
   const retryCount = Number(retryPendingMessages?.count ?? 0);
@@ -1306,7 +1306,7 @@ async function createChatRequest(context: ConversationStartContext) {
         recipientId: context.toUser.id,
         senderId: context.input.fromUserId,
         body: context.body,
-        requestId: requestEntityId,
+        sourceRequestId: requestEntityId,
       })
     );
   }
@@ -1772,7 +1772,7 @@ export async function respondToChatRequest(input: {
       recipientId: request.to_user_id,
       actorId: request.from_user_id,
       kind: "chat_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     }),
   ]);
   if (!Number(requestUpdate?.meta.changes ?? 0)) {
@@ -1817,7 +1817,7 @@ export async function cancelChatRequest(input: {
         recipientId: request.to_user_id,
         actorId: request.from_user_id,
         kind: "chat_request",
-        requestId: request.id,
+        sourceRequestId: request.id,
       });
       return { roomId: request.room_id, status: "cancelled" as const };
     }
@@ -1871,7 +1871,7 @@ export async function cancelChatRequest(input: {
       recipientId: request.to_user_id,
       actorId: request.from_user_id,
       kind: "chat_request",
-      requestId: request.id,
+      sourceRequestId: request.id,
     }),
   ]);
   if (!Number(requestUpdate?.meta.changes ?? 0)) {

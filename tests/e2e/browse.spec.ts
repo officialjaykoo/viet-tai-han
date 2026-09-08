@@ -7,13 +7,16 @@ test.describe("public browsing", () => {
     await seedLocaleCookie(page);
   });
 
-  test("home feed sort controls are present", async ({ page }) => {
+  test("guest feed uses the default home view", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
     await expect(
-      page.getByRole("tablist", { name: /sắp xếp bảng tin/i })
+      page.getByRole("heading", { name: "Việt tại Hàn", level: 1 })
     ).toBeVisible();
-    await expect(page.getByRole("tab", { name: /đề xuất/i })).toBeVisible();
+    await expect(page.getByTestId("feed-composer")).toBeVisible();
+    await expect(
+      page.getByRole("tablist", { name: /loại bảng tin/i })
+    ).toHaveCount(0);
   });
   test("guest navigation excludes private shortcuts", async ({
     page,

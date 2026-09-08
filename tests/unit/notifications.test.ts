@@ -67,7 +67,7 @@ describe("notification insert invariants", () => {
         userId: "recipient-1",
         actorId: "blocked-actor",
         kind: "chat_request",
-        requestId: "request-1",
+        sourceRequestId: "request-1",
         title: "Blocked request",
       })
     ).resolves.toBeNull();

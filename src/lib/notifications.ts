@@ -72,7 +72,7 @@ export async function createNotification(input: {
   href?: string | null;
   postId?: string | null;
   commentId?: string | null;
-  requestId?: string | null;
+  sourceRequestId?: string | null;
 }) {
   // Never notify yourself
   if (input.actorId && input.actorId === input.userId) return null;
@@ -127,7 +127,7 @@ export async function createNotification(input: {
       .prepare(
         `INSERT INTO notifications (
            id, user_id, actor_id, kind, title, body, href, post_id, comment_id,
-           request_id
+           source_request_id
          )
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE (
@@ -176,7 +176,7 @@ export async function createNotification(input: {
         input.href?.slice(0, 400) ?? null,
         input.postId ?? null,
         input.commentId ?? null,
-        input.requestId ?? null,
+        input.sourceRequestId ?? null,
         blockGuarded ? 1 : 0,
         input.userId,
         input.actorId ?? null,
@@ -184,11 +184,11 @@ export async function createNotification(input: {
         input.userId,
         requestGuarded ? 1 : 0,
         input.kind,
-        input.requestId ?? null,
+        input.sourceRequestId ?? null,
         input.actorId ?? null,
         input.userId,
         input.kind,
-        input.requestId ?? null,
+        input.sourceRequestId ?? null,
         input.actorId ?? null,
         input.userId
       ),
@@ -243,7 +243,7 @@ export function actionableNotificationReadStatements(
     recipientId: string;
     actorId: string;
     kind: "friend_request" | "chat_request";
-    requestId: string;
+    sourceRequestId: string;
   }
 ) {
   return [
@@ -255,13 +255,13 @@ export function actionableNotificationReadStatements(
            AND actor_id = ?
            AND kind = ?
            AND is_read = 0
-           AND (request_id = ? OR request_id IS NULL)`
+           AND (source_request_id = ? OR source_request_id IS NULL)`
       )
       .bind(
         input.recipientId,
         input.actorId,
         input.kind,
-        input.requestId
+        input.sourceRequestId
       ),
     db
       .prepare(
@@ -287,7 +287,7 @@ export async function reconcileActionableNotification(input: {
   recipientId: string;
   actorId: string;
   kind: "friend_request" | "chat_request";
-  requestId: string;
+  sourceRequestId: string;
 }) {
   const db = await getDb();
   const [result] = await db.batch(

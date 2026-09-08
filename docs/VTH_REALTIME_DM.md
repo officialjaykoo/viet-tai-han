@@ -74,6 +74,8 @@ D1 write가 성공한 뒤 `broadcastChatMessage()`가 room DO에 이벤트를 �
 
 `clientMessageId`가 같은 재시도는 기존 canonical message를 반환하며 message row, unread side effect, notification, broadcast를 중복 생성하지 않습니다. `requestId`는 기존 클라이언트 호환 alias로 허용됩니다.
 
+알림 source identity는 client idempotency token이 아닙니다. Friend request는 `user_friendships.id`, chat request는 `chat_requests.id`를 `notifications.source_request_id`에 저장하며, chat의 `chat_requests.request_id`는 client idempotency token으로만 사용합니다.
+
 ## 5. Request와 room 불변식
 
 - room은 immutable 두 사용자 ID의 정렬된 pair key로 식별합니다.

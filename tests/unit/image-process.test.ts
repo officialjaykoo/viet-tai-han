@@ -152,12 +152,18 @@ describe("image-process", () => {
       assertSourceImageDimensions(makeJpegHeader(8192, 1), "jpeg")
     ).not.toThrow();
   });
+  it("processes a browser-sized 2048px JPEG", () => {
+    expect(() => processUploadedImage(makeJpeg(2048, 2048))).not.toThrow();
+  });
   it("rejects Worker-risky RGBA pixel counts before decode", () => {
     expect(() =>
-      assertSourceImageDimensions(makeJpegHeader(4001, 3000), "jpeg")
+      assertSourceImageDimensions(makeJpegHeader(4001, 2000), "jpeg")
     ).toThrow(/dimensions/i);
     expect(() =>
-      assertSourceImageDimensions(makeJpegHeader(4000, 3000), "jpeg")
+      assertSourceImageDimensions(makeJpegHeader(4000, 2000), "jpeg")
+    ).not.toThrow();
+    expect(() =>
+      assertSourceImageDimensions(makeJpegHeader(2048, 2048), "jpeg")
     ).not.toThrow();
   });
 
@@ -165,6 +171,12 @@ describe("image-process", () => {
     expect(() =>
       assertSourceImageDimensions(makePngHeader(8193, 1), "png")
     ).toThrow(/dimensions/i);
+    expect(() =>
+      assertSourceImageDimensions(makePngHeader(4001, 2000), "png")
+    ).toThrow(/dimensions/i);
+    expect(() =>
+      assertSourceImageDimensions(makePngHeader(4000, 2000), "png")
+    ).not.toThrow();
     expect(() =>
       assertSourceImageDimensions(makeWebpVp8xHeader(8193, 1), "webp")
     ).toThrow(/dimensions/i);
