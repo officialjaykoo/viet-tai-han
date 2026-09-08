@@ -23,6 +23,7 @@ import {
   verifyPow,
   verifyRouteGate,
 } from "@/lib/security/challenge";
+import { isAtkOnlyMutation } from "@/lib/security/tunnel-policy";
 import { sha256Hex, timingSafeEqual } from "@/lib/security/crypto";
 import { enforceApiMutateRateLimit, enforceApiReadRateLimit } from "@/lib/rate-limit";
 import { AuthError, getSession } from "@/lib/session";
@@ -102,6 +103,11 @@ async function verifyEnvelope(
   // Reads: signed with session ATK only (no one-time challenge / PoW).
   if (method === "GET" || method === "HEAD") {
     await enforceApiReadRateLimit({ ip });
+    return { ip, atk, bootstrap: false };
+  }
+
+  // Logout is an authenticated session cleanup mutation, not a product write.
+  if (isAtkOnlyMutation(method, path)) {
     return { ip, atk, bootstrap: false };
   }
 

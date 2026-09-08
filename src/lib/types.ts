@@ -47,6 +47,7 @@ export interface CommentRow {
   like_count: number;
   depth: number;
   is_deleted: number;
+  is_removed: number;
   created_at: string;
   updated_at: string;
 }

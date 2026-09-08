@@ -19,6 +19,7 @@ export interface CommentNode {
   depth: number;
   createdAt: string;
   isDeleted: boolean;
+  isRemoved: boolean;
   liked: ViewerLike;
   translation: ContentTranslation | null;
   author: {
@@ -290,7 +291,8 @@ export async function getPostDetail(
         .prepare(
           `SELECT
              c.id, c.post_id, c.parent_id, c.body, c.like_count,
-             c.depth, c.created_at, c.is_deleted, c.is_shadow_hidden,
+             c.depth, c.created_at, c.is_deleted, c.is_removed,
+             c.is_shadow_hidden,
              c.source_lang, c.body_translated, c.translation_status,
              c.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
@@ -303,8 +305,19 @@ export async function getPostDetail(
              ) AS viewer_liked
            FROM comments c
            INNER JOIN "user" u ON u.id = c.author_id
-           WHERE c.post_id = ? AND c.is_removed = 0
-           ORDER BY c.created_at ASC`
+           WHERE c.post_id = ?
+             AND c.is_shadow_hidden = 0
+             AND (
+               (c.is_removed = 0 AND c.is_deleted = 0)
+               OR EXISTS (
+                 SELECT 1
+                 FROM comments child
+                 WHERE child.parent_id = c.id
+                   AND child.is_removed = 0
+                   AND child.is_shadow_hidden = 0
+               )
+             )
+           ORDER BY c.created_at ASC, c.id ASC`
         )
         .bind(viewerUserId, postId)
         .all()
@@ -312,7 +325,8 @@ export async function getPostDetail(
         .prepare(
           `SELECT
              c.id, c.post_id, c.parent_id, c.body, c.like_count,
-             c.depth, c.created_at, c.is_deleted, c.is_shadow_hidden,
+             c.depth, c.created_at, c.is_deleted, c.is_removed,
+             c.is_shadow_hidden,
              c.source_lang, c.body_translated, c.translation_status,
              c.translation_target_lang,
              u.id AS author_id, u.username AS author_username,
@@ -322,8 +336,19 @@ export async function getPostDetail(
              0 AS viewer_liked
            FROM comments c
            INNER JOIN "user" u ON u.id = c.author_id
-           WHERE c.post_id = ? AND c.is_removed = 0
-           ORDER BY c.created_at ASC`
+           WHERE c.post_id = ?
+             AND c.is_shadow_hidden = 0
+             AND (
+               (c.is_removed = 0 AND c.is_deleted = 0)
+               OR EXISTS (
+                 SELECT 1
+                 FROM comments child
+                 WHERE child.parent_id = c.id
+                   AND child.is_removed = 0
+                   AND child.is_shadow_hidden = 0
+               )
+             )
+           ORDER BY c.created_at ASC, c.id ASC`
         )
         .bind(postId)
         .all();
@@ -341,6 +366,7 @@ export async function getPostDetail(
       depth: number;
       created_at: string;
       is_deleted: number;
+      is_removed: number;
       is_shadow_hidden: number;
       source_lang: string | null;
       translation_target_lang: string | null;
@@ -363,13 +389,18 @@ export async function getPostDetail(
       id: row.id,
       postId: row.post_id,
       parentId: row.parent_id,
-      body: row.is_deleted ? "[deleted]" : row.body,
+      body: row.is_deleted
+        ? "[deleted]"
+        : row.is_removed
+          ? "[removed]"
+          : row.body,
       likeCount: Number(row.like_count ?? 0),
       depth: row.depth,
       createdAt: row.created_at,
       isDeleted: Boolean(row.is_deleted),
+      isRemoved: Boolean(row.is_removed),
       liked: Boolean(row.viewer_liked),
-      translation: row.is_deleted
+      translation: row.is_deleted || row.is_removed
         ? null
         : mapTranslation({
             source_lang: row.source_lang,
@@ -398,11 +429,22 @@ export async function getPostDetail(
   }
 
   for (const node of nodes.values()) {
-    if (node.parentId && nodes.has(node.parentId)) {
-      nodes.get(node.parentId)!.children.push(node);
-    } else {
+    if (node.parentId === null) {
       roots.push(node);
+      continue;
     }
+
+    const parent = nodes.get(node.parentId);
+    if (parent) {
+      parent.children.push(node);
+      continue;
+    }
+
+    console.warn("comment_tree_orphan", {
+      commentId: node.id,
+      parentId: node.parentId,
+      postId: node.postId,
+    });
   }
 
   return {
@@ -602,6 +644,7 @@ export async function listUserComments(
        INNER JOIN subreddits s ON s.id = p.subreddit_id
        WHERE c.author_id = ?
          AND c.is_removed = 0
+         AND c.is_deleted = 0
          AND c.is_shadow_hidden = 0
          AND p.is_removed = 0
        ORDER BY c.created_at DESC

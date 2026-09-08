@@ -51,6 +51,7 @@ export const vi: Messages = {
     continueHint:
       "Không cần email hoặc mật khẩu. Bạn có thể thêm email liên hệ sau.",
     couldNotContinue: "Không thể tiếp tục",
+    signOutFailed: "Không thể đăng xuất. Hãy thử lại.",
   },
   onboarding: {
     eyebrow: "Thiết lập lần đầu",
@@ -142,6 +143,7 @@ export const vi: Messages = {
     imageRequired: "Thêm hình ảnh",
     imageProcessError: "Không thể xử lý hình ảnh",
     imageUploadFailed: "Tải hình ảnh lên thất bại",
+    networkError: "Yêu cầu mạng thất bại. Bản nháp vẫn được giữ; hãy thử lại.",
     deleteConfirm: "Xóa bài đăng này?",
     range7d: "7 ngày qua",
     range30d: "30 ngày qua",
@@ -172,6 +174,7 @@ export const vi: Messages = {
     noComments: "Chưa có bình luận. Hãy là người đầu tiên.",
     placeholder: "Bạn nghĩ gì?",
     deleted: "[đã xóa]",
+    removed: "[đã bị quản trị viên gỡ]",
     deleteConfirm: "Xóa bình luận này?",
   },
   questions: {
@@ -410,8 +413,10 @@ export const vi: Messages = {
       "Trò chuyện riêng mở trực tiếp với các mối quan hệ phù hợp; cuộc trò chuyện mới khác có thể cần chấp nhận.",
     empty: "Chưa có cuộc trò chuyện",
     requests: "Yêu cầu",
+    sentRequests: "Yêu cầu đã gửi",
     accept: "Chấp nhận",
     decline: "Từ chối",
+    cancelRequest: "Hủy yêu cầu",
     send: "Gửi",
     placeholder: "Viết tin nhắn…",
     loadError: "Không thể tải tin nhắn",
@@ -810,6 +815,7 @@ export const vi: Messages = {
   common: {
     loading: "Đang tải…",
     error: "Đã xảy ra lỗi",
+    networkError: "Yêu cầu mạng thất bại. Hãy thử lại.",
     save: "Lưu",
     cancel: "Hủy",
     delete: "Xóa",

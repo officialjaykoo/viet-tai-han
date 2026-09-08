@@ -21,12 +21,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
+import { getSafeAuthNext } from "@/lib/auth-redirect";
 
 function SocialAuthForm() {
   const { t } = useI18n();
   const localizeError = useLocalizedError();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = getSafeAuthNext(searchParams.get("next"));
   const callbackError = searchParams.get("error");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -53,7 +54,7 @@ function SocialAuthForm() {
         return;
       }
 
-      const callbackURL = next.startsWith("/") ? next : "/";
+      const callbackURL = next;
       const result =
         provider === "facebook"
           ? await authClient.signIn.social({

@@ -5,6 +5,7 @@ import { runBackgroundTask } from "@/lib/background-task";
 import {
   listChatRooms,
   listIncomingRequests,
+  listOutgoingRequests,
   startConversation,
 } from "@/lib/messages";
 import { requireActiveUser } from "@/lib/permissions";
@@ -17,11 +18,12 @@ export async function GET() {
   try {
     const session = await requireSession();
     const userId = session.user.id;
-    const [rooms, requests] = await Promise.all([
+    const [rooms, requests, outgoingRequests] = await Promise.all([
       listChatRooms(userId),
       listIncomingRequests(userId),
+      listOutgoingRequests(userId),
     ]);
-    return NextResponse.json({ rooms, requests });
+    return NextResponse.json({ rooms, requests, outgoingRequests });
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);
     console.error("GET /api/messages failed", error);

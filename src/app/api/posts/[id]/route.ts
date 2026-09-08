@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { editPost, softDeletePost } from "@/lib/actions";
+import {
+  deleteOwnPost,
+  editPost,
+  removePostForModeration,
+} from "@/lib/actions";
 import { getPostDetail } from "@/lib/content";
 import { getDb } from "@/lib/db";
+import { parseEditPostPayload } from "@/lib/post-payload";
 import { requireModeratorOrAdmin, type SessionUser } from "@/lib/permissions";
 import { serializePostDetail } from "@/lib/serializers";
 import {
@@ -42,11 +47,8 @@ export async function PATCH(
   try {
     const session = await requireSession();
     const { id } = await context.params;
-    const body = (await readApiJson(request)) as {
-      title?: string;
-      body?: string | null;
-      url?: string | null;
-    };
+    const rawBody = await readApiJson(request);
+    const body = parseEditPostPayload(rawBody);
 
     const result = await editPost({
       postId: id,
@@ -85,11 +87,12 @@ export async function DELETE(
     }
 
     const user = session.user as SessionUser;
-    if (post.author_id !== user.id) {
+    if (post.author_id === user.id) {
+      await deleteOwnPost(id, user.id);
+    } else {
       await requireModeratorOrAdmin(user, post.subreddit_id);
+      await removePostForModeration(id, user.id);
     }
-
-    await softDeletePost(id, user.id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AuthError) {

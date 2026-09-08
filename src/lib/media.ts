@@ -10,6 +10,28 @@ export function isAllowedMediaKey(key: string): boolean {
   return /^media\/[A-Za-z0-9_-]{8,32}\.(jpg|webp)$/.test(key);
 }
 
+export async function assertOwnedMediaKey(
+  key: string,
+  userId: string
+): Promise<void> {
+  if (!isAllowedMediaKey(key)) {
+    throw new AuthError("Invalid media", 400);
+  }
+
+  const env = await getEnv();
+  const object = await env.MEDIA_BUCKET.head(key);
+  if (!object || object.customMetadata?.uploadedBy !== userId) {
+    throw new AuthError("Invalid media", 400);
+  }
+}
+
+/**
+ * Media objects are immutable and retained after upload, including when a
+ * request times out or the owning post is soft-deleted. A retry can still
+ * reference a post whose response was lost, so request-time deletion would
+ * risk deleting canonical media. Cleanup must be an authenticated,
+ * age-based janitor once an ownership registry is available.
+ */
 export async function uploadPostImage(options: {
   userId: string;
   file: File;

@@ -88,6 +88,7 @@ async function mutateCommentLike(input: {
        INNER JOIN posts p ON p.id = c.post_id
        WHERE c.id = ?
          AND c.is_removed = 0
+         AND c.is_deleted = 0
          AND c.is_shadow_hidden = 0
          AND p.is_removed = 0
          AND p.is_shadow_hidden = 0`

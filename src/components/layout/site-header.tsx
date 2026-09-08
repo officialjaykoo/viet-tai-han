@@ -26,6 +26,7 @@ import {
 import { BrandLogo } from "@/components/brand/brand-logo";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
+import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { SearchForm } from "@/components/search/search-form";
 import { MessagesNavIcon } from "@/components/messages/messages-nav-icon";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { signOut, useSession } from "@/lib/auth-client";
+import { resolveAuthUiState } from "@/lib/auth-ui";
 import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
@@ -48,14 +50,40 @@ const iconBtnClass =
 
 export function SiteHeader() {
   const { t } = useI18n();
+  const localizeError = useLocalizedError();
   const pathname = usePathname();
-  const { data: session, isPending } = useSession();
+  const {
+    data: session,
+    isPending,
+    error,
+    refetch,
+  } = useSession();
   const [hydrated, setHydrated] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+
   useEffect(() => {
     const hydrationId = window.setTimeout(() => setHydrated(true), 0);
     return () => window.clearTimeout(hydrationId);
   }, []);
+
+  useEffect(() => {
+    if (error && error.status !== 401) {
+      console.warn("Better Auth session refresh failed", {
+        status: error.status,
+      });
+    }
+  }, [error]);
+
   const visibleSession = hydrated ? session : null;
+  const authState = resolveAuthUiState({
+    hydrated,
+    session: visibleSession,
+    isPending,
+    error,
+  });
+  const authReady = authState !== "loading" && authState !== "unknown";
+  const signedIn = authState === "authenticated";
   const username =
     (visibleSession?.user as { username?: string } | undefined)?.username ??
     null;
@@ -65,8 +93,32 @@ export function SiteHeader() {
   const isAdmin =
     (visibleSession?.user as { role?: string } | undefined)?.role === "admin";
   const image = visibleSession?.user?.image ?? null;
-  const authReady = hydrated && !isPending;
-  const signedIn = authReady && Boolean(visibleSession?.user);
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      const result = await signOut();
+      if (result.error) {
+        setSignOutError(
+          localizeError(result.error.message, t("auth.signOutFailed"))
+        );
+        return;
+      }
+      window.location.replace("/");
+    } catch (error) {
+      setSignOutError(
+        localizeError(
+          error instanceof Error ? error.message : null,
+          t("auth.signOutFailed")
+        )
+      );
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   const primaryNav = [
     { href: "/", label: t("nav.popular"), icon: FlameIcon },
     { href: "/communities", label: t("nav.communities"), icon: UsersRoundIcon },
@@ -80,7 +132,7 @@ export function SiteHeader() {
       data-testid="site-header"
       className="sticky top-0 z-40 border-t-2 border-t-[var(--flag-red)] border-b border-border/70 bg-card/95 shadow-[0_1px_3px_rgb(0_0_0_/_8%)] backdrop-blur-md supports-[backdrop-filter]:bg-card/90 safe-pt-header"
     >
-      <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
+      <div className="relative mx-auto flex h-16 w-full max-w-[1240px] items-center gap-2 safe-px sm:gap-3">
         <Link
           href="/"
           className="group order-2 flex min-h-11 shrink-0 items-center sm:order-0"
@@ -297,15 +349,16 @@ export function SiteHeader() {
                       className="min-h-11"
                       variant="destructive"
                       onClick={() => {
-                        void signOut();
+                        void handleSignOut();
                       }}
+                      disabled={signingOut}
                     >
                       <LogOutIcon />
                       {t("nav.signOut")}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>
-              ) : (
+              ) : authState === "anonymous" ? (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
@@ -316,16 +369,25 @@ export function SiteHeader() {
                       <LogInIcon />
                       {t("nav.logIn")}
                     </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </>
+              ) : authState === "unknown" ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>{t("common.error")}</DropdownMenuLabel>
                     <DropdownMenuItem
                       className="min-h-11"
-                      render={<Link href="/signup" />}
+                      onClick={() => {
+                        void refetch();
+                      }}
                     >
-                      <UserRoundIcon />
-                      {t("nav.signUp")}
+                      <CircleUserRoundIcon />
+                      {t("feed.tryAgain")}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>
-              )}
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -354,24 +416,26 @@ export function SiteHeader() {
               <NotificationsBell className="hidden order-4 sm:order-none sm:inline-flex" />
             </>
           ) : null}
-          {authReady && !signedIn ? (
+          {authState === "anonymous" ? (
             <div className="mr-0.5 hidden items-center gap-1 sm:flex">
               <Link
                 href="/login"
-                className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {t("nav.logIn")}
-              </Link>
-              <Link
-                href="/signup"
                 className="inline-flex min-h-9 items-center rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
               >
-                {t("nav.signUp")}
+                {t("nav.logIn")}
               </Link>
             </div>
           ) : null}
 
         </div>
+        {signOutError ? (
+          <p
+            className="absolute right-2 top-full z-50 mt-2 max-w-xs rounded-xl border border-destructive/20 bg-card px-3 py-2 text-xs text-destructive shadow-lg"
+            role="alert"
+          >
+            {signOutError}
+          </p>
+        ) : null}
       </div>
     </header>
   );

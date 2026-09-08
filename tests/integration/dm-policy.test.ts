@@ -342,15 +342,18 @@ describe("DM relationship policy (D1)", () => {
       message: "You can't message this user",
     });
 
-    const roomStillActive = await env.DB
+    const roomMemberships = await env.DB
       .prepare(
-        `SELECT COUNT(*) AS count
+        `SELECT
+           SUM(CASE WHEN membership_status = 'active' THEN 1 ELSE 0 END) AS active_count,
+           SUM(CASE WHEN membership_status = 'left' THEN 1 ELSE 0 END) AS left_count
          FROM chat_room_members
-         WHERE room_id = ? AND membership_status = 'active'`
+         WHERE room_id = ?`
       )
       .bind(request.roomId)
-      .first<{ count: number }>();
-    expect(Number(roomStillActive?.count)).toBe(2);
+      .first<{ active_count: number; left_count: number }>();
+    expect(Number(roomMemberships?.active_count)).toBe(0);
+    expect(Number(roomMemberships?.left_count)).toBe(2);
   });
 
   it("uses the automatic message for friendship promotion", async () => {
@@ -384,7 +387,7 @@ describe("DM relationship policy (D1)", () => {
         .first<{ status: string }>()
     ).toEqual({ status: "accepted" });
   });
-  it("hides and rejects pending requests after a block", async () => {
+  it("cancels and hides pending requests after a block", async () => {
     const pair = ids("blocked-request", 0);
     await Promise.all([
       insertUser(pair.senderId, pair.senderUsername),
@@ -396,6 +399,20 @@ describe("DM relationship policy (D1)", () => {
     await blockUser(pair.recipientId, pair.senderId);
 
     expect(await listIncomingRequests(pair.recipientId)).toHaveLength(0);
+    const cancelled = await env.DB
+      .prepare(`SELECT status FROM chat_requests WHERE id = ?`)
+      .bind(request.requestId)
+      .first<{ status: string }>();
+    expect(cancelled?.status).toBe("cancelled");
+    const pendingOpener = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM chat_messages
+         WHERE room_id = ? AND sender_id = ? AND delivery_status = 'pending'`
+      )
+      .bind(request.roomId, pair.senderId)
+      .first<{ count: number }>();
+    expect(Number(pendingOpener?.count)).toBe(0);
     await expect(
       respondToChatRequest({
         requestId: request.requestId!,
@@ -403,8 +420,8 @@ describe("DM relationship policy (D1)", () => {
         accept: true,
       })
     ).rejects.toMatchObject({
-      status: 403,
-      message: "You can't message this user",
+      status: 409,
+      message: "Request already handled",
     });
   });
 

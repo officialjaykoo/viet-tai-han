@@ -11,6 +11,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "wrangler d1 execute DB --local --file=./seed.sql",
     "db:reset:local": "npm run db:migrate:local && npm run db:seed:local",
+    "comment-tree:audit": "node scripts/audit-comment-tree.mjs",
     "id:rekey:local": "node scripts/rekey-users.mjs --local --dry-run",
     "id:rekey:local:apply": "node scripts/rekey-users.mjs --local --apply",
     "id:rekey:remote:dry-run": "node scripts/rekey-users.mjs --remote --dry-run",

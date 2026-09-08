@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { editComment, softDeleteComment } from "@/lib/actions";
+import {
+  deleteOwnComment,
+  editComment,
+  removeCommentForModeration,
+} from "@/lib/actions";
 import { getDb } from "@/lib/db";
 import { requireModeratorOrAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
@@ -59,11 +63,12 @@ export async function DELETE(
     }
 
     const user = session.user as SessionUser;
-    if (comment.author_id !== user.id) {
+    if (comment.author_id === user.id) {
+      await deleteOwnComment(id, user.id);
+    } else {
       await requireModeratorOrAdmin(user, comment.subreddit_id);
+      await removeCommentForModeration(id, user.id);
     }
-
-    await softDeleteComment(id, user.id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AuthError) {

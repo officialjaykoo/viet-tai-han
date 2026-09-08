@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -15,7 +16,10 @@ export default async function SubmitInSubredditPage({
 }) {
   const { name } = await params;
   const session = await getSession();
-  await redirectIfIncompleteOnboarding(session?.user?.id);
+  if (!session?.user) {
+    redirect(`/login?next=${encodeURIComponent(`/r/${name}/submit`)}`);
+  }
+  await redirectIfIncompleteOnboarding(session.user.id);
   const { locale } = await getRequestLocale();
 
   return (

@@ -13,6 +13,7 @@ import {
   randomTokenBrowser,
   sha256HexBrowser,
 } from "@/lib/security/shared";
+import { isAtkOnlyMutation } from "@/lib/security/tunnel-policy";
 import {
   encodeInternalApiRequest,
   resolveInternalApiResponse,
@@ -93,7 +94,6 @@ function readCookie(name: string): string | null {
   );
   return match ? decodeURIComponent(match[1]!) : null;
 }
-
 
 /** Build /i/api?{serverRandomName}={serverRandomValue} from gate cookies. */
 function tunnelUrl(): string {
@@ -231,16 +231,18 @@ async function ensureAtk(): Promise<string> {
 
   return atkBootstrapPromise;
 }
-
-/** Signed read — ATK HMAC only (no PoW / one-time challenge). */
-async function signReadAndSend(input: {
+/** Signed ATK-only requests (reads and logout; no challenge / PoW). */
+async function signAtkAndSend(input: {
   method: string;
   path: string;
   query: string;
+  payload?: Uint8Array;
+  contentType?: string;
+  filename?: string;
 }): Promise<Response> {
   return withSignedRead(async () => {
     const atk = await ensureAtk();
-    const payload = new Uint8Array();
+    const payload = input.payload ?? new Uint8Array();
     const payloadHash = await sha256HexBrowser(payload as BufferSource);
     const timestampMs = Date.now();
     const nonce = randomTokenBrowser(16);
@@ -269,8 +271,8 @@ async function signReadAndSend(input: {
         signature,
         challengeId: "",
         powNonce: 0,
-        contentType: "",
-        filename: "",
+        contentType: input.contentType ?? "",
+        filename: input.filename ?? "",
       },
       atk
     );
@@ -398,8 +400,18 @@ export async function apiFetch(
     });
   }
 
+  if (isAtkOnlyMutation(method, path)) {
+    return signAtkAndSend({
+      method,
+      path,
+      query,
+      payload,
+      contentType,
+    });
+  }
+
   if (method === "GET" || method === "HEAD") {
-    return signReadAndSend({ method, path, query });
+    return signAtkAndSend({ method, path, query });
   }
 
   return signAndSend({

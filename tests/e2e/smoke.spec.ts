@@ -41,6 +41,34 @@ test.describe("cross-platform smoke", () => {
       ).toHaveCount(0);
     }
   });
+  test("signup compatibility redirect preserves a safe next path", async ({
+    page,
+  }) => {
+    await page.goto("/signup?next=%2Fmessages", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\/login\?next=%2Fmessages$/);
+    await expect(
+      page.getByRole("heading", { name: /tiếp tục với/i })
+    ).toBeVisible();
+
+    await page.goto("/signup?next=https%3A%2F%2Fevil.example", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test("anonymous login remains available without a session", async ({
+    page,
+  }) => {
+    await page.goto("/login?next=%2Fmessages", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\/login\?next=%2Fmessages$/);
+    await expect(
+      page.getByRole("heading", { name: /tiếp tục với/i })
+    ).toBeVisible();
+  });
 
   test("layout does not overflow horizontally", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });

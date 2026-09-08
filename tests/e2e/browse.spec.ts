@@ -15,7 +15,7 @@ test.describe("public browsing", () => {
     ).toBeVisible();
     await expect(page.getByRole("tab", { name: /đề xuất/i })).toBeVisible();
   });
-  test("navigation order preserves existing profile shortcuts", async ({
+  test("guest navigation excludes private shortcuts", async ({
     page,
   }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -44,23 +44,55 @@ test.describe("public browsing", () => {
     ]);
     expect(sideHrefs[0]).toBe(sideHrefs.at(-1));
 
+    const header = page.getByTestId("site-header");
+    await expect(
+      header.getByRole("link", { name: /đăng nhập/i })
+    ).toHaveCount(1);
+    await expect(
+      header.getByRole("link", { name: /đăng ký/i })
+    ).toHaveCount(0);
+    await header.getByRole("button", { name: /^menu$/i }).click();
+    const menu = page.getByRole("menu");
+    await expect(menu.getByRole("menuitem", { name: /đăng nhập/i })).toHaveCount(1);
+    await expect(menu.getByRole("menuitem", { name: /đăng ký/i })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: "domcontentloaded" });
     await dismissLanguagePrompt(page);
     const mobileHrefs = await page
       .locator("nav.safe-pb-nav a")
       .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
-    expect(mobileHrefs.slice(0, 6)).toEqual([
+    expect(mobileHrefs).toEqual([
       "/",
       "/communities",
       "/questions",
       "/marketplace",
       "/businesses",
-      "/notifications",
     ]);
-    expect(mobileHrefs[6]).toMatch(/^\/(?:login|u\/)/);
   });
+  test("session transport errors stay neutral instead of showing guest CTA", async ({
+    page,
+  }) => {
+    await page.route("**/i/api*", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "forced session transport failure",
+      });
+    });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await dismissLanguagePrompt(page);
 
+    const header = page.getByTestId("site-header");
+    await expect(header.getByRole("button", { name: /^menu$/i })).toBeVisible();
+    await expect(
+      header.getByRole("link", { name: /đăng nhập/i })
+    ).toHaveCount(0);
+    await expect(
+      header.getByRole("link", { name: /đăng ký/i })
+    ).toHaveCount(0);
+  });
 
   test("community page loads from directory", async ({ page }) => {
     await page.goto("/r/cloudflare", { waitUntil: "domcontentloaded" });

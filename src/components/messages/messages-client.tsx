@@ -49,6 +49,18 @@ type RequestItem = {
   };
 };
 
+type OutgoingRequestItem = {
+  id: string;
+  roomId: string;
+  openerBody: string;
+  createdAt: string;
+  to: {
+    username: string | null;
+    image: string | null;
+    displayName: string;
+  };
+};
+
 type ChatMessage = LocalChatMessage;
 
 type ChatHistoryPage = {
@@ -144,6 +156,9 @@ export function MessagesClient() {
   const toParam = searchParams.get("to") ?? "";
   const [rooms, setRooms] = useState<Room[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<
+    OutgoingRequestItem[]
+  >([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composeUser, setComposeUser] = useState(toParam);
   const [composeBody, setComposeBody] = useState("");
@@ -161,6 +176,7 @@ export function MessagesClient() {
   const messageListRef = useRef<HTMLDivElement>(null);
   const latestRoomMessagesRef = useRef(new Map<string, ChatMessage>());
   const composeClientMessageIdRef = useRef<string | null>(null);
+  const composeDraftFingerprintRef = useRef<string | null>(null);
   const beforeCursorRef = useRef<string | null>(null);
   const afterCursorRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
@@ -185,6 +201,15 @@ export function MessagesClient() {
       setComposeOpen(true);
     }
   }, [toParam]);
+
+  useEffect(() => {
+    const fingerprint = `${composeUser.trim()}\u0000${composeBody.trim()}`;
+    const previous = composeDraftFingerprintRef.current;
+    if (previous !== null && previous !== fingerprint) {
+      composeClientMessageIdRef.current = null;
+    }
+    composeDraftFingerprintRef.current = fingerprint;
+  }, [composeBody, composeUser]);
 
   const rememberRoomLatestMessage = useCallback(
     (roomId: string, message: ChatMessage) => {
@@ -229,6 +254,7 @@ export function MessagesClient() {
       const data = (await res.json()) as {
         rooms: Room[];
         requests: RequestItem[];
+        outgoingRequests?: OutgoingRequestItem[];
       };
       let nextRooms = data.rooms;
       for (const [roomId, message] of latestRoomMessagesRef.current) {
@@ -237,6 +263,7 @@ export function MessagesClient() {
       roomsRef.current = nextRooms;
       setRooms(nextRooms);
       setRequests(data.requests);
+      setOutgoingRequests(data.outgoingRequests ?? []);
       setLoaded(true);
     });
   }, [localizeError, router]);
@@ -621,6 +648,7 @@ export function MessagesClient() {
     if (composeSending || !toUsername || !openerBody) return;
     const clientMessageId =
       composeClientMessageIdRef.current ?? crypto.randomUUID();
+    const draftFingerprint = `${toUsername}\u0000${openerBody}`;
     composeClientMessageIdRef.current = clientMessageId;
     setComposeSending(true);
     startTransition(async () => {
@@ -645,15 +673,26 @@ export function MessagesClient() {
           conversationType?: "direct" | "request";
           roomId?: string;
         };
-        setComposeUser("");
-        setComposeBody("");
-        setComposeOpen(false);
-        composeClientMessageIdRef.current = null;
-        setError(null);
-        if (result.conversationType === "direct" && result.roomId) {
+        const draftIsCurrent =
+          composeClientMessageIdRef.current === clientMessageId &&
+          composeDraftFingerprintRef.current === draftFingerprint;
+        if (draftIsCurrent) {
+          setComposeUser("");
+          setComposeBody("");
+          setComposeOpen(false);
+          composeClientMessageIdRef.current = null;
+          setError(null);
+        }
+        if (
+          draftIsCurrent &&
+          result.conversationType === "direct" &&
+          result.roomId
+        ) {
           router.push(`/messages?room=${encodeURIComponent(result.roomId)}`);
         }
         loadInbox();
+      } catch {
+        setError(t("common.networkError"));
       } finally {
         setComposeSending(false);
       }
@@ -663,22 +702,49 @@ export function MessagesClient() {
   function respond(requestId: string, action: "accept" | "decline") {
     setError(null);
     startTransition(async () => {
-      const res = await apiFetch(`/api/messages/requests/${requestId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        setError(localizeError(payload?.error, "Couldn't update request"));
-        return;
+      try {
+        const res = await apiFetch(`/api/messages/requests/${requestId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          setError(localizeError(payload?.error, "Couldn't update request"));
+          return;
+        }
+        const data = (await res.json()) as { roomId: string; status: string };
+        loadInbox();
+        if (action === "accept") {
+          router.push(`/messages?room=${data.roomId}`);
+        }
+      } catch {
+        setError(t("common.networkError"));
       }
-      const data = (await res.json()) as { roomId: string; status: string };
-      loadInbox();
-      if (action === "accept") {
-        router.push(`/messages?room=${data.roomId}`);
+    });
+  }
+
+  function cancelOutgoingRequest(requestId: string) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const res = await apiFetch(`/api/messages/requests/${requestId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "cancel" }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          setError(localizeError(payload?.error, "Couldn't update request"));
+          return;
+        }
+        loadInbox();
+      } catch {
+        setError(t("common.networkError"));
       }
     });
   }
@@ -900,6 +966,46 @@ export function MessagesClient() {
                       {t("messages.decline")}
                     </Button>
                   </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {outgoingRequests.length > 0 ? (
+          <section className="space-y-1.5">
+            <h2 className="font-heading text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {t("messages.sentRequests")}
+            </h2>
+            <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+              {outgoingRequests.map((req) => (
+                <li
+                  key={req.id}
+                  className="rounded-xl border border-border/60 bg-card/70 p-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <UserAvatar
+                      username={req.to.username}
+                      image={req.to.image}
+                      size="xs"
+                    />
+                    <span className="text-sm font-medium">
+                      @{req.to.username ?? req.to.displayName}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground">
+                    {req.openerBody}
+                  </p>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() => cancelOutgoingRequest(req.id)}
+                    className="mt-1.5"
+                  >
+                    {t("messages.cancelRequest")}
+                  </Button>
                 </li>
               ))}
             </ul>

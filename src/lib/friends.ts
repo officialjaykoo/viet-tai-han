@@ -1,3 +1,4 @@
+import { scheduleChatPromotion } from "@/lib/chat-promotion";
 import { getDb } from "@/lib/db";
 import { createPublicId } from "@/lib/id";
 import { notifyQuietly } from "@/lib/notifications";
@@ -31,6 +32,7 @@ type FriendshipRow = {
   addressee_id: string;
   status: "pending" | "accepted" | "declined";
   created_at: string;
+  updated_at: string;
 };
 
 type UserRow = {
@@ -76,7 +78,7 @@ async function getFriendshipByPair(
 ): Promise<FriendshipRow | null> {
   return db
     .prepare(
-      `SELECT id, requester_id, addressee_id, status, created_at
+      `SELECT id, requester_id, addressee_id, status, created_at, updated_at
        FROM user_friendships
        WHERE pair_key = ?`
     )
@@ -141,6 +143,11 @@ export async function sendFriendRequest(
   const current = await getFriendshipByPair(db, pairKey);
 
   if (current?.status === "accepted") {
+    scheduleChatPromotion({
+      firstUserId: requesterId,
+      secondUserId: addresseeId,
+      reason: "friendship",
+    });
     return {
       friendStatus: "friends" as const,
       requestId: null,
@@ -255,7 +262,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
   const db = await getDb();
   const request = await db
     .prepare(
-      `SELECT id, requester_id, addressee_id, status, created_at
+      `SELECT id, requester_id, addressee_id, status, created_at, updated_at
        FROM user_friendships
        WHERE id = ? AND addressee_id = ?`
     )
@@ -274,7 +281,16 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
       .bind(request.requester_id, userId, userId, request.requester_id)
       .first();
     if (blocked) throw new AuthError("Can't connect with this user", 403);
-    const friend = await getFriendListItem(db, request.requester_id, request.created_at);
+    scheduleChatPromotion({
+      firstUserId: request.requester_id,
+      secondUserId: userId,
+      reason: "friendship",
+    });
+    const friend = await getFriendListItem(
+      db,
+      request.requester_id,
+      request.updated_at
+    );
     return { friendStatus: "friends" as const, requestId: null, friend };
   }
 
@@ -303,28 +319,36 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     if (blocked) throw new AuthError("Can't connect with this user", 403);
     const latest = await db
       .prepare(
-        `SELECT id, requester_id, addressee_id, status, created_at
+        `SELECT id, requester_id, addressee_id, status, created_at, updated_at
          FROM user_friendships WHERE id = ?`
       )
       .bind(requestId)
       .first<FriendshipRow>();
     if (latest?.status === "accepted") {
+      scheduleChatPromotion({
+        firstUserId: request.requester_id,
+        secondUserId: userId,
+        reason: "friendship",
+      });
       const friend = await getFriendListItem(
         db,
         request.requester_id,
-        latest.created_at
+        latest.updated_at
       );
       return { friendStatus: "friends" as const, requestId: null, friend };
     }
     throw new AuthError("Friend request is no longer available", 409);
   }
 
-  const { promotePendingChatRequestsForPair } = await import("@/lib/messages");
-  await promotePendingChatRequestsForPair(
-    request.requester_id,
-    userId,
-    "friendship"
-  );
+  scheduleChatPromotion({
+    firstUserId: request.requester_id,
+    secondUserId: userId,
+    reason: "friendship",
+  });
+  const accepted = await db
+    .prepare(`SELECT updated_at FROM user_friendships WHERE id = ?`)
+    .bind(requestId)
+    .first<{ updated_at: string }>();
 
   const actor = await db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)
@@ -338,7 +362,11 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     href: getUsernameProfileHref(actor?.username) ?? "/friends",
   });
 
-  const friend = await getFriendListItem(db, request.requester_id, request.created_at);
+  const friend = await getFriendListItem(
+    db,
+    request.requester_id,
+    accepted?.updated_at ?? request.updated_at
+  );
   return {
     friendStatus: "friends" as const,
     requestId: null,
@@ -440,7 +468,7 @@ export async function listFriends(userId: string): Promise<FriendListItem[]> {
   const { results } = await db
     .prepare(
       `SELECT
-         f.created_at,
+         f.updated_at AS accepted_at,
          CASE WHEN f.requester_id = ? THEN a.id ELSE r.id END AS id,
          CASE WHEN f.requester_id = ? THEN a.username ELSE r.username END AS username,
          CASE WHEN f.requester_id = ? THEN a.name ELSE r.name END AS name,
@@ -463,7 +491,7 @@ export async function listFriends(userId: string): Promise<FriendListItem[]> {
       userId
     )
     .all<{
-      created_at: string;
+      accepted_at: string;
       id: string;
       username: string | null;
       name: string;
@@ -475,7 +503,7 @@ export async function listFriends(userId: string): Promise<FriendListItem[]> {
     username: row.username ?? row.id,
     name: row.name,
     image: row.image,
-    since: row.created_at,
+    since: row.accepted_at,
   }));
 }
 

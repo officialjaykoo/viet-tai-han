@@ -6,9 +6,11 @@ import {
   type Locale,
   type PreferredLanguage,
 } from "@/lib/i18n/config";
-import { getSession } from "@/lib/session";
+import { getSession, type PublicSession } from "@/lib/session";
 
-export async function getRequestLocale(): Promise<{
+export async function getRequestLocale(options?: {
+  session?: PublicSession | null;
+}): Promise<{
   locale: Locale;
   preferredLanguage: PreferredLanguage;
   cookieLocale: string | null;
@@ -16,7 +18,7 @@ export async function getRequestLocale(): Promise<{
 }> {
   const [jar, requestHeaders] = await Promise.all([cookies(), headers()]);
   const cookieLocale = jar.get(LANG_COOKIE)?.value ?? null;
-  const session = await getSession();
+  const session = options ? options.session ?? null : await getSession();
   const preferredLanguage = ((session?.user as { preferredLanguage?: string } | undefined)
     ?.preferredLanguage ?? "unknown") as PreferredLanguage;
   const signedIn = Boolean(session?.user);

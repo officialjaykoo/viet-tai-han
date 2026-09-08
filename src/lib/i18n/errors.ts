@@ -312,6 +312,24 @@ const ERROR_CATALOG: Record<
     en: "Title must be 3–100 characters",
     ru: "Заголовок должен быть от 3 до 100 символов",
   },
+  "Invalid post payload": {
+    en: "Invalid post payload",
+    vi: "Dữ liệu bài đăng không hợp lệ",
+    ko: "게시글 입력값이 올바르지 않습니다",
+    ru: "Некорректные данные поста",
+  },
+  "Post body must be 20,000 characters or fewer": {
+    en: "Post body must be 20,000 characters or fewer",
+    vi: "Nội dung bài đăng phải có tối đa 20.000 ký tự",
+    ko: "게시글 본문은 20,000자 이하여야 합니다",
+    ru: "Текст поста должен содержать не более 20 000 символов",
+  },
+  "Post URL must be 2,048 characters or fewer": {
+    en: "Post URL must be 2,048 characters or fewer",
+    vi: "Đường dẫn bài đăng phải có tối đa 2.048 ký tự",
+    ko: "게시글 URL은 2,048자 이하여야 합니다",
+    ru: "Ссылка поста должна содержать не более 2048 символов",
+  },
   "Choose either a link or an image, not both": {
     en: "Choose either a link or an image, not both",
     ru: "Выберите либо ссылку, либо изображение",
@@ -339,6 +357,30 @@ const ERROR_CATALOG: Record<
   "Comment nesting too deep": {
     en: "Comment nesting too deep",
     ru: "Слишком глубокая вложенность комментариев",
+  },
+  "Only the author can delete this post": {
+    en: "Only the author can delete this post",
+    vi: "Chỉ tác giả mới có thể xóa bài đăng này",
+    ko: "작성자만 이 글을 삭제할 수 있습니다",
+    ru: "Удалить пост может только автор",
+  },
+  "Only the author can delete this comment": {
+    en: "Only the author can delete this comment",
+    vi: "Chỉ tác giả mới có thể xóa bình luận này",
+    ko: "작성자만 이 댓글을 삭제할 수 있습니다",
+    ru: "Удалить комментарий может только автор",
+  },
+  "Post has comments and cannot be deleted": {
+    en: "Post has comments and cannot be deleted",
+    vi: "Không thể xóa bài đăng có bình luận",
+    ko: "댓글이 있는 글은 삭제할 수 없습니다",
+    ru: "Нельзя удалить пост, в котором есть комментарии",
+  },
+  "Comment has replies and cannot be deleted": {
+    en: "Comment has replies and cannot be deleted",
+    vi: "Không thể xóa bình luận có câu trả lời",
+    ko: "답글이 있는 댓글은 삭제할 수 없습니다",
+    ru: "Нельзя удалить комментарий, у которого есть ответы",
   },
   "Only the author can edit this post": {
     en: "Only the author can edit this post",
@@ -657,6 +699,12 @@ const ERROR_CATALOG: Record<
   "Set a username before posting to your profile": {
     en: "Set a username before posting to your profile",
     ru: "Укажите имя пользователя перед публикацией в профиле",
+  },
+  "Profile community belongs to another user": {
+    en: "That profile community belongs to another user",
+    vi: "Cộng đồng hồ sơ đó thuộc về người dùng khác",
+    ko: "해당 프로필 커뮤니티는 다른 사용자의 공간입니다",
+    ru: "Это сообщество профиля принадлежит другому пользователю",
   },
   "toUsername and body are required": {
     en: "toUsername and body are required",

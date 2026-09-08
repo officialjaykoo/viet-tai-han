@@ -18,7 +18,7 @@ export default async function MessagesPage() {
   return (
     <>
       <SiteHeader />
-      <main className="relative flex-1">
+      <main data-testid="messages-page" className="relative flex-1">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--brand)_14%,transparent),transparent_70%)]"

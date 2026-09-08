@@ -51,6 +51,7 @@ export const ko: Messages = {
     continueHint:
       "이메일이나 비밀번호가 필요하지 않습니다. 연락 이메일은 나중에 추가할 수 있습니다.",
     couldNotContinue: "계속할 수 없습니다",
+    signOutFailed: "로그아웃하지 못했습니다. 다시 시도하세요.",
   },
   onboarding: {
     eyebrow: "최초 설정",
@@ -140,6 +141,7 @@ export const ko: Messages = {
     imageRequired: "이미지를 추가하세요",
     imageProcessError: "이미지를 처리할 수 없습니다",
     imageUploadFailed: "이미지 업로드에 실패했습니다",
+    networkError: "네트워크 요청에 실패했습니다. 작성 내용은 유지되니 다시 시도하세요.",
     deleteConfirm: "이 글을 삭제할까요?",
     range7d: "최근 7일",
     range30d: "최근 30일",
@@ -170,6 +172,7 @@ export const ko: Messages = {
     noComments: "아직 댓글이 없습니다. 첫 댓글을 남겨 보세요.",
     placeholder: "어떻게 생각하시나요?",
     deleted: "[삭제됨]",
+    removed: "[운영자에 의해 삭제됨]",
     deleteConfirm: "이 댓글을 삭제할까요?",
   },
   questions: {
@@ -406,8 +409,10 @@ export const ko: Messages = {
       "친구나 허용된 팔로우 관계는 바로 열리고, 그 외 새 대화는 요청으로 처리될 수 있습니다.",
     empty: "아직 대화가 없습니다",
     requests: "요청",
+    sentRequests: "보낸 요청",
     accept: "수락",
     decline: "거절",
+    cancelRequest: "요청 취소",
     send: "보내기",
     placeholder: "메시지를 작성하세요…",
     loadError: "메시지를 불러오지 못했습니다",
@@ -797,6 +802,7 @@ export const ko: Messages = {
   common: {
     loading: "불러오는 중…",
     error: "문제가 발생했습니다",
+    networkError: "네트워크 요청에 실패했습니다. 다시 시도하세요.",
     save: "저장",
     cancel: "취소",
     delete: "삭제",

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createPost } from "@/lib/actions";
+import { HUMAN_COOKIE, openHumanToken } from "@/lib/security/human-cookie";
+import { parseCreatePostPayload } from "@/lib/post-payload";
+import { isProfileCommunityName } from "@/lib/profile-community";
 import { withFeedAds } from "@/lib/ads";
 import {
   getDb,
@@ -74,17 +77,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
-    const body = requireBotAttestation(await readApiJson(request)) as {
-      subreddit?: string;
-      title?: string;
-      body?: string;
-      url?: string;
-      mediaKey?: string;
-      requestId?: string;
-    };
-
-    if (!body.subreddit || !body.title) {
-      return await jsonLocalizedError("subreddit and title are required", 400);
+    const rawBody = requireBotAttestation(await readApiJson(request));
+    const body = parseCreatePostPayload(rawBody);
+    const humanToken = request.cookies.get(HUMAN_COOKIE)?.value ?? null;
+    if (!(await openHumanToken(humanToken))) {
+      throw new AuthError("Could not verify request", 403);
     }
 
     const user = session.user as {
@@ -115,13 +112,16 @@ export async function POST(request: NextRequest) {
       const db = await getDb();
       const sub = await db
         .prepare(
-          `SELECT id FROM subreddits WHERE name = ? COLLATE NOCASE AND is_removed = 0`
+          `SELECT id, created_by FROM subreddits WHERE name = ? COLLATE NOCASE AND is_removed = 0`
         )
         .bind(body.subreddit)
-        .first<{ id: string }>();
+        .first<{ id: string; created_by: string | null }>();
 
       if (!sub) {
         return await jsonLocalizedError("Community not found", 404);
+      }
+      if (isProfileCommunityName(body.subreddit) && sub.created_by !== user.id) {
+        throw new AuthError("Profile community belongs to another user", 403);
       }
       subredditId = sub.id;
     }

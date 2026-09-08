@@ -3,6 +3,8 @@ import { PNG } from "pngjs";
 
 export const MAX_UPLOAD_BYTES = 1 * 1024 * 1024; // 1 MiB
 const MAX_DIMENSION = 2048;
+export const MAX_SOURCE_IMAGE_DIMENSION = 8192;
+export const MAX_SOURCE_IMAGE_PIXELS = 40_000_000;
 const MIN_QUALITY = 0.45;
 const START_QUALITY = 0.82;
 
@@ -64,7 +66,189 @@ export function detectImageFormat(bytes: Uint8Array): ImageFormat | null {
     return "webp";
   }
 
+
   return null;
+}
+
+type ImageDimensions = { width: number; height: number };
+
+function validateSourceDimensions(
+  dimensions: ImageDimensions
+): ImageDimensions {
+  const { width, height } = dimensions;
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1
+  ) {
+    throw new Error("Image dimensions are invalid");
+  }
+  if (
+    width > MAX_SOURCE_IMAGE_DIMENSION ||
+    height > MAX_SOURCE_IMAGE_DIMENSION ||
+    width * height > MAX_SOURCE_IMAGE_PIXELS
+  ) {
+    throw new Error("Image dimensions exceed safety limits");
+  }
+  return dimensions;
+}
+
+function isJpegSofMarker(marker: number): boolean {
+  return (
+    (marker >= 0xc0 && marker <= 0xc3) ||
+    (marker >= 0xc5 && marker <= 0xc7) ||
+    (marker >= 0xc9 && marker <= 0xcb) ||
+    (marker >= 0xcd && marker <= 0xcf)
+  );
+}
+
+function readJpegDimensions(bytes: Uint8Array): ImageDimensions {
+  let offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      throw new Error("Corrupt JPEG image");
+    }
+    while (offset < bytes.length && bytes[offset] === 0xff) offset++;
+    if (offset >= bytes.length) throw new Error("Corrupt JPEG image");
+
+    const marker = bytes[offset++]!;
+    if (marker === 0x00) throw new Error("Corrupt JPEG image");
+    if (marker === 0xd8 || marker === 0xd9) continue;
+    if (marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+
+    if (offset + 2 > bytes.length) throw new Error("Corrupt JPEG image");
+    const segmentLength = (bytes[offset]! << 8) | bytes[offset + 1]!;
+    if (
+      segmentLength < 2 ||
+      offset + segmentLength > bytes.length
+    ) {
+      throw new Error("Corrupt JPEG image");
+    }
+    if (isJpegSofMarker(marker)) {
+      if (segmentLength < 7) throw new Error("Corrupt JPEG image");
+      const height = (bytes[offset + 3]! << 8) | bytes[offset + 4]!;
+      const width = (bytes[offset + 5]! << 8) | bytes[offset + 6]!;
+      return validateSourceDimensions({ width, height });
+    }
+    offset += segmentLength;
+  }
+  throw new Error("Could not determine JPEG dimensions");
+}
+
+function readPngDimensions(bytes: Uint8Array): ImageDimensions {
+  if (
+    bytes.length < 24 ||
+    bytes[12] !== 0x49 ||
+    bytes[13] !== 0x48 ||
+    bytes[14] !== 0x44 ||
+    bytes[15] !== 0x52
+  ) {
+    throw new Error("Corrupt PNG image");
+  }
+  const width =
+    bytes[16]! * 0x1000000 +
+    (bytes[17]! << 16) +
+    (bytes[18]! << 8) +
+    bytes[19]!;
+  const height =
+    bytes[20]! * 0x1000000 +
+    (bytes[21]! << 16) +
+    (bytes[22]! << 8) +
+    bytes[23]!;
+  return validateSourceDimensions({ width, height });
+}
+
+function isFourCc(
+  bytes: Uint8Array,
+  offset: number,
+  value: string
+): boolean {
+  return (
+    bytes[offset] === value.charCodeAt(0) &&
+    bytes[offset + 1] === value.charCodeAt(1) &&
+    bytes[offset + 2] === value.charCodeAt(2) &&
+    bytes[offset + 3] === value.charCodeAt(3)
+  );
+}
+
+function readUint24Le(bytes: Uint8Array, offset: number): number {
+  return (
+    bytes[offset]! |
+    (bytes[offset + 1]! << 8) |
+    (bytes[offset + 2]! << 16)
+  );
+}
+
+function readWebpDimensions(bytes: Uint8Array): ImageDimensions {
+  if (bytes.length < 20) throw new Error("Corrupt WebP image");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const riffEnd = 8 + view.getUint32(4, true);
+  if (riffEnd < 20 || riffEnd > bytes.length) {
+    throw new Error("Corrupt WebP image");
+  }
+
+  let offset = 12;
+  while (offset < riffEnd) {
+    if (offset + 8 > riffEnd) throw new Error("Corrupt WebP image");
+    const chunkSize = view.getUint32(offset + 4, true);
+    const dataOffset = offset + 8;
+    const nextOffset = dataOffset + chunkSize + (chunkSize & 1);
+    if (dataOffset + chunkSize > riffEnd || nextOffset > riffEnd) {
+      throw new Error("Corrupt WebP image");
+    }
+
+    if (isFourCc(bytes, offset, "VP8X")) {
+      if (chunkSize < 10) throw new Error("Corrupt WebP image");
+      return validateSourceDimensions({
+        width: readUint24Le(bytes, dataOffset + 4) + 1,
+        height: readUint24Le(bytes, dataOffset + 7) + 1,
+      });
+    }
+    if (isFourCc(bytes, offset, "VP8 ")) {
+      if (
+        chunkSize < 10 ||
+        bytes[dataOffset + 3] !== 0x9d ||
+        bytes[dataOffset + 4] !== 0x01 ||
+        bytes[dataOffset + 5] !== 0x2a
+      ) {
+        throw new Error("Corrupt WebP image");
+      }
+      const width =
+        (bytes[dataOffset + 6]! | (bytes[dataOffset + 7]! << 8)) & 0x3fff;
+      const height =
+        (bytes[dataOffset + 8]! | (bytes[dataOffset + 9]! << 8)) & 0x3fff;
+      return validateSourceDimensions({ width, height });
+    }
+    if (isFourCc(bytes, offset, "VP8L")) {
+      if (chunkSize < 5 || bytes[dataOffset] !== 0x2f) {
+        throw new Error("Corrupt WebP image");
+      }
+      const bits = view.getUint32(dataOffset + 1, true);
+      return validateSourceDimensions({
+        width: (bits & 0x3fff) + 1,
+        height: ((bits >>> 14) & 0x3fff) + 1,
+      });
+    }
+    offset = nextOffset;
+  }
+  throw new Error("Could not determine WebP dimensions");
+}
+
+export function assertSourceImageDimensions(
+  bytes: Uint8Array,
+  format: ImageFormat
+): void {
+  if (format === "jpeg") {
+    readJpegDimensions(bytes);
+    return;
+  }
+  if (format === "png") {
+    readPngDimensions(bytes);
+    return;
+  }
+  readWebpDimensions(bytes);
 }
 
 /** Reject HTML/JS/PHP polyglots and other dangerous embedded fragments. */
@@ -430,6 +614,8 @@ export function processUploadedImage(bytes: Uint8Array): {
 
   assertNoDangerousFragments(bytes);
   assertContainerIntegrity(bytes, format);
+  // Reject decompression bombs before any metadata strip or pixel allocation.
+  assertSourceImageDimensions(bytes, format);
 
   if (format === "webp") {
     const cleaned = stripWebpMetadata(bytes);

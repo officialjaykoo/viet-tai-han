@@ -19,6 +19,7 @@ import { UserAvatar } from "@/components/user/user-avatar";
 import { AccountTags } from "@/components/user/account-tags";
 import { LikeButton } from "@/components/likes/like-button";
 import type { CommentNode } from "@/lib/content";
+import { MAX_COMMENT_DEPTH } from "@/lib/comment-constants";
 import type { CommentLikeResult, LikeMutation } from "@/lib/types";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
 import { cn } from "@/lib/utils";
@@ -53,15 +54,23 @@ function CommentItem({
   const requestIdRef = useRef<string | null>(null);
   const bot = useBotGuard();
   const isOwner = Boolean(comment.author.isAuthor);
+  const isTombstone = comment.isDeleted || comment.isRemoved;
+  const canReply =
+    !isTombstone && comment.depth < MAX_COMMENT_DEPTH;
+  const canDelete =
+    isOwner && !isTombstone && comment.children.length === 0;
   const offerTranslation =
-    !comment.isDeleted &&
+    !isTombstone &&
     shouldOfferTranslation(comment.translation, locale);
-  const displayBody =
-    offerTranslation &&
-    showTranslation &&
-    comment.translation?.bodyTranslated
-      ? comment.translation.bodyTranslated
-      : body;
+  const displayBody = comment.isDeleted
+    ? t("comments.deleted")
+    : comment.isRemoved
+      ? t("comments.removed")
+      : offerTranslation &&
+          showTranslation &&
+          comment.translation?.bodyTranslated
+        ? comment.translation.bodyTranslated
+        : body;
 
   function applyLike(action: LikeMutation) {
     if (pending) return;
@@ -152,7 +161,9 @@ function CommentItem({
     <li
       className={cn(
         "space-y-2",
-        depth > 0 && "border-l border-border/60 pl-3 sm:pl-4"
+        depth > 0 &&
+          depth <= MAX_COMMENT_DEPTH &&
+          "border-l border-border/60 pl-3 sm:pl-4"
       )}
     >
       <div className="space-y-2 rounded-xl bg-card/40 px-3 py-2.5">
@@ -207,7 +218,7 @@ function CommentItem({
               : t("translate.action")}
           </button>
         ) : null}
-        {!comment.isDeleted ? (
+        {!isTombstone ? (
           <div className="flex flex-wrap items-center gap-1">
             <LikeButton
               likeCount={likeCount}
@@ -216,16 +227,18 @@ function CommentItem({
               layout="horizontal"
               onToggle={applyLike}
             />
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="min-h-9 px-2 text-xs"
-              disabled={pending}
-              onClick={() => setReplyOpen((v) => !v)}
-            >
-              {t("comments.reply")}
-            </Button>
+            {canReply ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="min-h-9 px-2 text-xs"
+                disabled={pending}
+                onClick={() => setReplyOpen((v) => !v)}
+              >
+                {t("comments.reply")}
+              </Button>
+            ) : null}
             {isOwner ? (
               <>
                 <Button
@@ -241,33 +254,36 @@ function CommentItem({
                 >
                   {editing ? t("common.cancel") : t("common.edit")}
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="min-h-9 px-2 text-xs"
-                  disabled={pending}
-                  onClick={() => {
-                    if (!window.confirm(t("comments.deleteConfirm"))) return;
-                    startTransition(async () => {
-                      const res = await apiFetch(`/api/comments/${comment.id}`, {
-                        method: "DELETE",
+                {canDelete ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-9 px-2 text-xs"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!window.confirm(t("comments.deleteConfirm"))) return;
+                      startTransition(async () => {
+                        const res = await apiFetch(
+                          `/api/comments/${comment.id}`,
+                          { method: "DELETE" }
+                        );
+                        if (!res.ok) {
+                          setError(localizeError("Delete failed"));
+                          return;
+                        }
+                        router.refresh();
                       });
-                      if (!res.ok) {
-                        setError(localizeError("Delete failed"));
-                        return;
-                      }
-                      router.refresh();
-                    });
-                  }}
-                >
-                  {t("common.delete")}
-                </Button>
+                    }}
+                  >
+                    {t("common.delete")}
+                  </Button>
+                ) : null}
               </>
             ) : null}
           </div>
         ) : null}
-        {editing ? (
+        {editing && !isTombstone ? (
           <div className="space-y-2 pt-1">
             <Textarea
               value={editBody}
@@ -308,7 +324,7 @@ function CommentItem({
             {error}
           </p>
         ) : null}
-        {replyOpen ? (
+        {replyOpen && canReply ? (
           <div className="relative space-y-2 pt-1">
             <ParserTraps setTrapRef={bot.setTrapRef} />
             <Textarea

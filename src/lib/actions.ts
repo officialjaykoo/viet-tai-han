@@ -9,6 +9,15 @@ import {
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError } from "@/lib/session";
 import { normalizeRequestId } from "@/lib/idempotency";
+import {
+  MAX_POST_BODY_LENGTH,
+  MAX_POST_TITLE_LENGTH,
+  MAX_POST_URL_LENGTH,
+  MIN_POST_TITLE_LENGTH,
+} from "@/lib/post-limits";
+
+import { MAX_COMMENT_DEPTH } from "@/lib/comment-constants";
+import { isProfileCommunityName } from "@/lib/profile-community";
 
 export async function createPost(input: {
   userId: string;
@@ -20,13 +29,57 @@ export async function createPost(input: {
   mediaKey?: string | null;
   requestId?: string | null;
 }) {
+  if (typeof input.title !== "string") {
+    throw new AuthError("Invalid post payload", 400);
+  }
+  if (
+    input.body !== undefined &&
+    input.body !== null &&
+    typeof input.body !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+  if (
+    input.url !== undefined &&
+    input.url !== null &&
+    typeof input.url !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+  if (
+    input.mediaKey !== undefined &&
+    input.mediaKey !== null &&
+    typeof input.mediaKey !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+  if (
+    input.requestId !== undefined &&
+    input.requestId !== null &&
+    typeof input.requestId !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+
   const title = input.title.trim();
-  if (title.length < 3 || title.length > 300) {
+  if (
+    title.length < MIN_POST_TITLE_LENGTH ||
+    title.length > MAX_POST_TITLE_LENGTH
+  ) {
     throw new AuthError("Title must be 3–300 characters", 400);
   }
 
   const body = input.body?.trim() || null;
+  if (body && body.length > MAX_POST_BODY_LENGTH) {
+    throw new AuthError(
+      "Post body must be 20,000 characters or fewer",
+      400
+    );
+  }
   const url = input.url?.trim() || null;
+  if (url && url.length > MAX_POST_URL_LENGTH) {
+    throw new AuthError("Post URL must be 2,048 characters or fewer", 400);
+  }
   const mediaKey = input.mediaKey?.trim() || null;
 
   if (url && mediaKey) {
@@ -45,13 +98,6 @@ export async function createPost(input: {
     }
   }
 
-  if (mediaKey) {
-    const { isAllowedMediaKey } = await import("@/lib/media");
-    if (!isAllowedMediaKey(mediaKey)) {
-      throw new AuthError("Invalid media", 400);
-    }
-  }
-
   const requestId = normalizeRequestId(input.requestId);
   const db = await getDb();
   if (requestId) {
@@ -62,6 +108,32 @@ export async function createPost(input: {
       .bind(input.userId, requestId)
       .first<{ id: string }>();
     if (existing) return { id: existing.id };
+  }
+
+  const subreddit = await db
+    .prepare(
+      `SELECT id, name, created_by, is_removed
+       FROM subreddits WHERE id = ?`
+    )
+    .bind(input.subredditId)
+    .first<{
+      id: string;
+      name: string;
+      created_by: string | null;
+      is_removed: number;
+    }>();
+  if (!subreddit || subreddit.is_removed) {
+    throw new AuthError("Community not found", 404);
+  }
+  if (
+    isProfileCommunityName(subreddit.name) &&
+    subreddit.created_by !== input.userId
+  ) {
+    throw new AuthError("Profile community belongs to another user", 403);
+  }
+  if (mediaKey) {
+    const { assertOwnedMediaKey } = await import("@/lib/media");
+    await assertOwnedMediaKey(mediaKey, input.userId);
   }
 
   await enforceCreateRateLimit(input.userId, "post");
@@ -107,15 +179,19 @@ export async function createPost(input: {
     throw error;
   }
 
-
-  await bumpUserActivity(input.userId, input.subredditId, 3);
+  try {
+    await bumpUserActivity(input.userId, input.subredditId, 3);
+  } catch (error) {
+    console.error("post_activity_update_failed", error);
+  }
   syncAchievementsForEvent(input.userId, "post_created");
 
-
   if (!shadow) {
-    void import("@/lib/translation").then(({ schedulePostTranslation }) =>
-      schedulePostTranslation(id)
-    );
+    void import("@/lib/translation")
+      .then(({ schedulePostTranslation }) => schedulePostTranslation(id))
+      .catch((error) => {
+        console.error("post_translation_schedule_failed", error);
+      });
   }
 
   return { id };
@@ -176,11 +252,11 @@ export async function createComment(input: {
         is_removed: number;
         is_deleted: number;
       }>();
-    if (!parent || parent.is_removed) {
+    if (!parent || parent.is_removed || parent.is_deleted) {
       throw new AuthError("Parent comment not found", 404);
     }
     depth = parent.depth + 1;
-    if (depth > 12) {
+    if (depth > MAX_COMMENT_DEPTH) {
       throw new AuthError("Comment nesting too deep", 400);
     }
   }
@@ -194,25 +270,72 @@ export async function createComment(input: {
     moderation.shadow || input.userStatus === "shadowbanned" ? 1 : 0;
   const id = createPublicId();
 
+  const insert = input.parentId
+    ? db
+        .prepare(
+          `INSERT INTO comments (
+             id, post_id, author_id, parent_id, body, depth, is_shadow_hidden,
+             request_id
+           )
+           SELECT ?, p.id, ?, parent.id, ?, parent.depth + 1, ?, ?
+           FROM posts p
+           INNER JOIN comments parent ON parent.post_id = p.id
+           WHERE p.id = ?
+             AND p.is_removed = 0
+             AND p.is_locked = 0
+             AND parent.id = ?
+             AND parent.is_removed = 0
+             AND parent.is_deleted = 0
+             AND parent.depth < ?`
+        )
+        .bind(
+          id,
+          input.userId,
+          body,
+          shadow,
+          requestId,
+          input.postId,
+          input.parentId,
+          MAX_COMMENT_DEPTH
+        )
+    : db
+        .prepare(
+          `INSERT INTO comments (
+             id, post_id, author_id, parent_id, body, depth, is_shadow_hidden,
+             request_id
+           )
+           SELECT ?, p.id, ?, NULL, ?, 0, ?, ?
+           FROM posts p
+           WHERE p.id = ?
+             AND p.is_removed = 0
+             AND p.is_locked = 0`
+        )
+        .bind(
+          id,
+          input.userId,
+          body,
+          shadow,
+          requestId,
+          input.postId
+        );
+
+  let results: D1Result<unknown>[];
   try {
-    await db
-      .prepare(
-        `INSERT INTO comments (
-           id, post_id, author_id, parent_id, body, depth, is_shadow_hidden,
-           request_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        id,
-        input.postId,
-        input.userId,
-        input.parentId ?? null,
-        body,
-        depth,
-        shadow,
-        requestId
-      )
-      .run();
+    const statements = [insert];
+    if (!shadow) {
+      statements.push(
+        db
+          .prepare(
+            `UPDATE posts
+             SET comment_count = comment_count + 1,
+                 updated_at = datetime('now')
+             WHERE id = ?
+               AND EXISTS (SELECT 1 FROM comments WHERE id = ?)`
+          )
+          .bind(input.postId, id)
+      );
+    }
+    results = await db.batch(statements);
   } catch (error) {
     if (!requestId) throw error;
     const existing = await db
@@ -225,13 +348,11 @@ export async function createComment(input: {
     throw error;
   }
 
-  if (!shadow) {
-    await db
-      .prepare(
-        `UPDATE posts SET comment_count = comment_count + 1, updated_at = datetime('now') WHERE id = ?`
-      )
-      .bind(input.postId)
-      .run();
+  if (Number(results[0]?.meta.changes ?? 0) !== 1) {
+    throw new AuthError(
+      input.parentId ? "Parent comment not found" : "Post not found",
+      404
+    );
   }
 
   await bumpUserActivity(input.userId, post.subreddit_id, 1);
@@ -297,7 +418,59 @@ export async function createComment(input: {
   return { id, depth };
 }
 
-export async function softDeletePost(postId: string, actorId: string) {
+export async function deleteOwnPost(postId: string, actorId: string) {
+  const db = await getDb();
+  const post = await db
+    .prepare(`SELECT id, author_id, is_removed FROM posts WHERE id = ?`)
+    .bind(postId)
+    .first<{ id: string; author_id: string; is_removed: number }>();
+
+  if (!post || post.is_removed) {
+    throw new AuthError("Post not found", 404);
+  }
+  if (post.author_id !== actorId) {
+    throw new AuthError("Only the author can delete this post", 403);
+  }
+
+  const result = await db
+    .prepare(
+      `UPDATE posts
+       SET is_removed = 1, updated_at = datetime('now')
+       WHERE id = ?
+         AND author_id = ?
+         AND is_removed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM comments WHERE post_id = posts.id
+         )`
+    )
+    .bind(postId, actorId)
+    .run();
+
+  if (Number(result.meta.changes ?? 0) !== 1) {
+    const hasComments = await db
+      .prepare(`SELECT 1 AS present FROM comments WHERE post_id = ? LIMIT 1`)
+      .bind(postId)
+      .first();
+    if (hasComments) {
+      throw new AuthError("Post has comments and cannot be deleted", 409);
+    }
+    throw new AuthError("Post not found", 404);
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO moderation_actions (
+         id, actor_id, target_user_id, target_type, target_id, action, reason
+       ) VALUES (?, ?, ?, 'post', ?, 'remove', 'author delete')`
+    )
+    .bind(crypto.randomUUID(), actorId, post.author_id, postId)
+    .run();
+}
+
+export async function removePostForModeration(
+  postId: string,
+  actorId: string
+) {
   const db = await getDb();
   const post = await db
     .prepare(`SELECT id, author_id FROM posts WHERE id = ? AND is_removed = 0`)
@@ -305,60 +478,168 @@ export async function softDeletePost(postId: string, actorId: string) {
     .first<{ id: string; author_id: string }>();
   if (!post) throw new AuthError("Post not found", 404);
 
-  await db
+  const result = await db
     .prepare(
-      `UPDATE posts SET is_removed = 1, updated_at = datetime('now') WHERE id = ?`
+      `UPDATE posts SET is_removed = 1, updated_at = datetime('now')
+       WHERE id = ? AND is_removed = 0`
     )
     .bind(postId)
     .run();
+  if (Number(result.meta.changes ?? 0) !== 1) {
+    throw new AuthError("Post not found", 404);
+  }
 
   await db
     .prepare(
       `INSERT INTO moderation_actions (
          id, actor_id, target_user_id, target_type, target_id, action, reason
-       ) VALUES (?, ?, ?, 'post', ?, 'remove', 'soft delete')`
+       ) VALUES (?, ?, ?, 'post', ?, 'remove', 'moderator remove')`
     )
     .bind(crypto.randomUUID(), actorId, post.author_id, postId)
     .run();
-
 }
 
-export async function softDeleteComment(commentId: string, actorId: string) {
+export async function deleteOwnComment(commentId: string, actorId: string) {
   const db = await getDb();
   const comment = await db
     .prepare(
-      `SELECT id, author_id, post_id FROM comments WHERE id = ? AND is_removed = 0`
+      `SELECT id, author_id, post_id, is_deleted, is_removed, is_shadow_hidden
+       FROM comments WHERE id = ?`
     )
     .bind(commentId)
-    .first<{ id: string; author_id: string; post_id: string }>();
-  if (!comment) throw new AuthError("Comment not found", 404);
+    .first<{
+      id: string;
+      author_id: string;
+      post_id: string;
+      is_deleted: number;
+      is_removed: number;
+      is_shadow_hidden: number;
+    }>();
 
-  await db
+  if (!comment || comment.is_removed || comment.is_deleted) {
+    throw new AuthError("Comment not found", 404);
+  }
+  if (comment.author_id !== actorId) {
+    throw new AuthError("Only the author can delete this comment", 403);
+  }
+
+  const result = await db
     .prepare(
       `UPDATE comments
-       SET is_deleted = 1, is_removed = 1, body = '[deleted]', updated_at = datetime('now')
-       WHERE id = ?`
+       SET is_deleted = 1,
+           is_removed = 0,
+           body = '[deleted]',
+           source_lang = NULL,
+           translation_target_lang = NULL,
+           body_translated = NULL,
+           translation_status = 'skipped',
+           updated_at = datetime('now')
+       WHERE id = ?
+         AND author_id = ?
+         AND is_deleted = 0
+         AND is_removed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM comments child WHERE child.parent_id = comments.id
+         )`
     )
-    .bind(commentId)
+    .bind(commentId, actorId)
     .run();
 
-  await db
-    .prepare(
-      `UPDATE posts SET comment_count = MAX(0, comment_count - 1), updated_at = datetime('now') WHERE id = ?`
-    )
-    .bind(comment.post_id)
-    .run();
+  if (Number(result.meta.changes ?? 0) !== 1) {
+    const hasChildren = await db
+      .prepare(`SELECT 1 AS present FROM comments WHERE parent_id = ? LIMIT 1`)
+      .bind(commentId)
+      .first();
+    if (hasChildren) {
+      throw new AuthError("Comment has replies and cannot be deleted", 409);
+    }
+    throw new AuthError("Comment not found", 404);
+  }
+
+  if (!comment.is_shadow_hidden) {
+    await db
+      .prepare(
+        `UPDATE posts
+         SET comment_count = MAX(0, comment_count - 1),
+             updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .bind(comment.post_id)
+      .run();
+  }
 
   await db
     .prepare(
       `INSERT INTO moderation_actions (
          id, actor_id, target_user_id, target_type, target_id, action, reason
-       ) VALUES (?, ?, ?, 'comment', ?, 'remove', 'soft delete')`
+       ) VALUES (?, ?, ?, 'comment', ?, 'remove', 'author delete')`
     )
     .bind(crypto.randomUUID(), actorId, comment.author_id, commentId)
     .run();
 }
 
+export async function removeCommentForModeration(
+  commentId: string,
+  actorId: string
+) {
+  const db = await getDb();
+  const comment = await db
+    .prepare(
+      `SELECT id, author_id, post_id, is_deleted, is_removed, is_shadow_hidden
+       FROM comments WHERE id = ?`
+    )
+    .bind(commentId)
+    .first<{
+      id: string;
+      author_id: string;
+      post_id: string;
+      is_deleted: number;
+      is_removed: number;
+      is_shadow_hidden: number;
+    }>();
+  if (!comment || comment.is_removed) {
+    throw new AuthError("Comment not found", 404);
+  }
+
+  const result = await db
+    .prepare(
+      `UPDATE comments
+       SET is_removed = 1,
+           body = CASE WHEN is_deleted = 1 THEN '[deleted]' ELSE '[removed]' END,
+           source_lang = NULL,
+           translation_target_lang = NULL,
+           body_translated = NULL,
+           translation_status = 'skipped',
+           updated_at = datetime('now')
+       WHERE id = ? AND is_removed = 0 AND is_deleted = 0`
+    )
+    .bind(commentId)
+    .run();
+  if (Number(result.meta.changes ?? 0) !== 1) {
+    throw new AuthError("Comment not found", 404);
+  }
+
+  if (!comment.is_deleted && !comment.is_shadow_hidden) {
+    await db
+      .prepare(
+        `UPDATE posts
+         SET comment_count = MAX(0, comment_count - 1),
+             updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .bind(comment.post_id)
+      .run();
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO moderation_actions (
+         id, actor_id, target_user_id, target_type, target_id, action, reason
+       ) VALUES (?, ?, ?, 'comment', ?, 'remove', 'moderator remove')`
+    )
+    .bind(crypto.randomUUID(), actorId, comment.author_id, commentId)
+    .run();
+}
 
 export async function editPost(input: {
   postId: string;
@@ -386,13 +667,54 @@ export async function editPost(input: {
     throw new AuthError("Only the author can edit this post", 403);
   }
 
+  if (
+    input.title !== undefined &&
+    typeof input.title !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+  if (
+    input.body !== undefined &&
+    input.body !== null &&
+    typeof input.body !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+  if (
+    input.url !== undefined &&
+    input.url !== null &&
+    typeof input.url !== "string"
+  ) {
+    throw new AuthError("Invalid post payload", 400);
+  }
+
   const title = (input.title ?? post.title).trim();
-  if (title.length < 3 || title.length > 300) {
+  if (
+    title.length < MIN_POST_TITLE_LENGTH ||
+    title.length > MAX_POST_TITLE_LENGTH
+  ) {
     throw new AuthError("Title must be 3–300 characters", 400);
   }
   const body =
     input.body === undefined ? post.body : input.body?.trim() || null;
+  if (
+    input.body !== undefined &&
+    body &&
+    body.length > MAX_POST_BODY_LENGTH
+  ) {
+    throw new AuthError(
+      "Post body must be 20,000 characters or fewer",
+      400
+    );
+  }
   const url = input.url === undefined ? post.url : input.url?.trim() || null;
+  if (
+    input.url !== undefined &&
+    url &&
+    url.length > MAX_POST_URL_LENGTH
+  ) {
+    throw new AuthError("Post URL must be 2,048 characters or fewer", 400);
+  }
   if (url) {
     try {
       const parsed = new URL(url);

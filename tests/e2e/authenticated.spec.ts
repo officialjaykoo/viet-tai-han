@@ -216,4 +216,133 @@ test.describe("authenticated flows", () => {
     await expect(header).not.toHaveClass(/-translate-y-full/);
     await expect(mobileNav).not.toHaveClass(/translate-y-full/);
   });
+  test("authenticated login and signup routes honor safe next paths", async ({
+    page,
+  }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    await page.goto("/login?next=%2Fmessages", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\/messages$/);
+
+    await page.goto("/signup?next=%2Fmessages", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\/messages$/);
+  });
+
+  test("logout clears the session and exposes one guest CTA", async ({
+    page,
+  }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    const header = page.getByTestId("site-header");
+    await header.getByRole("button", { name: /menu tài khoản/i }).click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toContainText("@alice");
+    await expect(
+      menu.getByRole("menuitem", { name: /đăng nhập/i })
+    ).toHaveCount(0);
+    await expect(
+      menu.getByRole("menuitem", { name: /đăng ký/i })
+    ).toHaveCount(0);
+    await menu.getByRole("menuitem", { name: /đăng xuất/i }).click();
+
+    await expect(page).toHaveURL(/\/$/, { timeout: 45_000 });
+    await expect(
+      header.getByRole("link", { name: /đăng nhập/i })
+    ).toHaveCount(1, { timeout: 45_000 });
+    await expect(header.getByRole("link", { name: /đăng ký/i })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: /tin nhắn/i })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: /thông báo/i })).toHaveCount(0);
+    await expect(header.getByAltText("@alice")).toHaveCount(0);
+
+    const sessionResponse = await page.request.get("/api/auth/get-session");
+    expect(sessionResponse.ok()).toBe(true);
+    expect(await sessionResponse.json()).toBeNull();
+
+    const protectedResponse = await page.request.get("/api/messages");
+    expect(protectedResponse.status()).toBe(401);
+  });
+
+  test("logout removes private messages UI before returning home", async ({
+    page,
+  }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page, "/messages");
+    await expectSignedIn(page);
+    await expect(page.getByTestId("messages-page")).toBeVisible();
+
+    await page
+      .getByTestId("site-header")
+      .getByRole("button", { name: /menu tài khoản/i })
+      .click();
+    await page.getByRole("menuitem", { name: /đăng xuất/i }).click();
+
+    await expect(page).toHaveURL(/\/$/, { timeout: 45_000 });
+    await expect(page.getByTestId("messages-page")).toHaveCount(0);
+    await expect(
+      page.getByTestId("site-header").getByRole("link", { name: /tin nhắn/i })
+    ).toHaveCount(0);
+  });
+
+  test("logout failure keeps authenticated UI and shows a retryable error", async ({
+    page,
+  }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    const header = page.getByTestId("site-header");
+    await header.getByRole("button", { name: /menu tài khoản/i }).click();
+    await page.route("**/i/api*", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "forced logout failure",
+      });
+    });
+
+    await page.getByRole("menuitem", { name: /đăng xuất/i }).click();
+    await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
+    await expect(header.getByRole("button", { name: /menu tài khoản/i })).toBeVisible();
+    await expect(header.getByRole("alert")).toContainText(/không thể đăng xuất/i);
+    await page.unroute("**/i/api*");
+  });
+
+  test("logout propagates to another tab through the Better Auth store", async ({
+    page,
+  }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    const otherTab = await page.context().newPage();
+    try {
+      await otherTab.goto("/", { waitUntil: "domcontentloaded" });
+      await expectSignedIn(otherTab);
+
+      await page
+        .getByTestId("site-header")
+        .getByRole("button", { name: /menu tài khoản/i })
+        .click();
+      await page.getByRole("menuitem", { name: /đăng xuất/i }).click();
+      await expect(page).toHaveURL(/\/$/, { timeout: 45_000 });
+
+      await otherTab.bringToFront();
+      await expect(
+        otherTab.getByRole("link", { name: /đăng nhập/i })
+      ).toHaveCount(1, { timeout: 30_000 });
+      await expect(
+        otherTab.getByRole("button", { name: /menu tài khoản/i })
+      ).toHaveCount(0);
+    } finally {
+      await otherTab.close();
+    }
+  });
 });

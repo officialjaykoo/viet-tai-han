@@ -2,9 +2,12 @@ import { notifyQuietly } from "@/lib/notifications";
 
 import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
 import { syncAchievementsForEvent } from "@/lib/achievements";
+import { runBackgroundTask } from "@/lib/background-task";
+import { scheduleChatPromotion } from "@/lib/chat-promotion";
 import { getDb } from "@/lib/db";
 import { getFriendRelation } from "@/lib/friends";
 import { createPublicId } from "@/lib/id";
+import { refreshUnreadCounts } from "@/lib/unread";
 import { AuthError } from "@/lib/session";
 
 export type ReportReason =
@@ -62,6 +65,7 @@ export async function blockUser(blockerId: string, blockedId: string) {
     .first<{ id: string }>();
   if (!user) throw new AuthError("User not found", 404);
 
+  const pair = [blockerId, blockedId].sort().join(":");
   await db.batch([
     db
       .prepare(
@@ -81,8 +85,54 @@ export async function blockUser(blockerId: string, blockedId: string) {
         `DELETE FROM user_friendships
          WHERE pair_key = ?`
       )
-      .bind([blockerId, blockedId].sort().join(":")),
+      .bind(pair),
+    db
+      .prepare(
+        `UPDATE chat_requests
+         SET status = 'cancelled',
+             responded_at = COALESCE(
+               responded_at,
+               strftime('%Y-%m-%d %H:%M:%f', 'now')
+             )
+         WHERE status = 'pending'
+           AND (
+             (from_user_id = ? AND to_user_id = ?)
+             OR (from_user_id = ? AND to_user_id = ?)
+           )`
+      )
+      .bind(blockerId, blockedId, blockedId, blockerId),
+    db
+      .prepare(
+        `DELETE FROM chat_messages
+         WHERE delivery_status = 'pending'
+           AND EXISTS (
+             SELECT 1
+             FROM chat_rooms r
+             WHERE r.id = chat_messages.room_id
+               AND r.pair_key = ?
+           )`
+      )
+      .bind(pair),
+    db
+      .prepare(
+        `UPDATE chat_room_members
+         SET membership_status = 'left',
+             joined_at = NULL
+         WHERE user_id IN (?, ?)
+           AND membership_status != 'left'
+           AND room_id IN (
+             SELECT id FROM chat_rooms WHERE pair_key = ?
+           )`
+      )
+      .bind(blockerId, blockedId, pair),
   ]);
+
+  runBackgroundTask("blocked_unread_reconcile", async () => {
+    await Promise.allSettled([
+      refreshUnreadCounts(blockerId),
+      refreshUnreadCounts(blockedId),
+    ]);
+  });
 
   return { blocked: true as const };
 }
@@ -153,15 +203,19 @@ export async function followUser(followerId: string, followingId: string) {
       .bind(followerId, followingId, followingId, followerId)
       .first();
     if (stillBlocked) throw new AuthError("Can't follow this user", 403);
+    scheduleChatPromotion({
+      firstUserId: followerId,
+      secondUserId: followingId,
+      reason: "recipient_followed_sender",
+    });
     return { following: true as const };
   }
 
-  const { promotePendingChatRequestsForPair } = await import("@/lib/messages");
-  await promotePendingChatRequestsForPair(
-    followerId,
-    followingId,
-    "recipient_followed_sender"
-  );
+  scheduleChatPromotion({
+    firstUserId: followerId,
+    secondUserId: followingId,
+    reason: "recipient_followed_sender",
+  });
   syncAchievementsForEvent(followerId, "follow");
   syncAchievementsForEvent(followingId, "follow");
 

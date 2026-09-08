@@ -28,11 +28,20 @@ export async function ensureUnreadFanout(userId: string) {
            FROM chat_messages cm
            INNER JOIN chat_room_members rm
              ON rm.room_id = cm.room_id AND rm.user_id = ?
+           INNER JOIN chat_room_members peer
+             ON peer.room_id = cm.room_id
+            AND peer.user_id != cm.sender_id
+            AND peer.membership_status = 'active'
            WHERE rm.membership_status = 'active'
              AND cm.sender_id != ?
              AND cm.delivery_status = 'delivered'
              AND cm.is_shadow_hidden = 0
              AND cm.is_moderation_hidden = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = rm.user_id AND b.blocked_id = peer.user_id)
+                  OR (b.blocker_id = peer.user_id AND b.blocked_id = rm.user_id)
+             )
              AND (
                rm.last_read_at IS NULL
                OR cm.created_at > rm.last_read_at
@@ -71,6 +80,38 @@ export async function incrementUnread(
     .run();
 }
 
+/** Increment only while the recipient/sender pair is not blocked. */
+export async function incrementChatUnread(
+  recipientId: string,
+  senderId: string,
+  amount = 1
+) {
+  if (!Number.isInteger(amount) || amount <= 0) return;
+  const db = await getDb();
+  await db
+    .prepare(
+      `INSERT INTO unread_fanout (user_id, message_count, updated_at)
+       SELECT ?, ?, datetime('now')
+       WHERE NOT EXISTS (
+         SELECT 1 FROM user_blocks b
+         WHERE (b.blocker_id = ? AND b.blocked_id = ?)
+            OR (b.blocker_id = ? AND b.blocked_id = ?)
+       )
+       ON CONFLICT(user_id) DO UPDATE SET
+         message_count = message_count + excluded.message_count,
+         updated_at = datetime('now')`
+    )
+    .bind(
+      recipientId,
+      amount,
+      recipientId,
+      senderId,
+      senderId,
+      recipientId
+    )
+    .run();
+}
+
 export async function decrementUnread(
   userId: string,
   counter: UnreadCounter,
@@ -106,11 +147,20 @@ export async function refreshUnreadCounts(userId: string) {
            FROM chat_messages cm
            INNER JOIN chat_room_members rm
              ON rm.room_id = cm.room_id AND rm.user_id = unread_fanout.user_id
+           INNER JOIN chat_room_members peer
+             ON peer.room_id = cm.room_id
+            AND peer.user_id != cm.sender_id
+            AND peer.membership_status = 'active'
            WHERE rm.membership_status = 'active'
              AND cm.sender_id != unread_fanout.user_id
              AND cm.delivery_status = 'delivered'
              AND cm.is_shadow_hidden = 0
              AND cm.is_moderation_hidden = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = unread_fanout.user_id AND b.blocked_id = peer.user_id)
+                  OR (b.blocker_id = peer.user_id AND b.blocked_id = unread_fanout.user_id)
+             )
              AND (
                rm.last_read_at IS NULL
                OR cm.created_at > rm.last_read_at
@@ -145,11 +195,20 @@ export async function getUnreadCounts(userId: string): Promise<UnreadCounts> {
            FROM chat_messages cm
            INNER JOIN chat_room_members rm
              ON rm.room_id = cm.room_id AND rm.user_id = ?
+           INNER JOIN chat_room_members peer
+             ON peer.room_id = cm.room_id
+            AND peer.user_id != cm.sender_id
+            AND peer.membership_status = 'active'
            WHERE rm.membership_status = 'active'
              AND cm.sender_id != ?
              AND cm.delivery_status = 'delivered'
              AND cm.is_shadow_hidden = 0
              AND cm.is_moderation_hidden = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = rm.user_id AND b.blocked_id = peer.user_id)
+                  OR (b.blocker_id = peer.user_id AND b.blocked_id = rm.user_id)
+             )
              AND (
                rm.last_read_at IS NULL
                OR cm.created_at > rm.last_read_at

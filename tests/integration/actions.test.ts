@@ -1,15 +1,18 @@
 import { env } from "cloudflare:test";
+import jpeg from "jpeg-js";
 import { describe, expect, it } from "vitest";
 
 import {
   createComment,
   createPost,
   createSubreddit,
+  deleteOwnComment,
+  deleteOwnPost,
   editComment,
   editPost,
-  softDeleteComment,
-  softDeletePost,
 } from "@/lib/actions";
+import { uploadPostImage } from "@/lib/media";
+import { ensureProfileCommunity } from "@/lib/profile-community";
 import { getFeedPosts } from "@/lib/db";
 import { AuthError } from "@/lib/session";
 import {
@@ -69,7 +72,7 @@ describe("content lifecycle (D1)", () => {
       })
     ).rejects.toBeInstanceOf(AuthError);
 
-    await softDeletePost(created.id, authorId);
+    await deleteOwnPost(created.id, authorId);
     row = await getPostRow(created.id);
     expect(row?.is_removed).toBe(1);
   });
@@ -121,7 +124,7 @@ describe("content lifecycle (D1)", () => {
     expect(unlike.liked).toBe(false);
     expect(unlike.likeCount).toBe(0);
 
-    await softDeleteComment(child.id, actorId);
+    await deleteOwnComment(child.id, actorId);
     comment = await getCommentRow(child.id);
     expect(comment?.is_deleted).toBe(1);
     expect(comment?.body).toBe("[deleted]");
@@ -366,6 +369,24 @@ describe("communities", () => {
       })
     ).rejects.toMatchObject({ status: 403 });
   });
+  it("bootstraps profile communities atomically and protects their owner", async () => {
+    const { authorId, actorId } = await seedUsersAndSubreddit();
+    const username = `owner_${crypto.randomUUID().slice(0, 8)}`;
+
+    const [first, second] = await Promise.all([
+      ensureProfileCommunity({ userId: authorId, username }),
+      ensureProfileCommunity({ userId: authorId, username }),
+    ]);
+    expect(first.id).toBe(second.id);
+
+    await expect(
+      createPost({
+        userId: actorId,
+        subredditId: first.id,
+        title: "Unauthorized profile post",
+      })
+    ).rejects.toMatchObject({ status: 403 });
+  });
 });
 
 describe("validation edges", () => {
@@ -383,5 +404,55 @@ describe("validation edges", () => {
     await expect(blockUser(authorId, authorId)).rejects.toBeInstanceOf(
       AuthError
     );
+  });
+  it("rejects oversized post fields", async () => {
+    const { authorId, subredditId } = await seedUsersAndSubreddit();
+
+    await expect(
+      createPost({
+        userId: authorId,
+        subredditId,
+        title: "Valid title",
+        body: "x".repeat(20_001),
+      })
+    ).rejects.toMatchObject({ status: 400 });
+
+    await expect(
+      createPost({
+        userId: authorId,
+        subredditId,
+        title: "Valid title",
+        url: `https://${"x".repeat(2_042)}`,
+      })
+    ).rejects.toMatchObject({ status: 400 });
+  });
+  it("requires an existing media object owned by the poster", async () => {
+    const { authorId, actorId, subredditId } = await seedUsersAndSubreddit();
+    const source = jpeg.encode({
+      width: 8,
+      height: 8,
+      data: Buffer.alloc(8 * 8 * 4, 120),
+    });
+    const uploaded = await uploadPostImage({
+      userId: authorId,
+      file: new File([source.data], "test.jpg", { type: "image/jpeg" }),
+    });
+
+    await expect(
+      createPost({
+        userId: actorId,
+        subredditId,
+        title: "Someone else's image",
+        mediaKey: uploaded.mediaKey,
+      })
+    ).rejects.toMatchObject({ status: 400 });
+
+    const post = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Owned image",
+      mediaKey: uploaded.mediaKey,
+    });
+    expect(post.id).toBeTruthy();
   });
 });

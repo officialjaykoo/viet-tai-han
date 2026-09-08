@@ -63,6 +63,17 @@ describe("friend relationships (D1)", () => {
     expect((await listFriends(firstId)).some((friend) => friend.id === secondId)).toBe(
       true
     );
+    const friendship = await env.DB
+      .prepare(
+        `SELECT created_at, updated_at
+         FROM user_friendships WHERE id = ?`
+      )
+      .bind(sent.requestId)
+      .first<{ created_at: string; updated_at: string }>();
+    const listedFriend = (await listFriends(firstId)).find(
+      (friend) => friend.id === secondId
+    );
+    expect(listedFriend?.since).toBe(friendship?.updated_at);
 
     await blockUser(firstId, secondId);
     expect(await getFriendRelation(firstId, secondId)).toMatchObject({
@@ -98,6 +109,17 @@ describe("friend relationships (D1)", () => {
     await expect(sendFriendRequest(firstId, secondId)).rejects.toMatchObject({
       status: 403,
     });
+    await blockUser(firstId, secondId);
+    await blockUser(secondId, firstId);
+    const mutualBlocks = await env.DB
+      .prepare(
+        `SELECT blocker_id, blocked_id FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)`
+      )
+      .bind(firstId, secondId, secondId, firstId)
+      .all<{ blocker_id: string; blocked_id: string }>();
+    expect(mutualBlocks.results).toHaveLength(2);
     expect(
       await env.DB.prepare(
         `SELECT 1 FROM user_follows
@@ -109,6 +131,7 @@ describe("friend relationships (D1)", () => {
     ).toBeNull();
 
     await unblockUser(secondId, firstId);
+    await unblockUser(firstId, secondId);
     expect(await getFriendRelation(firstId, secondId)).toMatchObject({
       status: "none",
     });

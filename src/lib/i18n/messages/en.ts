@@ -49,6 +49,7 @@ export const en = {
     continueHint:
       "No email or password is required. You can add a contact email later.",
     couldNotContinue: "Could not continue",
+    signOutFailed: "Could not sign out. Try again.",
   },
   onboarding: {
     eyebrow: "First setup",
@@ -140,6 +141,7 @@ export const en = {
     imageRequired: "Add an image",
     imageProcessError: "Could not process image",
     imageUploadFailed: "Image upload failed",
+    networkError: "The network request failed. Your draft is preserved; try again.",
     deleteConfirm: "Delete this post?",
     range7d: "Last 7 days",
     range30d: "Last 30 days",
@@ -170,6 +172,7 @@ export const en = {
     noComments: "No comments yet. Be first.",
     placeholder: "What are your thoughts?",
     deleted: "[deleted]",
+    removed: "[removed by moderators]",
     deleteConfirm: "Delete this comment?",
   },
   questions: {
@@ -410,8 +413,10 @@ export const en = {
       "Private chats open directly for eligible relationships; other new chats may need approval.",
     empty: "No conversations yet",
     requests: "Requests",
+    sentRequests: "Sent requests",
     accept: "Accept",
     decline: "Decline",
+    cancelRequest: "Cancel request",
     send: "Send",
     placeholder: "Write a message…",
     loadError: "Couldn't load messages",
@@ -812,6 +817,7 @@ export const en = {
   common: {
     loading: "Loading…",
     error: "Something went wrong",
+    networkError: "The network request failed. Try again.",
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",

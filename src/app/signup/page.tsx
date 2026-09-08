@@ -1,5 +1,28 @@
-import { SocialAuthPage } from "@/components/auth/social-auth-form";
+import { redirect } from "next/navigation";
 
-export default function SignupPage() {
-  return <SocialAuthPage />;
+import { getSafeAuthNext } from "@/lib/auth-redirect";
+import { getSession } from "@/lib/session";
+
+type SignupPageProps = {
+  searchParams: Promise<{
+    next?: string | string[] | undefined;
+  }>;
+};
+
+export default async function SignupPage({
+  searchParams,
+}: SignupPageProps) {
+  const { next } = await searchParams;
+  const safeNext = getSafeAuthNext(next);
+  const session = await getSession();
+
+  if (session?.user) {
+    redirect(safeNext);
+  }
+
+  redirect(
+    safeNext === "/"
+      ? "/login"
+      : `/login?next=${encodeURIComponent(safeNext)}`
+  );
 }

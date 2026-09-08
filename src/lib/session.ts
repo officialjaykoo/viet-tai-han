@@ -1,3 +1,5 @@
+import type { BaseSession, BaseUser } from "@better-auth/core/db";
+
 import { headers } from "next/headers";
 
 import { getAuth } from "@/lib/auth";
@@ -14,7 +16,20 @@ export class AuthError extends Error {
   }
 }
 
-export async function getSession() {
+export type PublicSessionUser = Omit<BaseUser, "email"> & {
+  username?: string | null;
+  status?: string | null;
+  [key: string]: unknown;
+};
+
+export type PublicSession = {
+  session: BaseSession & {
+    [key: string]: unknown;
+  };
+  user: PublicSessionUser;
+};
+
+export async function getSession(): Promise<PublicSession | null> {
   const auth = await getAuth();
   const session = await auth.api.getSession({
     headers: await headers(),

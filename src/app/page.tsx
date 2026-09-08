@@ -160,7 +160,9 @@ export default async function HomePage({
       mode,
       viewerUserId: session?.user?.id ?? null,
     }),
-    loadOnlineUsers(session?.user?.id ?? null),
+    signedIn
+      ? loadOnlineUsers(session?.user?.id ?? null)
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -250,15 +252,17 @@ export default async function HomePage({
             <Feed initialFeed={initialFeed} sort={sort} mode={mode} />
           </div>
 
-          <aside className="hidden xl:col-start-3 xl:block">
-            <div className="sticky top-[4.5rem]">
-              <OnlinePeopleList
-                initialUsers={onlineUsers}
-                heading={tLocale(locale, "online.title")}
-                empty={tLocale(locale, "online.empty")}
-              />
-            </div>
-          </aside>
+          {signedIn ? (
+            <aside className="hidden xl:col-start-3 xl:block">
+              <div className="sticky top-[4.5rem]">
+                <OnlinePeopleList
+                  initialUsers={onlineUsers}
+                  heading={tLocale(locale, "online.title")}
+                  empty={tLocale(locale, "online.empty")}
+                />
+              </div>
+            </aside>
+          ) : null}
         </PageShell>
       </main>
     </>

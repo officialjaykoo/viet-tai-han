@@ -42,13 +42,20 @@ export default async function PostPage({
       <main className="relative flex-1">
         <PageShell width="narrow" className="space-y-6">
 
-          <PostCard post={post} discoverySource={discoverySource} />
+          <PostCard
+            post={post}
+            discoverySource={discoverySource}
+            showBody={false}
+          />
 
           <PostAuthorActions
             postId={post.id}
             isOwner={Boolean(post.author.isAuthor)}
+            postType={post.mediaKey ? "image" : post.url ? "link" : "text"}
             initialTitle={post.title}
             initialBody={post.body}
+            initialUrl={post.url}
+            commentCount={post.commentCount}
           />
 
           <AdSlot placement="post_footer" />

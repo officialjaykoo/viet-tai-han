@@ -51,6 +51,7 @@ export const ru: Messages = {
     continueHint:
       "Email и пароль не нужны. Контактный email можно добавить позже.",
     couldNotContinue: "Не удалось продолжить",
+    signOutFailed: "Не удалось выйти. Повторите попытку.",
   },
   onboarding: {
     eyebrow: "Первичная настройка",
@@ -142,6 +143,7 @@ export const ru: Messages = {
     imageRequired: "Добавьте изображение",
     imageProcessError: "Не удалось обработать изображение",
     imageUploadFailed: "Не удалось загрузить изображение",
+    networkError: "Сетевая ошибка. Черновик сохранён; попробуйте ещё раз.",
     deleteConfirm: "Удалить этот пост?",
     range7d: "За 7 дней",
     range30d: "За 30 дней",
@@ -173,6 +175,7 @@ export const ru: Messages = {
     noComments: "Комментариев пока нет. Будьте первым.",
     placeholder: "Что вы думаете?",
     deleted: "[удалено]",
+    removed: "[удалено модераторами]",
     deleteConfirm: "Удалить этот комментарий?",
   },
   questions: {
@@ -410,8 +413,10 @@ export const ru: Messages = {
       "Личные чаты открываются напрямую для подходящих отношений; для остальных новых чатов может потребоваться одобрение.",
     empty: "Пока нет переписок",
     requests: "Запросы",
+    sentRequests: "Отправленные запросы",
     accept: "Принять",
     decline: "Отклонить",
+    cancelRequest: "Отменить запрос",
     send: "Отправить",
     placeholder: "Напишите сообщение…",
     loadError: "Не удалось загрузить сообщения",
@@ -812,6 +817,7 @@ export const ru: Messages = {
   common: {
     loading: "Загрузка…",
     error: "Что-то пошло не так",
+    networkError: "Сетевой запрос не выполнен. Попробуйте снова.",
     save: "Сохранить",
     cancel: "Отмена",
     delete: "Удалить",

@@ -35,6 +35,7 @@ export type PublicComment = {
   depth: number;
   createdAt: string;
   isDeleted: boolean;
+  isRemoved: boolean;
   translation: FeedPost["translation"];
   author: PublicAuthor;
   children: PublicComment[];
@@ -141,6 +142,7 @@ export function serializeComment(
     depth: comment.depth,
     createdAt: comment.createdAt,
     isDeleted: comment.isDeleted,
+    isRemoved: comment.isRemoved,
     translation: comment.translation,
     author: publicAuthor(
       {

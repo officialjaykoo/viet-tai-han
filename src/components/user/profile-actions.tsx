@@ -14,6 +14,7 @@ import {
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
+import { announceUnreadChanged } from "@/components/notifications/use-unread-count";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
@@ -75,68 +76,72 @@ export function ProfileActions({
   const buttonClass = compact
     ? "min-h-8 gap-1 px-2 text-xs"
     : "min-h-11 gap-1.5 sm:min-h-8";
-
   function run(action: Action) {
     setError(null);
     startTransition(async () => {
-      const isFriendApi =
-        action === "friend_accept" || action === "friend_decline";
-      const endpoint = isFriendApi
-        ? "/api/friends"
-        : `/api/users/${encodeURIComponent(username)}`;
-      const body = isFriendApi
-        ? {
-            action: action === "friend_accept" ? "accept" : "decline",
-            requestId: friendRequestId,
-          }
-        : { action };
-      const res = await apiFetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (res.status === 401) {
-        router.push(
-          `/login?next=${encodeURIComponent(
-            getUsernameProfileHref(username) ?? "/"
-          )}`
-        );
-        return;
-      }
-      const payload = (await res.json().catch(() => null)) as
-        | (FriendResponse & { error?: string })
-        | null;
-      if (!res.ok) {
-        setError(localizeError(payload?.error, "Action failed"));
-        return;
-      }
+      try {
+        const isFriendApi =
+          action === "friend_accept" || action === "friend_decline";
+        const endpoint = isFriendApi
+          ? "/api/friends"
+          : `/api/users/${encodeURIComponent(username)}`;
+        const body = isFriendApi
+          ? {
+              action: action === "friend_accept" ? "accept" : "decline",
+              requestId: friendRequestId,
+            }
+          : { action };
+        const res = await apiFetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.status === 401) {
+          router.push(
+            `/login?next=${encodeURIComponent(
+              getUsernameProfileHref(username) ?? "/"
+            )}`
+          );
+          return;
+        }
+        const payload = (await res.json().catch(() => null)) as
+          | (FriendResponse & { error?: string })
+          | null;
+        if (!res.ok) {
+          setError(localizeError(payload?.error, "Action failed"));
+          return;
+        }
 
-      if (action === "follow") setFollowing(true);
-      if (action === "unfollow") setFollowing(false);
-      if (action === "block") {
-        setBlockedByMe(true);
-        setFollowing(false);
-        setFriendStatus("none");
-        setFriendRequestId(null);
+        if (action === "follow") setFollowing(true);
+        if (action === "unfollow") setFollowing(false);
+        if (action === "block") {
+          setBlockedByMe(true);
+          setFollowing(false);
+          setFriendStatus("none");
+          setFriendRequestId(null);
+          announceUnreadChanged();
+        }
+        if (action === "unblock") setBlockedByMe(false);
+        if (action === "friend_request") {
+          setFriendStatus(payload?.friendStatus ?? "outgoing");
+          setFriendRequestId(payload?.requestId ?? null);
+        }
+        if (
+          action === "friend_cancel" ||
+          action === "friend_remove" ||
+          action === "friend_decline"
+        ) {
+          setFriendStatus("none");
+          setFriendRequestId(null);
+        }
+        if (action === "friend_accept") {
+          setFriendStatus("friends");
+          setFriendRequestId(null);
+        }
+        router.refresh();
+      } catch {
+        setError(t("common.networkError"));
       }
-      if (action === "unblock") setBlockedByMe(false);
-      if (action === "friend_request") {
-        setFriendStatus(payload?.friendStatus ?? "outgoing");
-        setFriendRequestId(payload?.requestId ?? null);
-      }
-      if (
-        action === "friend_cancel" ||
-        action === "friend_remove" ||
-        action === "friend_decline"
-      ) {
-        setFriendStatus("none");
-        setFriendRequestId(null);
-      }
-      if (action === "friend_accept") {
-        setFriendStatus("friends");
-        setFriendRequestId(null);
-      }
-      router.refresh();
     });
   }
 
@@ -233,7 +238,7 @@ export function ProfileActions({
           {following ? t("profile.unfollow") : t("profile.follow")}
         </Button>
       ) : null}
-      {showBlock && !blockedByThem ? (
+      {showBlock ? (
         <Button
           type="button"
           size="sm"

@@ -15,6 +15,7 @@ import {
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useSession } from "@/lib/auth-client";
+import { resolveAuthUiState } from "@/lib/auth-ui";
 import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
@@ -24,13 +25,25 @@ const itemClass =
 export function MobileNav() {
   const pathname = usePathname();
   const { t } = useI18n();
-  const { data: session } = useSession();
+  const {
+    data: session,
+    isPending,
+    error,
+  } = useSession();
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     const hydrationId = window.setTimeout(() => setHydrated(true), 0);
     return () => window.clearTimeout(hydrationId);
   }, []);
-  const profileHref = getProfileHref(hydrated ? session?.user : null);
+  const visibleSession = hydrated ? session : null;
+  const authState = resolveAuthUiState({
+    hydrated,
+    session: visibleSession,
+    isPending,
+    error,
+  });
+  const signedIn = authState === "authenticated";
+  const profileHref = getProfileHref(visibleSession?.user);
   if (pathname === "/login" || pathname === "/signup") return null;
 
   function active(href: string) {
@@ -46,8 +59,12 @@ export function MobileNav() {
     { href: "/questions", label: t("nav.questions"), icon: CircleHelpIcon },
     { href: "/marketplace", label: t("nav.marketplace"), icon: ShoppingBagIcon },
     { href: "/businesses", label: t("nav.businesses"), icon: StoreIcon },
-    { href: "/notifications", label: t("nav.notifications"), icon: BellIcon },
-    { href: profileHref, label: t("nav.profile"), icon: UserRoundIcon },
+    ...(signedIn
+      ? [
+          { href: "/notifications", label: t("nav.notifications"), icon: BellIcon },
+          { href: profileHref, label: t("nav.profile"), icon: UserRoundIcon },
+        ]
+      : []),
   ];
 
   return (

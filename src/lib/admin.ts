@@ -111,50 +111,81 @@ export async function deleteAccount(input: {
     throw new AuthError("Cannot delete your own account", 400);
   }
   const db = await getDb();
-  await db
-    .prepare(
-      `UPDATE "user"
-       SET status = 'banned',
-           name = 'deleted',
-           username = NULL,
-           bio = NULL,
-           email = 'deleted_' || id || '@red.invalid',
-           updatedAt = datetime('now')
-       WHERE id = ?`
-    )
-    .bind(input.targetUserId)
-    .run();
-
-  await db
-    .prepare(
-      `UPDATE posts SET is_removed = 1, updated_at = datetime('now') WHERE author_id = ?`
-    )
-    .bind(input.targetUserId)
-    .run();
-
-  await db
-    .prepare(
-      `UPDATE comments
-       SET is_deleted = 1, is_removed = 1, body = '[deleted]', updated_at = datetime('now')
-       WHERE author_id = ?`
-    )
-    .bind(input.targetUserId)
-    .run();
-
-  await db
-    .prepare(
-      `INSERT INTO moderation_actions (
-         id, actor_id, target_user_id, target_type, target_id, action, reason
-       ) VALUES (?, ?, ?, 'user', ?, 'delete_account', ?)`
-    )
-    .bind(
-      crypto.randomUUID(),
-      input.actorId,
-      input.targetUserId,
-      input.targetUserId,
-      input.reason ?? null
-    )
-    .run();
+  const statements = [
+    db
+      .prepare(
+        `UPDATE "user"
+         SET status = 'banned',
+             name = 'deleted',
+             username = NULL,
+             bio = NULL,
+             email = 'deleted_' || id || '@red.invalid',
+             updatedAt = datetime('now')
+         WHERE id = ?`
+      )
+      .bind(input.targetUserId),
+    db
+      .prepare(
+        `UPDATE posts
+         SET is_removed = 1, updated_at = datetime('now')
+         WHERE author_id = ?`
+      )
+      .bind(input.targetUserId),
+    db
+      .prepare(
+        `UPDATE posts
+         SET comment_count = MAX(
+               0,
+               comment_count - (
+                 SELECT COUNT(*)
+                 FROM comments c
+                 WHERE c.post_id = posts.id
+                   AND c.author_id = ?
+                   AND c.is_removed = 0
+                   AND c.is_deleted = 0
+                   AND c.is_shadow_hidden = 0
+               )
+             ),
+             updated_at = datetime('now')
+         WHERE EXISTS (
+           SELECT 1
+           FROM comments c
+           WHERE c.post_id = posts.id
+             AND c.author_id = ?
+             AND c.is_removed = 0
+             AND c.is_deleted = 0
+             AND c.is_shadow_hidden = 0
+         )`
+      )
+      .bind(input.targetUserId, input.targetUserId),
+    db
+      .prepare(
+        `UPDATE comments
+         SET is_removed = 1,
+             body = CASE WHEN is_deleted = 1 THEN '[deleted]' ELSE '[removed]' END,
+             source_lang = NULL,
+             translation_target_lang = NULL,
+             body_translated = NULL,
+             translation_status = 'skipped',
+             updated_at = datetime('now')
+         WHERE author_id = ?`
+      )
+      .bind(input.targetUserId),
+    db
+      .prepare(
+        `INSERT INTO moderation_actions (
+           id, actor_id, target_user_id, target_type, target_id, action, reason
+         ) VALUES (?, ?, ?, 'user', ?, 'delete_account', ?)`
+      )
+      .bind(
+        crypto.randomUUID(),
+        input.actorId,
+        input.targetUserId,
+        input.targetUserId,
+        input.reason ?? null
+      ),
+  ];
+  await db.batch(statements);
 }
 
 export async function deleteSubreddit(input: {
@@ -272,7 +303,8 @@ export async function getAdminDashboard() {
       `SELECT
          (SELECT COUNT(*) FROM "user" WHERE status = 'active') AS users,
          (SELECT COUNT(*) FROM posts WHERE is_removed = 0) AS posts,
-         (SELECT COUNT(*) FROM comments WHERE is_removed = 0) AS comments,
+         (SELECT COUNT(*) FROM comments
+          WHERE is_removed = 0 AND is_deleted = 0 AND is_shadow_hidden = 0) AS comments,
          (SELECT COUNT(*) FROM subreddits WHERE is_removed = 0) AS communities,
          (SELECT COUNT(*) FROM businesses WHERE status != 'removed') AS businesses,
          (SELECT COUNT(*) FROM listings WHERE status != 'removed') AS listings,

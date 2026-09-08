@@ -409,7 +409,9 @@ export async function processCommentTranslation(
     .prepare(
       `SELECT id, body, is_deleted, translation_status
        FROM comments
-       WHERE id = ? AND is_removed = 0`
+       WHERE id = ?
+         AND is_removed = 0
+         AND is_deleted = 0`
     )
     .bind(commentId)
     .first<{

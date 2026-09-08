@@ -33,6 +33,11 @@ import {
 } from "@/components/security/bot-check";
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { useSession } from "@/lib/auth-client";
+import {
+  MAX_POST_BODY_LENGTH,
+  MAX_POST_TITLE_LENGTH,
+  MAX_POST_URL_LENGTH,
+} from "@/lib/post-limits";
 import { prepareImageForUpload } from "@/lib/prepare-image";
 import { requiresTurnstileToken } from "@/lib/security/turnstile-client";
 import { cn } from "@/lib/utils";
@@ -64,8 +69,10 @@ const fieldRadius = "rounded-lg";
 
 export function CreatePostForm({
   defaultSubreddit = "",
+  defaultPostType = "text",
 }: {
   defaultSubreddit?: string;
+  defaultPostType?: PostType;
 }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -80,9 +87,14 @@ export function CreatePostForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef<string | null>(null);
+  const mediaKeyRef = useRef<string | null>(null);
+  const draftFingerprintRef = useRef<{
+    value: string;
+    imageFile: File | null;
+  } | null>(null);
   const listId = useId();
 
-  const [postType, setPostType] = useState<PostType>("text");
+  const [postType, setPostType] = useState<PostType>(defaultPostType);
   const [destination, setDestination] = useState<Destination | null>(
     defaultSubreddit
       ? { kind: "community", name: defaultSubreddit, title: defaultSubreddit }
@@ -107,6 +119,34 @@ export function CreatePostForm({
   useEffect(() => {
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    const fingerprint = JSON.stringify([
+      postType,
+      destination?.kind ?? null,
+      destination?.kind === "community" ? destination.name : null,
+      title,
+      postType === "text" ? body : "",
+      postType === "link" ? url : "",
+      postType === "image" && imageFile
+        ? [
+            imageFile.name,
+            imageFile.size,
+            imageFile.lastModified,
+            imageFile.type,
+          ]
+        : null,
+    ]);
+    const previous = draftFingerprintRef.current;
+    if (
+      previous !== null &&
+      (previous.value !== fingerprint || previous.imageFile !== imageFile)
+    ) {
+      requestIdRef.current = null;
+      mediaKeyRef.current = null;
+    }
+    draftFingerprintRef.current = { value: fingerprint, imageFile };
+  }, [body, destination, imageFile, postType, title, url]);
 
   // Default destination: own profile once session is known (unless community was prefills)
   useEffect(() => {
@@ -172,7 +212,13 @@ export function CreatePostForm({
     setCommunityQuery("");
   }
 
+  function resetTurnstile() {
+    setTurnstileToken(null);
+    turnstileReset.current?.reset();
+  }
+
   function clearImage() {
+    mediaKeyRef.current = null;
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
     setImagePreview(null);
@@ -225,78 +271,105 @@ export function CreatePostForm({
     startTransition(async () => {
       const requestId = requestIdRef.current ?? crypto.randomUUID();
       requestIdRef.current = requestId;
-      const check = await passBotCheck(bot, turnstileToken);
-      if (!check.ok) {
-        setError(localizeError(check.error, t("common.error")));
-        return;
-      }
 
-      let mediaKey: string | undefined;
-
-      if (postType === "image" && imageFile) {
-        let prepared: File;
-        try {
-          prepared = await prepareImageForUpload(imageFile);
-        } catch (prepareError) {
-          setError(
-            prepareError instanceof Error
-              ? localizeError(prepareError.message, t("post.imageProcessError"))
-              : t("post.imageProcessError")
-          );
+      try {
+        const check = await passBotCheck(bot, turnstileToken);
+        if (!check.ok) {
+          resetTurnstile();
+          setError(localizeError(check.error, t("common.error")));
           return;
         }
+        // Siteverify tokens are single-use. Any later retry needs a new token.
+        resetTurnstile();
 
-        const form = new FormData();
-        form.set("file", prepared);
-        const upload = await apiFetch("/api/media", {
+        let mediaKey =
+          postType === "image" ? mediaKeyRef.current ?? undefined : undefined;
+
+        if (postType === "image" && imageFile && !mediaKey) {
+          let prepared: File;
+          try {
+            prepared = await prepareImageForUpload(imageFile);
+          } catch (prepareError) {
+            setError(
+              prepareError instanceof Error
+                ? localizeError(
+                    prepareError.message,
+                    t("post.imageProcessError")
+                  )
+                : t("post.imageProcessError")
+            );
+            return;
+          }
+
+          const form = new FormData();
+          form.set("file", prepared);
+          const upload = await apiFetch("/api/media", {
+            method: "POST",
+            body: form,
+          });
+          if (upload.status === 401) {
+            router.push(`/login?next=${encodeURIComponent("/submit")}`);
+            return;
+          }
+          if (!upload.ok) {
+            const payload = (await upload.json().catch(() => null)) as {
+              error?: string;
+            } | null;
+            setError(
+              localizeError(payload?.error, t("post.imageUploadFailed"))
+            );
+            return;
+          }
+          const uploaded = (await upload.json()) as { mediaKey?: string };
+          if (!uploaded.mediaKey) {
+            throw new Error("Image upload failed");
+          }
+          mediaKey = uploaded.mediaKey;
+          mediaKeyRef.current = mediaKey;
+        }
+
+        const res = await apiFetch("/api/posts", {
           method: "POST",
-          body: form,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            bot.attachToPayload({
+              subreddit:
+                destination.kind === "profile" ? "profile" : destination.name,
+              title,
+              body: postType === "text" ? body || undefined : undefined,
+              url: postType === "link" ? url || undefined : undefined,
+              mediaKey,
+              requestId,
+            })
+          ),
         });
-        if (upload.status === 401) {
+        if (res.status === 401) {
           router.push(`/login?next=${encodeURIComponent("/submit")}`);
           return;
         }
-        if (!upload.ok) {
-          const payload = (await upload.json().catch(() => null)) as {
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as {
             error?: string;
           } | null;
-          setError(localizeError(payload?.error, t("post.imageUploadFailed")));
+          setError(localizeError(payload?.error, t("common.error")));
           return;
         }
-        const uploaded = (await upload.json()) as { mediaKey: string };
-        mediaKey = uploaded.mediaKey;
+        const data = (await res.json()) as { id: string };
+        if (requestIdRef.current === requestId) {
+          requestIdRef.current = null;
+          mediaKeyRef.current = null;
+        }
+        router.push(`/post/${data.id}`);
+        router.refresh();
+      } catch (submitError) {
+        resetTurnstile();
+        setError(
+          localizeError(
+            submitError instanceof Error ? submitError.message : null,
+            t("post.networkError")
+          )
+        );
       }
-
-      const res = await apiFetch("/api/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          bot.attachToPayload({
-            subreddit:
-              destination.kind === "profile" ? "profile" : destination.name,
-            title,
-            body: postType === "text" ? body || undefined : undefined,
-            url: postType === "link" ? url || undefined : undefined,
-            mediaKey,
-            requestId,
-          })
-        ),
-      });
-      if (res.status === 401) {
-        router.push(`/login?next=${encodeURIComponent("/submit")}`);
-        return;
-      }
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        setError(localizeError(payload?.error, t("common.error")));
-        return;
-      }
-      const data = (await res.json()) as { id: string };
-      requestIdRef.current = null;
-      router.push(`/post/${data.id}`);
-      router.refresh();
     });
   }
 
@@ -532,7 +605,7 @@ export function CreatePostForm({
           onChange={(e) => setTitle(e.target.value)}
           required
           minLength={3}
-          maxLength={300}
+          maxLength={MAX_POST_TITLE_LENGTH}
           placeholder={t("post.titlePlaceholder")}
           className={cn(
             "h-11 font-heading text-base font-medium sm:text-[1.05rem]",
@@ -540,7 +613,7 @@ export function CreatePostForm({
           )}
         />
         <p className="text-right text-xs text-muted-foreground">
-          {title.length}/300
+          {title.length}/{MAX_POST_TITLE_LENGTH}
         </p>
       </div>
 
@@ -557,9 +630,13 @@ export function CreatePostForm({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={8}
+            maxLength={MAX_POST_BODY_LENGTH}
             placeholder={t("post.bodyPlaceholder")}
             className={cn("min-h-40", fieldRadius)}
           />
+          <p className="text-right text-xs text-muted-foreground">
+            {body.length}/{MAX_POST_BODY_LENGTH}
+          </p>
         </div>
       ) : null}
 
@@ -575,8 +652,12 @@ export function CreatePostForm({
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://"
             required
+            maxLength={MAX_POST_URL_LENGTH}
             className={cn("h-11", fieldRadius)}
           />
+          <p className="text-right text-xs text-muted-foreground">
+            {url.length}/{MAX_POST_URL_LENGTH}
+          </p>
         </div>
       ) : null}
 

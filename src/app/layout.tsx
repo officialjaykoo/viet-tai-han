@@ -5,6 +5,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Geist_Mono, Manrope } from "next/font/google";
 
 import { ConsentBanner } from "@/components/consent/consent-banner";
+import { AuthSessionHydrator } from "@/components/auth/auth-session-hydrator";
+
 import { I18nProvider } from "@/components/i18n/i18n-provider";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -134,12 +136,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     "";
   const isAdminPath =
     requestPath === "/admin" || requestPath.startsWith("/admin/");
+  const session = await getSession();
   const { locale, preferredLanguage, cookieLocale, signedIn } =
-    await getRequestLocale();
+    await getRequestLocale({ session });
   const pref: PreferredLanguage = isPreferredLanguage(preferredLanguage)
     ? preferredLanguage
     : "unknown";
-  const session = signedIn ? await getSession() : null;
   const themeRaw = (session?.user as { theme?: string } | undefined)?.theme;
   const initialTheme: ThemePreference =
     themeRaw === "light" || themeRaw === "dark" || themeRaw === "system"
@@ -160,17 +162,19 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body className="mobile-nav-space flex min-h-dvh flex-col bg-background font-sans text-foreground">
         <ThemeProvider initialTheme={initialTheme}>
-          <I18nProvider
-            initialLocale={locale}
-            initialPreferredLanguage={signedIn ? pref : "unknown"}
-            initialCookieLocale={cookieLocale}
-          >
-            {children}
-            {!isAdminPath ? <OnlinePresenceBeacon enabled={signedIn} /> : null}
-            {!isAdminPath ? <MobileNav /> : null}
-            {!isAdminPath ? <SiteFooter /> : null}
-            {!isAdminPath ? <ConsentBanner signedIn={signedIn} /> : null}
-          </I18nProvider>
+          <AuthSessionHydrator initialSession={session}>
+            <I18nProvider
+              initialLocale={locale}
+              initialPreferredLanguage={signedIn ? pref : "unknown"}
+              initialCookieLocale={cookieLocale}
+            >
+              {children}
+              {!isAdminPath ? <OnlinePresenceBeacon enabled={signedIn} /> : null}
+              {!isAdminPath ? <MobileNav /> : null}
+              {!isAdminPath ? <SiteFooter /> : null}
+              {!isAdminPath ? <ConsentBanner signedIn={signedIn} /> : null}
+            </I18nProvider>
+          </AuthSessionHydrator>
         </ThemeProvider>
       </body>
     </html>

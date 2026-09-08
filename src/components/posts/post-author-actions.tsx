@@ -10,18 +10,31 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  MAX_POST_BODY_LENGTH,
+  MAX_POST_TITLE_LENGTH,
+  MAX_POST_URL_LENGTH,
+} from "@/lib/post-limits";
 import { apiFetch, apiJson } from "@/lib/api-client";
+
+type PostType = "text" | "image" | "link";
 
 export function PostAuthorActions({
   postId,
   isOwner,
+  postType,
   initialTitle,
   initialBody,
+  initialUrl,
+  commentCount,
 }: {
   postId: string;
   isOwner: boolean;
+  postType: PostType;
   initialTitle: string;
   initialBody: string | null;
+  initialUrl: string | null;
+  commentCount: number;
 }) {
   const router = useRouter();
   const { t } = useI18n();
@@ -29,18 +42,23 @@ export function PostAuthorActions({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState(initialBody ?? "");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   if (!isOwner) return null;
-
   function save() {
     setError(null);
     startTransition(async () => {
+      const payload = {
+        title,
+        ...(postType === "text" ? { body } : {}),
+        ...(postType === "link" ? { url } : {}),
+      };
       const res = await apiFetch(`/api/posts/${postId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as {
@@ -92,24 +110,43 @@ export function PostAuthorActions({
         >
           {editing ? t("post.cancel") : t("post.edit")}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={pending}
-          onClick={remove}
-        >
-          {t("post.delete")}
-        </Button>
+        {commentCount === 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={remove}
+          >
+            {t("post.delete")}
+          </Button>
+        ) : null}
       </div>
       {editing ? (
         <div className="space-y-2 rounded-2xl border border-border/60 p-3">
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          <Textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={5}
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            minLength={3}
+            maxLength={MAX_POST_TITLE_LENGTH}
           />
+          {postType === "text" ? (
+            <Textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={5}
+              maxLength={MAX_POST_BODY_LENGTH}
+            />
+          ) : null}
+          {postType === "link" ? (
+            <Input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              maxLength={MAX_POST_URL_LENGTH}
+              required
+            />
+          ) : null}
           <Button type="button" size="sm" disabled={pending} onClick={save}>
             {t("post.save")}
           </Button>

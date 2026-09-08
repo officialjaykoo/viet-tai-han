@@ -17,6 +17,13 @@ type FeedComposerProps = {
 const actionClass =
   "inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:text-sm";
 
+type PostType = "text" | "image" | "link";
+
+function getSubmitHref(signedIn: boolean, type: PostType): string {
+  const target = `/submit?type=${type}`;
+  return signedIn ? target : `/login?next=${encodeURIComponent(target)}`;
+}
+
 export function FeedComposer({
   signedIn,
   username,
@@ -27,8 +34,9 @@ export function FeedComposer({
   imageLabel,
   linkLabel,
 }: FeedComposerProps) {
-  const submitHref = signedIn ? "/submit" : "/login?next=%2Fsubmit";
-
+  const textSubmitHref = getSubmitHref(signedIn, "text");
+  const imageSubmitHref = getSubmitHref(signedIn, "image");
+  const linkSubmitHref = getSubmitHref(signedIn, "link");
   return (
     <section
       aria-label={title}
@@ -43,7 +51,7 @@ export function FeedComposer({
           alt={username ? `@${username}` : title}
         />
         <Link
-          href={submitHref}
+          href={textSubmitHref}
           className="flex min-h-11 min-w-0 flex-1 items-center rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <span className="truncate">{prompt}</span>
@@ -51,7 +59,7 @@ export function FeedComposer({
       </div>
 
       <div className="grid grid-cols-3 border-t border-border/70 px-1 py-1 sm:px-2">
-        <Link href={submitHref} className={actionClass}>
+        <Link href={textSubmitHref} className={actionClass}>
           <FileTextIcon
             className="size-5 text-[var(--brand)]"
             strokeWidth={1.8}
@@ -59,7 +67,7 @@ export function FeedComposer({
           />
           <span className="truncate">{textLabel}</span>
         </Link>
-        <Link href={submitHref} className={actionClass}>
+        <Link href={imageSubmitHref} className={actionClass}>
           <ImageIcon
             className="size-5 text-emerald-600 dark:text-emerald-400"
             strokeWidth={1.8}
@@ -67,7 +75,7 @@ export function FeedComposer({
           />
           <span className="truncate">{imageLabel}</span>
         </Link>
-        <Link href={submitHref} className={actionClass}>
+        <Link href={linkSubmitHref} className={actionClass}>
           <Link2Icon
             className="size-5 text-[var(--flag-gold)]"
             strokeWidth={1.8}

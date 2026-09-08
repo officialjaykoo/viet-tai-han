@@ -4,7 +4,6 @@ import { listOnlineUsers, touchUserPresence } from "@/lib/presence";
 import { jsonLocalizedError } from "@/lib/public-error";
 import {
   AuthError,
-  getSession,
   jsonAuthError,
   requireSession,
 } from "@/lib/session";
@@ -13,8 +12,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = await getSession();
-    const users = await listOnlineUsers(session?.user?.id ?? null);
+    const session = await requireSession();
+    const users = await listOnlineUsers(session.user.id);
     return NextResponse.json({ users });
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);

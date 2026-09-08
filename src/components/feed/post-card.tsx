@@ -34,11 +34,13 @@ import type { DiscoverySource } from "@/lib/discovery";
 interface PostCardProps {
   post: FeedPost;
   discoverySource?: DiscoverySource;
+  showBody?: boolean;
 }
 
 export function PostCard({
   post,
   discoverySource = "popular",
+  showBody = true,
 }: PostCardProps) {
   const router = useRouter();
   const { t, locale } = useI18n();
@@ -248,7 +250,7 @@ export function PostCard({
             </CardTitle>
           </CardHeader>
 
-          {displayBody ? (
+          {showBody && displayBody ? (
             <CardContent className="px-4 pt-2 pb-0">
               <p className="line-clamp-4 text-[15px] leading-relaxed text-card-foreground/85 [overflow-wrap:anywhere]">
                 {displayBody}
