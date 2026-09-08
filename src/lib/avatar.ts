@@ -1,3 +1,5 @@
+import { mediaKeyFromImageField } from "@/lib/media-key";
+
 /** Reddit-style generated avatars — deterministic from a seed. */
 
 export const GENERATED_AVATAR_PREFIX = "generated:";
@@ -60,14 +62,33 @@ export function encodeGeneratedAvatar(seed: string): string {
   return `${GENERATED_AVATAR_PREFIX}${seed}`;
 }
 
+const GENERATED_SEED_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+
 export function isGeneratedAvatar(image: string | null | undefined): boolean {
-  return Boolean(image?.startsWith(GENERATED_AVATAR_PREFIX));
+  if (!image?.startsWith(GENERATED_AVATAR_PREFIX)) return false;
+  return GENERATED_SEED_PATTERN.test(
+    image.slice(GENERATED_AVATAR_PREFIX.length)
+  );
 }
 
+/** Normalize an avatar explicitly supplied by a user profile mutation. */
 export function normalizeAvatarImage(image: unknown): string | null {
   const value = typeof image === "string" ? image.trim() : "";
   if (!value) return null;
-  if (isGeneratedAvatar(value) || value.startsWith("/")) return value;
+  if (isGeneratedAvatar(value)) return value;
+
+  const mediaKey = mediaKeyFromImageField(value);
+  if (mediaKey && value === `/api/media/${mediaKey}`) return value;
+  return null;
+}
+
+/**
+ * OAuth providers are trusted sources for initial profile images. This
+ * normalization is intentionally separate from user-controlled profile input.
+ */
+export function normalizeOAuthAvatarImage(image: unknown): string | null {
+  const value = typeof image === "string" ? image.trim() : "";
+  if (!value) return null;
 
   let url: URL;
   try {
@@ -87,8 +108,18 @@ export function normalizeAvatarImage(image: unknown): string | null {
   return null;
 }
 
-export function isCustomAvatarUrl(image: string | null | undefined): boolean {
+/**
+ * Existing OAuth avatars remain renderable, while new profile mutations use
+ * normalizeAvatarImage and media ownership checks.
+ */
+function normalizeStoredAvatarImage(image: unknown): string | null {
   const normalized = normalizeAvatarImage(image);
+  if (normalized) return normalized;
+  return normalizeOAuthAvatarImage(image);
+}
+
+export function isCustomAvatarUrl(image: string | null | undefined): boolean {
+  const normalized = normalizeStoredAvatarImage(image);
   return Boolean(normalized && !isGeneratedAvatar(normalized));
 }
 
@@ -97,11 +128,13 @@ export function resolveAvatarSeed(
   image: string | null | undefined,
   fallback: string
 ): string {
-  if (image?.startsWith(GENERATED_AVATAR_PREFIX)) {
-    return image.slice(GENERATED_AVATAR_PREFIX.length) || fallback;
+  const normalized = normalizeStoredAvatarImage(image);
+  if (normalized && isGeneratedAvatar(normalized)) {
+    return normalized.slice(GENERATED_AVATAR_PREFIX.length);
   }
   return fallback;
 }
+
 
 function pick<T>(list: readonly T[], n: number): T {
   return list[n % list.length]!;
@@ -189,7 +222,7 @@ export function resolveAvatarSrc(
   image: string | null | undefined,
   fallbackSeed: string
 ): { kind: "url" | "generated"; src: string } {
-  const normalized = normalizeAvatarImage(image);
+  const normalized = normalizeStoredAvatarImage(image);
   if (normalized && !isGeneratedAvatar(normalized)) {
     return { kind: "url", src: normalized };
   }

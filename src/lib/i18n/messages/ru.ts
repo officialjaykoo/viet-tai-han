@@ -476,6 +476,8 @@ export const ru: Messages = {
     pushUnsupported: "Браузеру нужны HTTPS и поддержка push-уведомлений.",
     pushPermissionDenied: "Разрешение на уведомления в браузере не выдано.",
     pushFailed: "Не удалось изменить push-уведомления.",
+    pushChecking: "Проверка этого устройства…",
+    pushOtherDevices: "Push-уведомления включены ещё на устройствах: {count}.",
   },
   consent: {
     bannerTitle: "Ваш выбор конфиденциальности",
@@ -609,6 +611,7 @@ export const ru: Messages = {
     identityLoadFailed: "Не удалось загрузить связанные аккаунты",
     linkFailed: "Не удалось связать аккаунт",
     unlinkFailed: "Не удалось отвязать аккаунт",
+    contactEmailSaveFailed: "Не удалось изменить контактный email",
     accountUnlinked: "Аккаунт отвязан",
     passkeys: "Ключи доступа",
     passkeysDesc:
@@ -677,6 +680,14 @@ export const ru: Messages = {
     proPlanLifetime: "Навсегда",
     profileSaved: "Профиль сохранён",
     saved: "Сохранено",
+    consentSaveFailed: "Не удалось сохранить выбор конфиденциальности",
+    saveFailed: "Не удалось сохранить настройки",
+    unblockFailed: "Не удалось разблокировать аккаунт",
+    unblocked: "Аккаунт разблокирован",
+    retry: "Повторить",
+    noOAuthProviders: "Социальные провайдеры не настроены.",
+    otherConnectedAccounts: "Других связанных аккаунтов: {count}",
+    unknownUser: "Неизвестный пользователь",
   },
   communities: {
     title: "Сообщества",

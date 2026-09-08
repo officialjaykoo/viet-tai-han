@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
+import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-client";
 import type { PushConfigState } from "@/lib/push";
@@ -15,11 +16,17 @@ function decodeVapidKey(value: string): Uint8Array {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+
 type BrowserPushState = "unknown" | "supported" | "unsupported" | "denied";
+
+type PushStatus = {
+  currentDeviceSubscribed: boolean;
+  activeDeviceCount: number;
+};
 
 class PushServiceWorkerError extends Error {
   constructor() {
-    super("Service worker failed to activate");
+    super("Push service worker is unavailable");
     this.name = "PushServiceWorkerError";
   }
 }
@@ -66,29 +73,103 @@ function detectBrowserPushState(): BrowserPushState {
   return Notification.permission === "denied" ? "denied" : "supported";
 }
 
+function readPushStatus(payload: unknown): PushStatus | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  const value = payload as Partial<PushStatus>;
+  if (
+    typeof value.currentDeviceSubscribed !== "boolean" ||
+    typeof value.activeDeviceCount !== "number" ||
+    !Number.isInteger(value.activeDeviceCount) ||
+    value.activeDeviceCount < 0
+  ) {
+    return null;
+  }
+  return value as PushStatus;
+}
+
 export function PushSettings({
   available,
   configuration,
   publicKey,
-  initialSubscribed,
+  initialCurrentDeviceSubscribed,
+  initialActiveDeviceCount,
 }: {
   available: boolean;
   configuration: PushConfigState;
   publicKey: string | null;
-  initialSubscribed: boolean;
+  initialCurrentDeviceSubscribed: boolean;
+  initialActiveDeviceCount: number;
 }) {
   const { t } = useI18n();
-  const [subscribed, setSubscribed] = useState(initialSubscribed);
+  const localizeError = useLocalizedError();
+  const [subscribed, setSubscribed] = useState(initialCurrentDeviceSubscribed);
+  const [activeDeviceCount, setActiveDeviceCount] = useState(
+    initialActiveDeviceCount
+  );
   const [busy, setBusy] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [browserState, setBrowserState] =
-    useState<BrowserPushState>("unknown");
+  const [browserState, setBrowserState] = useState<BrowserPushState>(
+    detectBrowserPushState
+  );
 
   useEffect(() => {
-    // Browser-only capability detection must run after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setBrowserState(detectBrowserPushState());
-  }, []);
+    let cancelled = false;
+    async function syncStatus() {
+      try {
+        const registration = await navigator.serviceWorker
+          ?.getRegistration("/")
+          .catch(() => undefined);
+        const subscription = await registration?.pushManager
+          .getSubscription()
+          .catch(() => null);
+        const endpoint = subscription?.endpoint;
+        const query = endpoint
+          ? `?endpoint=${encodeURIComponent(endpoint)}`
+          : "";
+        const response = await apiFetch(`/api/push${query}`);
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error("Could not load push status");
+        const status = readPushStatus(payload);
+        if (!status) throw new Error("Could not load push status");
+        if (cancelled) return;
+        setSubscribed(status.currentDeviceSubscribed);
+        setActiveDeviceCount(status.activeDeviceCount);
+      } catch (cause) {
+        if (!cancelled) {
+          setError(
+            cause instanceof Error
+              ? localizeError(cause.message, t("notifications.pushFailed"))
+              : t("notifications.pushFailed")
+          );
+        }
+      } finally {
+        if (!cancelled) setStatusLoading(false);
+      }
+    }
+
+    void syncStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [localizeError, t]);
+
+  async function readMutationStatus(response: Response): Promise<PushStatus> {
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const errorMessage =
+        payload && typeof payload === "object" && !Array.isArray(payload) &&
+        typeof (payload as { error?: unknown }).error === "string"
+          ? (payload as { error: string }).error
+          : t("notifications.pushFailed");
+      throw new Error(errorMessage);
+    }
+    const status = readPushStatus(payload);
+    if (!status) throw new Error(t("notifications.pushFailed"));
+    return status;
+  }
 
   async function enable() {
     setError(null);
@@ -137,22 +218,20 @@ export function PushSettings({
           userVisibleOnly: true,
           applicationServerKey: decodeVapidKey(publicKey) as BufferSource,
         }));
-      const res = await apiFetch("/api/push", {
+      const response = await apiFetch("/api/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
-      const data = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (!res.ok) throw new Error(data?.error ?? t("notifications.pushFailed"));
-      setSubscribed(true);
+      const status = await readMutationStatus(response);
+      setSubscribed(status.currentDeviceSubscribed);
+      setActiveDeviceCount(status.activeDeviceCount);
     } catch (cause) {
       setError(
         cause instanceof PushServiceWorkerError || cause instanceof DOMException
           ? t("notifications.pushFailed")
           : cause instanceof Error
-            ? cause.message
+            ? localizeError(cause.message, t("notifications.pushFailed"))
             : t("notifications.pushFailed")
       );
     } finally {
@@ -163,32 +242,36 @@ export function PushSettings({
   async function disable() {
     setError(null);
     setBusy(true);
+    let serverDisabled = false;
     try {
       const registration = await navigator.serviceWorker.getRegistration("/");
       const subscription = await registration?.pushManager.getSubscription();
-      if (subscription) {
-        const res = await apiFetch("/api/push", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-        });
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        if (!res.ok) throw new Error(data?.error ?? t("notifications.pushFailed"));
-        await subscription.unsubscribe();
+      if (!subscription) {
+        setSubscribed(false);
+        return;
       }
-      setSubscribed(false);
+      const response = await apiFetch("/api/push", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+      const status = await readMutationStatus(response);
+      serverDisabled = true;
+      setSubscribed(status.currentDeviceSubscribed);
+      setActiveDeviceCount(status.activeDeviceCount);
+      await subscription.unsubscribe();
     } catch (cause) {
+      if (serverDisabled) setSubscribed(false);
       setError(
         cause instanceof Error
-          ? cause.message
+          ? localizeError(cause.message, t("notifications.pushFailed"))
           : t("notifications.pushFailed")
       );
     } finally {
       setBusy(false);
     }
   }
+
   const serverConfigured = configuration === "configured" && available;
   const browserBlocked =
     browserState === "unsupported" || browserState === "denied";
@@ -198,15 +281,21 @@ export function PushSettings({
       : configuration === "unavailable"
         ? t("notifications.pushRuntimeUnavailable")
         : t("notifications.pushUnavailable");
-  const statusMessage = subscribed
-    ? t("notifications.pushEnabled")
-    : !serverConfigured
-      ? serverMessage
-      : browserState === "unsupported"
-        ? t("notifications.pushUnsupported")
-        : browserState === "denied"
-          ? t("notifications.pushPermissionDenied")
-          : t("notifications.pushDisabled");
+  const statusMessage = statusLoading
+    ? t("notifications.pushChecking")
+    : subscribed
+      ? t("notifications.pushEnabled")
+      : !serverConfigured
+        ? serverMessage
+        : browserState === "unsupported"
+          ? t("notifications.pushUnsupported")
+          : browserState === "denied"
+            ? t("notifications.pushPermissionDenied")
+            : t("notifications.pushDisabled");
+  const otherDeviceCount = Math.max(
+    0,
+    activeDeviceCount - (subscribed ? 1 : 0)
+  );
 
   return (
     <div className="space-y-3 rounded-2xl border border-border/60 p-4">
@@ -222,7 +311,11 @@ export function PushSettings({
         <Button
           type="button"
           variant={subscribed ? "outline" : "default"}
-          disabled={busy || (!subscribed && (!serverConfigured || browserBlocked))}
+          disabled={
+            busy ||
+            statusLoading ||
+            (!subscribed && (!serverConfigured || browserBlocked))
+          }
           onClick={subscribed ? disable : enable}
         >
           {busy
@@ -235,6 +328,11 @@ export function PushSettings({
           {statusMessage}
         </span>
       </div>
+      {otherDeviceCount > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {t("notifications.pushOtherDevices", { count: otherDeviceCount })}
+        </p>
+      ) : null}
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}

@@ -4,6 +4,8 @@ import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
+import { getEnv } from "@/lib/db";
+import { getOAuthProviderCapabilities } from "@/lib/oauth-providers";
 import { getOnboardingState } from "@/lib/onboarding";
 import { SettingsClient } from "@/components/settings/settings-client";
 import { getPushStatus } from "@/lib/push";
@@ -35,10 +37,28 @@ function parseSection(value: string | undefined): Section {
   return "profile";
 }
 
+function getIdentityCallbackError(params: {
+  error?: string;
+  error_description?: string;
+}): string | undefined {
+  const value = params.error?.trim() || params.error_description?.trim();
+  if (!value) return undefined;
+  // Known Better Auth/provider codes are localized on the client. Unknown or
+  // verbose provider text is reduced to a safe public fallback.
+  if (/^(KOE\d{3}|access_denied|cancelled|canceled)$/i.test(value)) {
+    return value.slice(0, 80);
+  }
+  return "Could not link account";
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ section?: string; error?: string }>;
+  searchParams: Promise<{
+    section?: string;
+    error?: string;
+    error_description?: string;
+  }>;
 }) {
   const session = await getSession();
   if (!session?.user) {
@@ -49,6 +69,7 @@ export default async function SettingsPage({
 
   const { locale } = await getRequestLocale();
   const params = await searchParams;
+  const env = await getEnv();
   const settings = await getUserSettings(session.user.id);
   if (!settings) {
     redirect("/login?next=/settings");
@@ -75,11 +96,15 @@ export default async function SettingsPage({
             initialSettings={settings}
             initialBlocked={blocked}
             initialSection={parseSection(params.section)}
+            initialIdentityError={getIdentityCallbackError(params)}
+            oauthProviders={getOAuthProviderCapabilities(env)}
             initialPush={{
               available: push.available,
               configuration: push.configuration,
               publicKey: push.publicKey,
-              subscribed: push.subscribed,
+              currentDeviceSubscribed: push.currentDeviceSubscribed,
+              activeDeviceCount: push.activeDeviceCount,
+              hasAnySubscription: push.hasAnySubscription,
             }}
             initialConsent={consent}
             initialPro={pro}

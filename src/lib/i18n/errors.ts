@@ -342,6 +342,42 @@ const ERROR_CATALOG: Record<
     en: "Invalid media",
     ru: "Некорректный файл",
   },
+  "Invalid profile payload": {
+    en: "Invalid profile payload",
+    vi: "Dữ liệu hồ sơ không hợp lệ",
+    ko: "프로필 입력값이 올바르지 않습니다",
+    ru: "Некорректные данные профиля",
+  },
+  "Invalid profile image": {
+    en: "Invalid profile image",
+    vi: "Ảnh hồ sơ không hợp lệ",
+    ko: "프로필 이미지가 올바르지 않습니다",
+    ru: "Некорректное изображение профиля",
+  },
+  "Could not link account": {
+    en: "Could not link account",
+    vi: "Không thể liên kết tài khoản",
+    ko: "계정을 연결할 수 없습니다",
+    ru: "Не удалось связать аккаунт",
+  },
+  "Invalid profile tab": {
+    en: "Invalid profile tab",
+    vi: "Mục hồ sơ không hợp lệ",
+    ko: "프로필 탭이 올바르지 않습니다",
+    ru: "Некорректная вкладка профиля",
+  },
+  "Failed to load profile activity": {
+    en: "Failed to load profile activity",
+    vi: "Không thể tải hoạt động hồ sơ",
+    ko: "프로필 활동을 불러오지 못했습니다",
+    ru: "Не удалось загрузить активность профиля",
+  },
+  "Invalid settings payload": {
+    en: "Invalid settings payload",
+    vi: "Dữ liệu cài đặt không hợp lệ",
+    ko: "설정 입력값이 올바르지 않습니다",
+    ru: "Некорректные данные настроек",
+  },
   "Comment must be 1–10000 characters": {
     en: "Comment must be 1–10000 characters",
     ru: "Комментарий должен быть от 1 до 10000 символов",

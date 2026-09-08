@@ -89,18 +89,7 @@ export function validatePushSubscription(value: unknown): PushSubscriptionInput 
     keys?: { p256dh?: unknown; auth?: unknown };
     userAgent?: unknown;
   };
-  if (typeof input.endpoint !== "string" || input.endpoint.length > 2048) {
-    throw new AuthError("Invalid push subscription endpoint", 400);
-  }
-  let endpoint: URL;
-  try {
-    endpoint = new URL(input.endpoint);
-  } catch {
-    throw new AuthError("Invalid push subscription endpoint", 400);
-  }
-  if (endpoint.protocol !== "https:") {
-    throw new AuthError("Invalid push subscription endpoint", 400);
-  }
+  const endpoint = new URL(normalizePushEndpoint(input.endpoint));
   if (
     !input.keys ||
     typeof input.keys.p256dh !== "string" ||
@@ -122,6 +111,22 @@ export function validatePushSubscription(value: unknown): PushSubscriptionInput 
     },
     userAgent,
   };
+}
+
+export function normalizePushEndpoint(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 2048) {
+    throw new AuthError("Invalid push subscription endpoint", 400);
+  }
+  let endpoint: URL;
+  try {
+    endpoint = new URL(value);
+  } catch {
+    throw new AuthError("Invalid push subscription endpoint", 400);
+  }
+  if (endpoint.protocol !== "https:") {
+    throw new AuthError("Invalid push subscription endpoint", 400);
+  }
+  return endpoint.toString();
 }
 
 export function inspectPushConfigValues(input: {
@@ -196,7 +201,10 @@ export async function getPushConfig(): Promise<PushConfig | null> {
   return (await inspectPushConfig()).config;
 }
 
-export async function getPushStatus(userId: string) {
+export async function getPushStatus(
+  userId: string,
+  currentEndpoint?: string | null
+) {
   const db = await getDb();
   const configStatus = await getPushConfigStatus();
   const row = await db
@@ -207,11 +215,24 @@ export async function getPushStatus(userId: string) {
     )
     .bind(userId)
     .first<{ c: number }>();
+  const current = currentEndpoint
+    ? await db
+        .prepare(
+          `SELECT 1 AS found
+           FROM push_subscriptions
+           WHERE user_id = ? AND endpoint = ? AND disabled_at IS NULL`
+        )
+        .bind(userId, currentEndpoint)
+        .first<{ found: number }>()
+    : null;
+  const activeDeviceCount = Number(row?.c ?? 0);
   return {
     available: configStatus.available,
     configuration: configStatus.state,
     publicKey: configStatus.publicKey,
-    subscribed: Number(row?.c ?? 0) > 0,
+    currentDeviceSubscribed: Boolean(current),
+    activeDeviceCount,
+    hasAnySubscription: activeDeviceCount > 0,
   };
 }
 

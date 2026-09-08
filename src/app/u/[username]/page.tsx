@@ -11,6 +11,7 @@ import { ProfileCommentCard } from "@/components/user/profile-comment-card";
 import { ProfileFriends } from "@/components/user/profile-friends";
 import { ProfileHeader } from "@/components/user/profile-header";
 import { ProfileSidebar } from "@/components/user/profile-sidebar";
+import { ProfileActivity } from "@/components/user/profile-activity";
 import {
   ProfileTabs,
   type ProfileTab,
@@ -18,7 +19,7 @@ import {
 import { listUserAchievements } from "@/lib/achievements";
 
 import {
-  listUserComments,
+  listUserCommentsPage,
   resolvePublicProfile,
   type ProfileComment,
 } from "@/lib/content";
@@ -29,8 +30,12 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
 import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
-import type { FeedPost } from "@/lib/types";
+import type { FeedPost, OrganicFeedPage } from "@/lib/types";
 import { getProfileRelation } from "@/lib/user-actions";
+import {
+  serializeFeed,
+  type PublicFeedPost,
+} from "@/lib/serializers";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +73,31 @@ function buildOverview(
   return items.slice(0, limit);
 }
 
+function serializeProfilePosts(
+  feed: OrganicFeedPage,
+  viewerUserId: string | null
+): {
+  posts: PublicFeedPost[];
+  nextCursor: string | null;
+  hasMore: boolean;
+} {
+  const serialized = serializeFeed(
+    {
+      posts: feed.posts.map((post) => ({ ...post, kind: "post" as const })),
+      nextCursor: feed.nextCursor,
+      hasMore: feed.hasMore,
+    },
+    viewerUserId
+  );
+  return {
+    posts: serialized.posts.filter(
+      (post): post is PublicFeedPost => post.kind === "post"
+    ),
+    nextCursor: serialized.nextCursor,
+    hasMore: serialized.hasMore,
+  };
+}
+
 function logProfileStage(msg: string) {
   console.info(JSON.stringify({ msg }));
 }
@@ -98,22 +128,60 @@ export default async function ProfilePage({
   const isOwner = session?.user?.id === profile.id;
   const relation = await getProfileRelation(session?.user?.id, profile.id);
 
+  const viewerUserId = session?.user?.id ?? null;
+  let achievements: Awaited<ReturnType<typeof listUserAchievements>>;
+  let postsFeed: OrganicFeedPage = {
+    posts: [],
+    nextCursor: null,
+    hasMore: false,
+  };
+  let commentsPage: Awaited<ReturnType<typeof listUserCommentsPage>> = {
+    comments: [],
+    nextCursor: null,
+    hasMore: false,
+  };
+  let friends: Awaited<ReturnType<typeof listFriends>> = [];
 
-  const [achievements, postsFeed, comments, friends] = await Promise.all([
-    listUserAchievements(profile.id),
-    getFeedPosts({
-      authorId: profile.id,
-      limit: 30,
-      sort: "new",
-      mode: "popular",
-      viewerUserId: session?.user?.id ?? null,
-    }),
-    listUserComments(profile.id, 30),
-    listFriends(profile.id),
-  ]);
+  if (tab === "overview") {
+    [achievements, postsFeed, commentsPage] = await Promise.all([
+      listUserAchievements(profile.id),
+      getFeedPosts({
+        authorId: profile.id,
+        limit: 30,
+        sort: "new",
+        mode: "popular",
+        viewerUserId,
+      }),
+      listUserCommentsPage(profile.id, { limit: 30 }),
+    ]);
+  } else if (tab === "posts") {
+    [achievements, postsFeed] = await Promise.all([
+      listUserAchievements(profile.id),
+      getFeedPosts({
+        authorId: profile.id,
+        limit: 30,
+        sort: "new",
+        mode: "popular",
+        viewerUserId,
+      }),
+    ]);
+  } else if (tab === "comments") {
+    [achievements, commentsPage] = await Promise.all([
+      listUserAchievements(profile.id),
+      listUserCommentsPage(profile.id, { limit: 30 }),
+    ]);
+  } else {
+    [achievements, friends] = await Promise.all([
+      listUserAchievements(profile.id),
+      listFriends(profile.id),
+    ]);
+  }
   logProfileStage("profile_data_done");
   const user = profile;
   const posts = postsFeed.posts;
+  const comments = commentsPage.comments;
+  const initialProfilePosts =
+    tab === "posts" ? serializeProfilePosts(postsFeed, viewerUserId) : undefined;
   const overview = buildOverview(posts, comments);
 
   return (
@@ -155,29 +223,25 @@ export default async function ProfilePage({
                 />
               ) : null}
 
-              {tab === "posts" ? (
-                <ProfileFeed
+              {tab === "posts" && initialProfilePosts ? (
+                <ProfileActivity
+                  key={`${user.id}-posts`}
+                  username={user.username ?? identifier}
+                  tab="posts"
+                  locale={locale}
+                  initialPosts={initialProfilePosts}
                   empty={tLocale(locale, "profile.emptyPosts")}
-                  items={posts.map((post) => (
-                    <PostCard
-                      key={post.id}
-                      post={post}
-                      discoverySource="profile"
-                    />
-                  ))}
                 />
               ) : null}
 
               {tab === "comments" ? (
-                <ProfileFeed
+                <ProfileActivity
+                  key={`${user.id}-comments`}
+                  username={user.username ?? identifier}
+                  tab="comments"
+                  locale={locale}
+                  initialComments={commentsPage}
                   empty={tLocale(locale, "profile.emptyComments")}
-                  items={comments.map((comment) => (
-                    <ProfileCommentCard
-                      key={comment.id}
-                      comment={comment}
-                      locale={locale}
-                    />
-                  ))}
                 />
               ) : null}
               {tab === "friends" ? (

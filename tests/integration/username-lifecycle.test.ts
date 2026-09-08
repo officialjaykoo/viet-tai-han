@@ -82,21 +82,24 @@ describe("username lifecycle", () => {
     const ownerId = `profile_update_${crypto.randomUUID()}`;
     const oldUsername = `profile_old_${crypto.randomUUID().slice(0, 6)}`;
     const newUsername = `profile_new_${crypto.randomUUID().slice(0, 6)}`;
+    const ownMediaKey = `media/profile_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}.jpg`;
     await insertUser({ id: ownerId, username: oldUsername });
-
+    await env.MEDIA_BUCKET.put(ownMediaKey, new Uint8Array([1]), {
+      customMetadata: { uploadedBy: ownerId },
+    });
 
     const updated = await updateUserProfileAndUsername({
       userId: ownerId,
       username: `@${newUsername.toUpperCase()}`,
       name: "Updated display name",
       bio: "Updated bio",
-      image: "/api/media/profile-image",
+      image: `/api/media/${ownMediaKey}`,
     });
     expect(updated).toMatchObject({
       username: newUsername,
       name: "Updated display name",
       bio: "Updated bio",
-      image: "/api/media/profile-image",
+      image: `/api/media/${ownMediaKey}`,
     });
     const nameOnly = await updateUserProfileAndUsername({
       userId: ownerId,
@@ -110,9 +113,9 @@ describe("username lifecycle", () => {
     expect(bioOnly.bio).toBe("Bio only");
     const imageOnly = await updateUserProfileAndUsername({
       userId: ownerId,
-      image: "/api/media/image-only",
+      image: `/api/media/${ownMediaKey}`,
     });
-    expect(imageOnly.image).toBe("/api/media/image-only");
+    expect(imageOnly.image).toBe(`/api/media/${ownMediaKey}`);
     await expect(
       updateUserProfileAndUsername({ userId: ownerId, username: "ab" })
     ).rejects.toMatchObject({ status: 400 });
@@ -135,6 +138,41 @@ describe("username lifecycle", () => {
       name: "Name only",
       username: newUsername,
     });
+  });
+
+  it("rejects foreign and remote avatar values while preserving OAuth images", async () => {
+    const ownerId = `avatar_owner_${crypto.randomUUID()}`;
+    const foreignId = `avatar_foreign_${crypto.randomUUID()}`;
+    const ownerUsername = `avatar_owner_${crypto.randomUUID().slice(0, 6)}`;
+    const foreignUsername = `avatar_foreign_${crypto.randomUUID().slice(0, 6)}`;
+    const foreignKey = `media/foreign_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}.webp`;
+    await insertUser({ id: ownerId, username: ownerUsername });
+    await insertUser({ id: foreignId, username: foreignUsername });
+    await env.MEDIA_BUCKET.put(foreignKey, new Uint8Array([1]), {
+      customMetadata: { uploadedBy: foreignId },
+    });
+    await env.DB.prepare(`UPDATE "user" SET image = ? WHERE id = ?`)
+      .bind("https://profile.example/avatar.png", ownerId)
+      .run();
+
+    const preserved = await updateUserProfileAndUsername({
+      userId: ownerId,
+      name: "Keeps provider image",
+    });
+    expect(preserved.image).toBe("https://profile.example/avatar.png");
+
+    await expect(
+      updateUserProfileAndUsername({
+        userId: ownerId,
+        image: `/api/media/${foreignKey}`,
+      })
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      updateUserProfileAndUsername({
+        userId: ownerId,
+        image: "https://attacker.example/avatar.png",
+      })
+    ).rejects.toMatchObject({ status: 400 });
   });
  
   it("allows only one concurrent owner of a new username", async () => {

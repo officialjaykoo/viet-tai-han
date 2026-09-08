@@ -476,6 +476,8 @@ export const en = {
     pushUnsupported: "This browser needs HTTPS and push notification support.",
     pushPermissionDenied: "Browser notification permission was not granted.",
     pushFailed: "Could not update push notifications.",
+    pushChecking: "Checking this device…",
+    pushOtherDevices: "{count} other devices have push enabled.",
   },
   consent: {
     bannerTitle: "Your privacy choices",
@@ -610,6 +612,7 @@ export const en = {
     identityLoadFailed: "Could not load connected accounts",
     linkFailed: "Could not link account",
     unlinkFailed: "Could not unlink account",
+    contactEmailSaveFailed: "Could not update contact email",
     accountUnlinked: "Account unlinked",
     passkeys: "Passkeys",
     passkeysDesc:
@@ -663,6 +666,7 @@ export const en = {
     consentMarketingDescription:
       "Allow optional product updates and promotional messages.",
     consentSaved: "Privacy choices saved",
+    consentSaveFailed: "Could not save privacy choices",
     pro: "Việt tại Hàn Pro",
     proDescription:
       "Pro entitlements come from a verified payment provider subscription.",
@@ -677,6 +681,13 @@ export const en = {
     proPlanLifetime: "Lifetime",
     profileSaved: "Profile saved",
     saved: "Saved",
+    saveFailed: "Could not save settings",
+    unblockFailed: "Could not unblock account",
+    unblocked: "Account unblocked",
+    retry: "Retry",
+    noOAuthProviders: "No social providers are configured.",
+    otherConnectedAccounts: "{count} other connected accounts",
+    unknownUser: "Unknown user",
   },
   communities: {
     title: "Communities",

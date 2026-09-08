@@ -6,12 +6,10 @@ import {
   updateUserContactEmail,
   updateUserPreferences,
   updateUserProfile,
-  type AllowDms,
-  type ThemePreference,
 } from "@/lib/user-settings";
-import { isLocale } from "@/lib/i18n/config";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
+import { parseSettingsPatch } from "@/lib/settings-payload";
 import { readApiJson } from "@/lib/security/guard";
 
 export async function GET() {
@@ -35,28 +33,12 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   try {
     const session = await requireSession();
-    const body = (await readApiJson(request).catch(() => null)) as {
-      section?: string;
-      name?: string;
-      bio?: string | null;
-      image?: string | null;
-      bannerKey?: string | null;
-      contactEmail?: string;
-      theme?: ThemePreference;
-      preferredLanguage?: string;
-      isNsfw?: boolean;
-      showNsfw?: boolean;
-      allowDms?: AllowDms;
-      notifyComments?: boolean;
-      notifyFollows?: boolean;
-      notifyChat?: boolean;
-      notifyMentions?: boolean;
-    } | null;
-
-    if (!body?.section) {
-      return await jsonLocalizedError("section is required", 400);
+    const parsed = parseSettingsPatch(await readApiJson(request));
+    if (!parsed.ok) {
+      return await jsonLocalizedError(parsed.error, 400);
     }
 
+    const body = parsed.value;
     if (body.section === "profile") {
       const settings = await updateUserProfile({
         userId: session.user.id,
@@ -69,9 +51,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body.section === "contactEmail") {
-      if (typeof body.contactEmail !== "string") {
-        return await jsonLocalizedError("contactEmail is required", 400);
-      }
       const result = await updateUserContactEmail(
         session.user.id,
         body.contactEmail
@@ -79,25 +58,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    if (body.section === "preferences") {
-      const settings = await updateUserPreferences({
-        userId: session.user.id,
-        theme: body.theme,
-        preferredLanguage: isLocale(body.preferredLanguage)
-          ? body.preferredLanguage
-          : undefined,
-        isNsfw: body.isNsfw,
-        showNsfw: body.showNsfw,
-        allowDms: body.allowDms,
-        notifyComments: body.notifyComments,
-        notifyFollows: body.notifyFollows,
-        notifyChat: body.notifyChat,
-        notifyMentions: body.notifyMentions,
-      });
-      return NextResponse.json({ settings });
-    }
-
-    return await jsonLocalizedError("Unknown section", 400);
+    const settings = await updateUserPreferences({
+      userId: session.user.id,
+      theme: body.theme,
+      preferredLanguage: body.preferredLanguage,
+      isNsfw: body.isNsfw,
+      showNsfw: body.showNsfw,
+      allowDms: body.allowDms,
+      notifyComments: body.notifyComments,
+      notifyFollows: body.notifyFollows,
+      notifyChat: body.notifyChat,
+      notifyMentions: body.notifyMentions,
+    });
+    return NextResponse.json({ settings });
   } catch (error) {
     if (error instanceof AuthError) return await jsonAuthError(error);
     console.error("PATCH /api/me/settings failed", error);

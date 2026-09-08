@@ -94,6 +94,63 @@ test.describe("authenticated flows", () => {
       page.getByRole("button", { name: /tạo cộng đồng/i })
     ).toHaveCount(0);
   });
+  test("profile and settings preserve callback errors and mobile keyboard UX", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginAsAlice(page);
+
+    await page.goto(
+      "/settings?section=account&error=KOE004&error_description=secret-leak",
+      { waitUntil: "domcontentloaded" }
+    );
+    await waitForHydration(page);
+    await expect(page.locator('p[role="alert"]')).toContainText(/kakao login/i);
+    await expect(page).toHaveURL(/\/settings\?section=account$/);
+
+    await page.goto("/settings?section=profile", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForHydration(page);
+    await expect(
+      page.getByRole("textbox", { name: /tên người dùng/i })
+    ).toBeVisible();
+    const username = page.getByRole("textbox", {
+      name: /tên người dùng/i,
+    });
+    await username.fill("alice_keyboard");
+    const save = page.getByRole("button", { name: /lưu hồ sơ/i });
+    await save.click();
+
+    const dialog = page.getByRole("dialog");
+    const cancel = dialog.getByRole("button", { name: /hủy/i });
+    const confirm = dialog.getByRole("button", { name: /đổi và lưu/i });
+    await expect(dialog).toBeVisible();
+    await expect(cancel).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(confirm).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(cancel).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(save).toBeFocused();
+
+    await page.goto("/u/alice?tab=posts", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(
+      page.getByRole("link", { name: "Bài đăng" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Bài đăng" })
+    ).toHaveAttribute("href", "/u/alice?tab=posts");
+    const layout = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
+  });
+
   test("composer shortcuts preserve post type", async ({ page }) => {
     await disguiseAutomation(page);
     await loginAsAlice(page);

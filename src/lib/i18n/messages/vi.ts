@@ -476,6 +476,8 @@ export const vi: Messages = {
     pushUnsupported: "Trình duyệt cần HTTPS và hỗ trợ thông báo đẩy.",
     pushPermissionDenied: "Chưa được cấp quyền thông báo trong trình duyệt.",
     pushFailed: "Không thể cập nhật thông báo đẩy.",
+    pushChecking: "Đang kiểm tra thiết bị này…",
+    pushOtherDevices: "{count} thiết bị khác đang bật thông báo đẩy.",
   },
   consent: {
     bannerTitle: "Lựa chọn quyền riêng tư",
@@ -608,6 +610,7 @@ export const vi: Messages = {
     identityLoadFailed: "Không thể tải tài khoản đã liên kết",
     linkFailed: "Không thể liên kết tài khoản",
     unlinkFailed: "Không thể hủy liên kết tài khoản",
+    contactEmailSaveFailed: "Không thể cập nhật email liên hệ",
     accountUnlinked: "Đã hủy liên kết tài khoản",
     passkeys: "Passkey",
     passkeysDesc:
@@ -675,6 +678,14 @@ export const vi: Messages = {
     proPlanLifetime: "Trọn đời",
     profileSaved: "Đã lưu hồ sơ",
     saved: "Đã lưu",
+    consentSaveFailed: "Không thể lưu lựa chọn quyền riêng tư",
+    saveFailed: "Không thể lưu cài đặt",
+    unblockFailed: "Không thể bỏ chặn tài khoản",
+    unblocked: "Đã bỏ chặn tài khoản",
+    retry: "Thử lại",
+    noOAuthProviders: "Chưa cấu hình nhà cung cấp mạng xã hội nào.",
+    otherConnectedAccounts: "{count} tài khoản đã liên kết khác",
+    unknownUser: "Người dùng không xác định",
   },
   communities: {
     title: "Cộng đồng",

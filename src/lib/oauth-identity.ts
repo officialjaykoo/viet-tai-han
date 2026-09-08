@@ -54,6 +54,9 @@ export function stripOAuthCompatibilityFields<T extends Record<string, unknown>>
     usernameChangedAt: _usernameChangedAt,
     ...safeUser
   } = user;
+  void _email;
+  void _candidate;
+  void _usernameChangedAt;
   return safeUser;
 }
 
@@ -75,6 +78,11 @@ export function mapOAuthProfile(input: {
   };
 }
 
+/**
+ * Better Auth requires an email column for its social-account compatibility
+ * model. Email/password sign-in stays disabled; the app's optional contact
+ * channel is tracked separately in contactEmail/contactEmailVerified.
+ */
 export function mapOAuthEmail(input: {
   providerId: string;
   accountId: string;

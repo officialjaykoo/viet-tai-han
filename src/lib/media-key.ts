@@ -3,13 +3,24 @@
  * Keep this module free of "use client" so Server Components can call it.
  */
 
-/** Resolve a stored image field to a media key for TunneledMedia, or null. */
+const MEDIA_KEY_PATTERN = /^media\/[A-Za-z0-9_-]{8,32}\.(jpg|webp)$/;
+
+export function isValidMediaKey(value: unknown): value is string {
+  return typeof value === "string" && MEDIA_KEY_PATTERN.test(value);
+}
+
+/** Resolve a stored image field to a validated media key for TunneledMedia. */
 export function mediaKeyFromImageField(
   image: string | null | undefined
 ): string | null {
-  if (!image) return null;
-  if (image.startsWith("/api/media/")) return image.slice("/api/media/".length);
-  if (image.startsWith("/i/media/")) return image.slice("/i/media/".length);
-  if (image.startsWith("media/")) return image;
-  return null;
+  const value = typeof image === "string" ? image.trim() : "";
+  if (!value) return null;
+
+  for (const prefix of ["/api/media/", "/i/media/"] as const) {
+    if (!value.startsWith(prefix)) continue;
+    const key = value.slice(prefix.length);
+    return isValidMediaKey(key) ? key : null;
+  }
+
+  return isValidMediaKey(value) ? value : null;
 }

@@ -470,6 +470,8 @@ export const ko: Messages = {
     pushUnsupported: "브라우저에서 HTTPS와 푸시 알림을 지원해야 합니다.",
     pushPermissionDenied: "브라우저 알림 권한을 허용하지 않았습니다.",
     pushFailed: "푸시 알림을 변경하지 못했습니다.",
+    pushChecking: "이 기기를 확인하는 중…",
+    pushOtherDevices: "{count}개의 다른 기기에서 푸시 알림이 켜져 있습니다.",
   },
   consent: {
     bannerTitle: "개인정보 선택",
@@ -597,6 +599,7 @@ export const ko: Messages = {
     identityLoadFailed: "연결된 계정을 불러올 수 없습니다",
     linkFailed: "계정을 연결할 수 없습니다",
     unlinkFailed: "계정 연결을 해제할 수 없습니다",
+    contactEmailSaveFailed: "연락처 이메일을 변경할 수 없습니다",
     accountUnlinked: "계정 연결을 해제했습니다",
     passkeys: "패스키",
     passkeysDesc:
@@ -663,6 +666,14 @@ export const ko: Messages = {
     proPlanLifetime: "평생",
     profileSaved: "프로필을 저장했습니다",
     saved: "저장됨",
+    consentSaveFailed: "개인정보 선택을 저장할 수 없습니다",
+    saveFailed: "설정을 저장할 수 없습니다",
+    unblockFailed: "계정 차단을 해제할 수 없습니다",
+    unblocked: "계정 차단을 해제했습니다",
+    retry: "다시 시도",
+    noOAuthProviders: "설정된 소셜 로그인 제공자가 없습니다.",
+    otherConnectedAccounts: "연결된 다른 계정 {count}개",
+    unknownUser: "알 수 없는 사용자",
   },
   communities: {
     title: "커뮤니티",

@@ -11,12 +11,16 @@ import {
   mapOAuthProfile,
 } from "@/lib/oauth-identity";
 import { createTemporaryUsername } from "@/lib/username";
+import { generateBase62Id, generateUserId } from "@/lib/id";
 import {
   createAvatarSeed,
   encodeGeneratedAvatar,
-  normalizeAvatarImage,
+  normalizeOAuthAvatarImage,
 } from "@/lib/avatar";
-import { generateBase62Id, generateUserId } from "@/lib/id";
+import {
+  getOAuthProviderCapabilities,
+  OAUTH_PROVIDER_IDS,
+} from "@/lib/oauth-providers";
 export type AppUserRole = "user" | "moderator" | "admin";
 export type AppUserStatus = "active" | "banned" | "shadowbanned";
 type AuthEnv = {
@@ -56,19 +60,20 @@ function configuredOrigins(baseURL: string, extraOrigins?: string): string[] {
       []),
   ].filter((origin, index, origins) => origins.indexOf(origin) === index);
 }
-
 function zaloOAuthConfig(env: AuthEnv) {
-  if (!env.ZALO_APP_ID || !env.ZALO_APP_SECRET) return [];
+  if (!getOAuthProviderCapabilities(env).zalo) return [];
+  const clientId = env.ZALO_APP_ID!;
+  const clientSecret = env.ZALO_APP_SECRET!;
 
   return [
     {
       providerId: "zalo",
-      clientId: env.ZALO_APP_ID,
-      clientSecret: env.ZALO_APP_SECRET,
+      clientId,
+      clientSecret,
       authorizationUrl: "https://oauth.zaloapp.com/v4/permission",
       tokenUrl: "https://oauth.zaloapp.com/v4/access_token",
       pkce: true,
-      authorizationUrlParams: { app_id: env.ZALO_APP_ID },
+      authorizationUrlParams: { app_id: clientId },
       async getToken({
         code,
         codeVerifier,
@@ -86,7 +91,7 @@ function zaloOAuthConfig(env: AuthEnv) {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
-              secret_key: env.ZALO_APP_SECRET!,
+              secret_key: clientSecret,
             },
             body: new URLSearchParams({
               code,
@@ -143,7 +148,7 @@ function zaloOAuthConfig(env: AuthEnv) {
           id: profile.id,
           ...profileFields,
           ...emailFields,
-          image: normalizeAvatarImage(profile.picture?.data?.url) ?? undefined,
+          image: normalizeOAuthAvatarImage(profile.picture?.data?.url) ?? undefined,
         };
       },
     },
@@ -194,11 +199,12 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
     dialect: new D1Dialect({ database: db }),
   });
   const baseURL = env.BETTER_AUTH_URL ?? "http://localhost:3000";
-  const facebookEnabled = Boolean(
-    env.FACEBOOK_CLIENT_ID && env.FACEBOOK_CLIENT_SECRET
+  const configuredProviders = getOAuthProviderCapabilities(env);
+  const facebookEnabled = configuredProviders.facebook;
+  const kakaoEnabled = configuredProviders.kakao;
+  const trustedProviders = OAUTH_PROVIDER_IDS.filter(
+    (provider) => configuredProviders[provider]
   );
-  const kakaoEnabled = Boolean(env.KAKAO_CLIENT_ID);
-
   return betterAuth({
     database: {
       db: kysely,
@@ -269,7 +275,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
                 };
                 const nickname =
                   kakaoProfile.nickname ?? profileWithName.name ?? undefined;
-                const image = normalizeAvatarImage(
+                const image = normalizeOAuthAvatarImage(
                   kakaoProfile.profile_image_url
                 );
                 return {
@@ -297,7 +303,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
     account: {
       accountLinking: {
         enabled: true,
-        trustedProviders: ["facebook", "kakao", "zalo"],
+        trustedProviders,
         disableImplicitLinking: true,
         allowDifferentEmails: true,
         allowUnlinkingAll: false,
@@ -461,7 +467,7 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
             );
             const assignedUsername =
               currentUsername ?? (await createTemporaryUsername(db));
-            const normalizedImage = normalizeAvatarImage(user.image);
+            const normalizedImage = normalizeOAuthAvatarImage(user.image);
 
             return {
               data: {

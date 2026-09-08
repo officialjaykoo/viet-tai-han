@@ -61,6 +61,9 @@
 		"FACEBOOK_CLIENT_ID": "1027160433660070",
 		"KAKAO_CLIENT_ID": "055c7ca94e809f9f322d85a8f23fcf99"
 	},
+	"triggers": {
+		"crons": ["0 3 * * *"]
+	},
 	"workers_dev": true,
 	"routes": [
 		{

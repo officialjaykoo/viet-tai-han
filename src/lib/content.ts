@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { openFeedCursor, signFeedCursor } from "@/lib/security/feed-cursor";
 import type {
   ContentSourceLang,
   ContentTranslation,
@@ -621,12 +622,35 @@ export interface ProfileComment {
   };
 }
 
-/** Recent comments by a user for profile tabs. */
-export async function listUserComments(
+export type ProfileCommentPage = {
+  comments: ProfileComment[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+export async function listUserCommentsPage(
   authorId: string,
-  limit = 30
-): Promise<ProfileComment[]> {
+  options: { limit?: number; cursor?: string | null } = {}
+): Promise<ProfileCommentPage> {
   const db = await getDb();
+  const limit = Math.min(Math.max(options.limit ?? 30, 1), 50);
+  const cursorContext = {
+    sort: "new" as const,
+    mode: "popular" as const,
+    subreddit: null,
+    authorId,
+    viewerId: null,
+    scope: "comments" as const,
+  };
+  const cursor = await openFeedCursor(options.cursor ?? null, cursorContext);
+  const params: Array<string | number> = [authorId];
+  const cursorClause = cursor
+    ? " AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))"
+    : "";
+  if (cursor) {
+    params.push(cursor.createdAt, cursor.createdAt, cursor.id);
+  }
+
   const { results } = await db
     .prepare(
       `SELECT
@@ -646,11 +670,11 @@ export async function listUserComments(
          AND c.is_removed = 0
          AND c.is_deleted = 0
          AND c.is_shadow_hidden = 0
-         AND p.is_removed = 0
-       ORDER BY c.created_at DESC
+         AND p.is_removed = 0${cursorClause}
+       ORDER BY c.created_at DESC, c.id DESC
        LIMIT ?`
     )
-    .bind(authorId, limit)
+    .bind(...params, limit + 1)
     .all<{
       id: string;
       post_id: string;
@@ -663,7 +687,10 @@ export async function listUserComments(
       subreddit_name: string;
     }>();
 
-  return (results ?? []).map((row) => ({
+  const rows = results ?? [];
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const comments = page.map((row) => ({
     id: row.id,
     postId: row.post_id,
     postTitle: row.post_title,
@@ -675,4 +702,24 @@ export async function listUserComments(
       name: row.subreddit_name,
     },
   }));
+  const last = page.at(-1);
+  return {
+    comments,
+    hasMore,
+    nextCursor:
+      hasMore && last
+        ? await signFeedCursor(
+            { createdAt: last.created_at, id: last.id },
+            cursorContext
+          )
+        : null,
+  };
+}
+
+/** Recent comments by a user for overview/profile callers. */
+export async function listUserComments(
+  authorId: string,
+  limit = 30
+): Promise<ProfileComment[]> {
+  return (await listUserCommentsPage(authorId, { limit })).comments;
 }

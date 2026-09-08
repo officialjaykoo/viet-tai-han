@@ -1,83 +1,38 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BellIcon,
-  CameraIcon,
-  EyeIcon,
-  ImageIcon,
-  LinkIcon,
   LockIcon,
   PaletteIcon,
-  RotateCcwIcon,
   ShieldIcon,
-  SparklesIcon,
   UserIcon,
 } from "lucide-react";
-import { PushSettings } from "@/components/notifications/push-settings";
+
+import { AccountSettings } from "@/components/settings/account-settings";
+import { AppearanceSettings } from "@/components/settings/appearance-settings";
+import { ConnectedAccountsSettings } from "@/components/settings/connected-accounts-settings";
+import { NotificationSettings } from "@/components/settings/notification-settings";
+import {
+  PrivacySettings,
+  type BlockedUser,
+} from "@/components/settings/privacy-settings";
+import { ProfileSettings } from "@/components/settings/profile-settings";
 import type { PushConfigState } from "@/lib/push";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
-import { useTheme } from "@/components/theme/theme-provider";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { UserAvatar } from "@/components/user/user-avatar";
-import { authClient } from "@/lib/auth-client";
-import { createAvatarSeed, encodeGeneratedAvatar } from "@/lib/avatar";
-import { LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages/en";
-import type {
-  AllowDms,
-  ThemePreference,
-  UserSettings,
-} from "@/lib/user-settings";
-import type { ConsentRecord, ProPlan, ProStatus } from "@/lib/monetization";
-import {
-  CONSENT_STORAGE_KEY,
-  CONSENT_VERSION,
-  type ConsentChoice,
-} from "@/lib/consent";
+import type { UserSettings } from "@/lib/user-settings";
+import type { ConsentRecord, ProStatus } from "@/lib/monetization";
+import type { OAuthProviderCapabilities } from "@/lib/oauth-providers";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-client";
-import { usernameCooldownEndsAt } from "@/lib/username";
 
-type Section = "profile" | "account" | "appearance" | "privacy" | "notifications";
-const PRO_PLAN_LABELS: Record<ProPlan, MessageKey> = {
-  monthly: "settings.proPlanMonthly",
-  annual: "settings.proPlanAnnual",
-  lifetime: "settings.proPlanLifetime",
-};
-const LANGUAGE_LABEL_KEYS: Record<Locale, MessageKey> = {
-  vi: "language.vietnamese",
-  ko: "language.korean",
-  en: "language.english",
-  ru: "language.russian",
-};
-
-type BlockedUser = {
-  id: string;
-  username: string | null;
-  name: string;
-  image: string | null;
-  blockedAt: string;
-};
-type LinkedAccount = {
-  id: string;
-  providerId: string;
-  accountId: string;
-};
-
-
+type Section =
+  | "profile"
+  | "account"
+  | "appearance"
+  | "privacy"
+  | "notifications";
 
 const SECTIONS: { id: Section; labelKey: MessageKey; icon: ReactNode }[] = [
   {
@@ -113,6 +68,7 @@ export function SettingsClient({
   initialSection = "profile",
   initialPush,
   initialIdentityError,
+  oauthProviders,
   initialConsent,
   initialPro,
 }: {
@@ -123,380 +79,52 @@ export function SettingsClient({
     available: boolean;
     configuration: PushConfigState;
     publicKey: string | null;
-    subscribed: boolean;
+    currentDeviceSubscribed: boolean;
+    activeDeviceCount: number;
+    hasAnySubscription: boolean;
   };
   initialIdentityError?: string;
+  oauthProviders: OAuthProviderCapabilities;
   initialConsent: ConsentRecord | null;
   initialPro: ProStatus;
 }) {
-  const router = useRouter();
-  const { t, setLanguage, locale } = useI18n();
+  const { t } = useI18n();
   const localizeError = useLocalizedError();
-  const { theme, setTheme } = useTheme();
   const [section, setSection] = useState<Section>(initialSection);
-  const [consent, setConsent] = useState<ConsentChoice>({
-    analytics: initialConsent?.analytics ?? false,
-    personalizedAds: initialConsent?.personalizedAds ?? false,
-    marketing: initialConsent?.marketing ?? false,
-  });
   const [settings, setSettings] = useState(initialSettings);
   const [blocked, setBlocked] = useState(initialBlocked);
-  const [pending, startTransition] = useTransition();
-  const [confirmingUsernameChange, setConfirmingUsernameChange] = useState(false);
-  const [now, setNow] = useState(0);
-
-
+  const shellRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(() =>
     initialIdentityError
       ? localizeError(initialIdentityError, t("settings.linkFailed"))
       : null
   );
-  // Public handle; it changes independently from the immutable user.id.
-  const [name, setName] = useState(initialSettings.name);
-  const [usernameInput, setUsernameInput] = useState(
-    initialSettings.username ?? ""
-  );
-  const [bio, setBio] = useState(initialSettings.bio ?? "");
-  const [image, setImage] = useState(initialSettings.image);
-  const avatarInput = useRef<HTMLInputElement>(null);
-  const cameraAvatarInput = useRef<HTMLInputElement>(null);
 
-  // Optional contact information; it is never the sign-in identity.
-  const [contactEmail, setContactEmail] = useState(
-    initialSettings.contactEmail ?? ""
-  );
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
-  const socialAccounts = linkedAccounts;
-  const [identityLoading, setIdentityLoading] = useState(true);
-
-  const username = settings.username ?? "user";
-
-  const flash = useCallback((ok: string | null, err: string | null) => {
-    setMessage(ok);
-    setError(err);
-  }, []);
-
-  async function uploadFile(file: File): Promise<string> {
-    const form = new FormData();
-    form.set("file", file);
-    const res = await apiFetch("/api/media", { method: "POST", body: form });
-    const data = (await res.json()) as { mediaKey?: string; error?: string };
-    if (!res.ok || !data.mediaKey) {
-      throw new Error(data.error ?? "Upload failed");
-    }
-    return data.mediaKey;
-  }
-  function chooseAvatarFile(file: File | undefined) {
-    if (!file) return;
-    startTransition(async () => {
-      try {
-        const key = await uploadFile(file);
-        setImage(`/api/media/${key}`);
-        flash(null, null);
-      } catch (err) {
-        flash(
-          null,
-          localizeError(
-            err instanceof Error ? err.message : null,
-            "Upload failed"
-          )
-        );
-      }
-    });
-  }
-
-  async function persistProfile() {
-    flash(null, null);
-    const res = await apiFetch("/api/me/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: normalizedUsernameInput,
-        name,
-        bio,
-        image,
-      }),
-    });
-    const data = (await res.json()) as {
-      settings?: UserSettings;
-      error?: string;
-    };
-    if (!res.ok) {
-      flash(null, localizeError(data.error, t("settings.usernameSaveFailed")));
-      return;
-    }
-    if (data.settings) {
-      setSettings(data.settings);
-      setName(data.settings.name);
-      setBio(data.settings.bio ?? "");
-      setImage(data.settings.image);
-      setUsernameInput(data.settings.username ?? "");
-      await authClient.getSession();
-    }
-    flash(t("settings.profileSaved"), null);
-  }
-
-  function saveProfile() {
-    const usernameChanged = normalizedUsernameInput !== username;
-    const nameChanged = name.trim().slice(0, 80) !== settings.name;
-    const bioChanged =
-      (bio.trim().slice(0, 300) || null) !== (settings.bio ?? null);
-    const imageChanged = image !== settings.image;
-
-    if (!usernameChanged && !nameChanged && !bioChanged && !imageChanged) {
-      flash(t("settings.profileSaved"), null);
-      return;
-    }
-    if (usernameChanged) {
-      setConfirmingUsernameChange(true);
-      return;
-    }
-    startTransition(persistProfile);
-  }
-
-  function confirmUsernameChange() {
-    setConfirmingUsernameChange(false);
-    startTransition(persistProfile);
-  }
-
-  function saveContactEmail() {
-    flash(null, null);
-    startTransition(async () => {
-      const res = await apiFetch("/api/me/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section: "contactEmail", contactEmail }),
-      });
-      const data = (await res.json()) as {
-        contactEmail?: string | null;
-        contactEmailVerified?: boolean;
-        error?: string;
-      };
-      if (!res.ok) {
-        flash(
-          null,
-          localizeError(data.error, "Could not update contact email")
-        );
-        return;
-      }
-      const nextContactEmail = data.contactEmail ?? "";
-      setContactEmail(nextContactEmail);
-      setSettings((s) => ({
-        ...s,
-        contactEmail: data.contactEmail ?? null,
-        contactEmailVerified: data.contactEmailVerified ?? false,
-      }));
-      flash(t("settings.contactEmailUpdated"), null);
-    });
-  }
-
-  const loadIdentityMethods = useCallback(
-    async (showError = true) => {
-      const accountsResult = await authClient.listAccounts();
-      setIdentityLoading(false);
-
-      if (accountsResult.data) {
-        setLinkedAccounts(
-          accountsResult.data.filter(
-            (account) => account.providerId !== "credential"
-          )
-        );
-      }
-
-      if (showError && accountsResult.error) {
-        flash(
-          null,
-          localizeError(
-            accountsResult.error.message,
-            t("settings.identityLoadFailed")
-          )
-        );
-      }
+  const flash = useCallback(
+    (nextMessage: string | null, nextError: string | null) => {
+      setMessage(nextMessage);
+      setError(nextError);
     },
-    [flash, localizeError, t]
+    []
   );
-
-  function linkIdentity(provider: "facebook" | "zalo" | "kakao") {
-    flash(null, null);
-    startTransition(async () => {
-      const callbackURL = "/settings?section=account";
-      const result =
-        provider === "facebook"
-          ? await authClient.linkSocial({
-              provider: "facebook",
-              callbackURL,
-              errorCallbackURL: callbackURL,
-            })
-          : provider === "kakao"
-            ? await authClient.linkSocial({
-                provider: "kakao",
-                callbackURL,
-                errorCallbackURL: callbackURL,
-              })
-            : await authClient.oauth2.link({
-                providerId: "zalo",
-                callbackURL,
-                errorCallbackURL: callbackURL,
-              });
-
-      if (result.error) {
-        flash(
-          null,
-          localizeError(result.error.message, t("settings.linkFailed"))
-        );
-      }
-    });
-  }
-
-  function unlinkIdentity(account: LinkedAccount) {
-    flash(null, null);
-    startTransition(async () => {
-      const result = await authClient.unlinkAccount({
-        providerId: account.providerId,
-        accountId: account.accountId,
-      });
-      if (result.error) {
-        flash(
-          null,
-          localizeError(result.error.message, t("settings.unlinkFailed"))
-        );
-        return;
-      }
-      await loadIdentityMethods(false);
-      flash(t("settings.accountUnlinked"), null);
-    });
-  }
-
-
-
-  function savePreferences(patch: Record<string, unknown>) {
-    flash(null, null);
-    startTransition(async () => {
-      const res = await apiFetch("/api/me/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section: "preferences", ...patch }),
-      });
-      const data = (await res.json()) as {
-        settings?: UserSettings;
-        error?: string;
-      };
-      if (!res.ok) {
-        flash(null, localizeError(data.error, "Could not save"));
-        return;
-      }
-      if (data.settings) {
-        setSettings(data.settings);
-        if (isLocale(data.settings.preferredLanguage)) {
-          void setLanguage(data.settings.preferredLanguage);
-        }
-        if (
-          data.settings.theme === "system" ||
-          data.settings.theme === "light" ||
-          data.settings.theme === "dark"
-        ) {
-          setTheme(data.settings.theme);
-        }
-      }
-      flash(t("settings.saved"), null);
-      router.refresh();
-    });
-  }
-
-  function saveConsent(patch: Partial<ConsentChoice>) {
-    const previous = consent;
-    const next = { ...consent, ...patch };
-    setConsent(next);
-    flash(null, null);
-    startTransition(async () => {
-      try {
-        const res = await apiFetch("/api/me/consent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            consentVersion: CONSENT_VERSION,
-            ...next,
-          }),
-        });
-        const data = (await res.json()) as {
-          consent?: ConsentRecord;
-          error?: string;
-        };
-        if (!res.ok || !data.consent) {
-          setConsent(previous);
-          flash(null, localizeError(data.error, "Could not save privacy choices"));
-          return;
-        }
-        setConsent({
-          analytics: data.consent.analytics,
-          personalizedAds: data.consent.personalizedAds,
-          marketing: data.consent.marketing,
-        });
-        try {
-          window.localStorage.setItem(
-            CONSENT_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch {
-          // The server record is authoritative when browser storage is blocked.
-        }
-        flash(t("settings.consentSaved"), null);
-      } catch {
-        setConsent(previous);
-        flash(null, t("common.error"));
-      }
-    });
-
-  }
-  function unblock(usernameToUnblock: string) {
-    startTransition(async () => {
-      await apiFetch(`/api/users/${encodeURIComponent(usernameToUnblock)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "unblock" }),
-      });
-      setBlocked((list) =>
-        list.filter((u) => u.username !== usernameToUnblock)
-      );
-    });
-  }
+  useEffect(() => {
+    shellRef.current?.setAttribute("data-hydrated", "true");
+  }, []);
 
   useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set("section", section);
     url.searchParams.delete("error");
+    url.searchParams.delete("error_description");
     window.history.replaceState({}, "", url.toString());
   }, [section]);
-  useEffect(() => {
-    if (section !== "account") return;
-    const loadId = window.setTimeout(() => {
-      void loadIdentityMethods();
-    }, 0);
-    return () => window.clearTimeout(loadId);
-  }, [loadIdentityMethods, section]);
-  useEffect(() => {
-    const nowId = window.setTimeout(() => setNow(Date.now()), 0);
-    return () => window.clearTimeout(nowId);
-  }, []);
-
-
-
-
-  const usernameCooldownEnds = usernameCooldownEndsAt(
-    settings.usernameChangedAt
-  );
-  const usernameChangeLocked = Boolean(
-    usernameCooldownEnds && now > 0 && usernameCooldownEnds.getTime() > now
-  );
-  const normalizedUsernameInput = usernameInput
-    .trim()
-    .replace(/^@+/, "")
-    .toLowerCase();
-  const usernameInputChanged = normalizedUsernameInput !== username;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
+    <div
+      ref={shellRef}
+      className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]"
+    >
       <nav
         className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
         aria-label={t("settings.navAria")}
@@ -535,636 +163,60 @@ export function SettingsClient({
         )}
 
         {section === "profile" ? (
-          <SettingsCard
-            title={t("settings.customizeProfile")}
-            description={t("settings.customizeProfileDesc")}
-          >
-            <div className="rounded-2xl border border-border/60 p-4">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="rounded-full bg-background p-1 ring-1 ring-border/60">
-                  <UserAvatar
-                    username={username}
-                    image={image}
-                    size="2xl"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{t("settings.changeAvatar")}</p>
-                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                    {t("settings.avatarHelp")}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <input
-                  ref={cameraAvatarInput}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  capture="user"
-                  aria-label={t("settings.takePhoto")}
-                  className="sr-only"
-                  onChange={(e) => {
-                    chooseAvatarFile(e.currentTarget.files?.[0]);
-                    e.currentTarget.value = "";
-                  }}
-                />
-                <input
-                  ref={avatarInput}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  aria-label={t("settings.chooseFromGallery")}
-                  className="sr-only"
-                  onChange={(e) => {
-                    chooseAvatarFile(e.currentTarget.files?.[0]);
-                    e.currentTarget.value = "";
-                  }}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="min-h-11 gap-1.5 sm:min-h-8"
-                  disabled={pending}
-                  onClick={() => cameraAvatarInput.current?.click()}
-                >
-                  <CameraIcon className="size-4" />
-                  {t("settings.takePhoto")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="min-h-11 gap-1.5 sm:min-h-8"
-                  disabled={pending}
-                  onClick={() => avatarInput.current?.click()}
-                >
-                  <ImageIcon className="size-4" />
-                  {t("settings.chooseFromGallery")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="min-h-11 gap-1.5 sm:min-h-8"
-                  disabled={pending}
-                  onClick={() => setImage(null)}
-                >
-                  <RotateCcwIcon className="size-4" />
-                  {t("settings.defaultAvatar")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="min-h-11 gap-1.5 sm:min-h-8"
-                  disabled={pending}
-                  onClick={() =>
-                    setImage(encodeGeneratedAvatar(createAvatarSeed()))
-                  }
-                >
-                  <SparklesIcon className="size-4" />
-                  {t("settings.shuffleAvatar")}
-                </Button>
-              </div>
-            </div>
-
-            <Field label={t("settings.username")}>
-              <Input
-                value={usernameInput}
-                maxLength={24}
-                autoComplete="username"
-                onChange={(event) => setUsernameInput(event.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                {usernameChangeLocked && usernameCooldownEnds
-                  ? t("settings.usernameChangeCooldown", {
-                      date: usernameCooldownEnds.toLocaleDateString(locale),
-                    })
-                  : t("settings.usernameChangeHint")}
-              </p>
-            </Field>
-
-            <Field label={t("settings.displayName")}>
-              <Input
-                value={name}
-                maxLength={80}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field>
-
-            <Field label={t("settings.bio")}>
-              <Textarea
-                value={bio}
-                maxLength={300}
-                rows={4}
-                placeholder={t("settings.bioPlaceholder")}
-                onChange={(e) => setBio(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">{bio.length}/300</p>
-            </Field>
-
-            <Button
-              type="button"
-              disabled={
-                pending || (usernameChangeLocked && usernameInputChanged)
-              }
-              onClick={saveProfile}
-              className="min-h-11"
-            >
-              {pending ? t("settings.saving") : t("settings.saveProfile")}
-            </Button>
-          </SettingsCard>
+          <ProfileSettings
+            settings={settings}
+            onSettingsChange={setSettings}
+            onAvatarSaved={(image) =>
+              setSettings((current) => ({ ...current, image }))
+            }
+            flash={flash}
+          />
         ) : null}
 
         {section === "account" ? (
           <>
-            <SettingsCard
-              title={t("settings.pro")}
-              description={t("settings.proDescription")}
-            >
-              <div className="rounded-xl border border-border/50 px-3 py-3">
-                <div className="flex items-start gap-3">
-                  <SparklesIcon className="mt-0.5 size-5 text-[var(--brand)]" />
-                  <div>
-                    <p className="text-sm font-medium">
-                      {initialPro.active
-                        ? t("settings.proActive")
-                        : t("settings.proInactive")}
-                    </p>
-                    {initialPro.plan ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t(PRO_PLAN_LABELS[initialPro.plan])}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {initialPro.active
-                    ? t("settings.proAdFree")
-                    : t("settings.proBillingUnavailable")}
-                </p>
-                {initialPro.active && initialPro.currentPeriodEnd ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t("settings.proEndsAt", {
-                      date: new Date(
-                        initialPro.currentPeriodEnd
-                      ).toLocaleDateString(locale),
-                    })}
-                  </p>
-                ) : null}
-              </div>
-            </SettingsCard>
-            <SettingsCard
-              title={t("settings.contactEmail")}
-              description={t("settings.contactEmailDesc")}
-            >
-              <Field label={t("settings.contactEmail")}>
-                <Input
-                  type="email"
-                  value={contactEmail}
-                  placeholder={t("settings.contactEmailPlaceholder")}
-                  autoComplete="email"
-                  onChange={(event) => setContactEmail(event.target.value)}
-                />
-              </Field>
-              <Button
-                type="button"
-                disabled={
-                  pending ||
-                  contactEmail.trim().toLowerCase() ===
-                    (settings.contactEmail ?? "")
-                }
-                onClick={saveContactEmail}
-              >
-                {contactEmail.trim()
-                  ? t("settings.updateContactEmail")
-                  : t("settings.clearContactEmail")}
-              </Button>
-            </SettingsCard>
-
-            <SettingsCard
-              title={t("settings.connectedAccounts")}
-              description={t("settings.connectedAccountsDesc")}
-            >
-              {identityLoading && linkedAccounts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("common.loading")}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {(
-                    [
-                      {
-                        provider: "facebook",
-                        labelKey: "settings.linkFacebook",
-                      },
-                      {
-                        provider: "kakao",
-                        labelKey: "settings.linkKakao",
-                      },
-                      {
-                        provider: "zalo",
-                        labelKey: "settings.linkZalo",
-                      },
-                    ] as const
-                  ).map(({ provider, labelKey }) => {
-                    const account = linkedAccounts.find(
-                      (candidate) => candidate.providerId === provider
-                    );
-                    return (
-                      <li
-                        key={provider}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">
-                            {t(labelKey)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {account
-                              ? t("settings.connected")
-                              : t("settings.notConnected")}
-                          </p>
-                        </div>
-                        {account ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              pending ||
-                              identityLoading ||
-                              socialAccounts.length <= 1
-                            }
-                            onClick={() => unlinkIdentity(account)}
-                          >
-                            {t("settings.unlink")}
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={pending || identityLoading}
-                            onClick={() => linkIdentity(provider)}
-                          >
-                            <LinkIcon className="size-4" />
-                            {t("settings.connect")}
-                          </Button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </SettingsCard>
-
-
+            <AccountSettings
+              settings={settings}
+              initialPro={initialPro}
+              onSettingsChange={setSettings}
+              flash={flash}
+            />
+            <ConnectedAccountsSettings
+              capabilities={oauthProviders}
+              flash={flash}
+            />
           </>
         ) : null}
 
         {section === "appearance" ? (
-          <SettingsCard
-            title={t("settings.appearance")}
-            description={t("settings.appearanceDesc")}
-          >
-            <Field label={t("settings.theme")}>
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ["system", "settings.themeSystem"],
-                    ["light", "settings.themeLight"],
-                    ["dark", "settings.themeDark"],
-                  ] as const
-                ).map(([value, labelKey]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={pending}
-                    onClick={() => {
-                      setTheme(value);
-                      savePreferences({ theme: value as ThemePreference });
-                    }}
-                    className={cn(
-                      "min-h-10 rounded-xl border px-3 text-sm font-medium",
-                      theme === value
-                        ? "border-[color-mix(in_oklch,var(--brand)_45%,transparent)] bg-[color-mix(in_oklch,var(--brand)_10%,transparent)]"
-                        : "border-border/60 text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {t(labelKey)}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <Field label={t("language.settingsLabel")}>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {LOCALES.map((code) => (
-                  <button
-                    key={code}
-                    type="button"
-                    disabled={pending}
-                    onClick={() => {
-                      savePreferences({ preferredLanguage: code });
-                    }}
-                    className={cn(
-                      "min-h-10 rounded-xl border px-3 text-sm font-medium",
-                      locale === code
-                        ? "border-[color-mix(in_oklch,var(--brand)_45%,transparent)] bg-[color-mix(in_oklch,var(--brand)_10%,transparent)]"
-                        : "border-border/60 text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {t(LANGUAGE_LABEL_KEYS[code])}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          </SettingsCard>
+          <AppearanceSettings
+            settings={settings}
+            onSettingsChange={setSettings}
+            flash={flash}
+          />
         ) : null}
 
         {section === "privacy" ? (
-          <>
-            <SettingsCard
-              title={t("settings.privacy")}
-              description={t("settings.privacyDesc")}
-            >
-              <ToggleRow
-                label={t("settings.markNsfw")}
-                description={t("settings.markNsfwDesc")}
-                checked={settings.isNsfw}
-                disabled={pending}
-                onChange={(next) => savePreferences({ isNsfw: next })}
-              />
-              <ToggleRow
-                label={t("settings.showNsfw")}
-                description={t("settings.showNsfwDesc")}
-                checked={settings.showNsfw}
-                disabled={pending}
-                onChange={(next) => savePreferences({ showNsfw: next })}
-                icon={<EyeIcon className="size-4" />}
-              />
-              <Field label={t("settings.allowDms")}>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["anyone", "settings.dmsAnyone"],
-                      ["followers", "settings.dmsFollowers"],
-                      ["nobody", "settings.dmsNobody"],
-                    ] as const
-                  ).map(([value, labelKey]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        savePreferences({ allowDms: value as AllowDms })
-                      }
-                      className={cn(
-                        "min-h-10 rounded-xl border px-3 text-sm font-medium",
-                        settings.allowDms === value
-                          ? "border-[color-mix(in_oklch,var(--brand)_45%,transparent)] bg-[color-mix(in_oklch,var(--brand)_10%,transparent)]"
-                          : "border-border/60 text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {t(labelKey)}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-            </SettingsCard>
-            <SettingsCard
-              title={t("settings.consentTitle")}
-              description={t("settings.consentDescription")}
-            >
-              <ToggleRow
-                label={t("settings.consentAnalytics")}
-                description={t("settings.consentAnalyticsDescription")}
-                checked={consent.analytics}
-                disabled={pending}
-                onChange={(next) => saveConsent({ analytics: next })}
-              />
-              <ToggleRow
-                label={t("settings.consentPersonalizedAds")}
-                description={t("settings.consentPersonalizedAdsDescription")}
-                checked={consent.personalizedAds}
-                disabled={pending}
-                onChange={(next) => saveConsent({ personalizedAds: next })}
-              />
-              <ToggleRow
-                label={t("settings.consentMarketing")}
-                description={t("settings.consentMarketingDescription")}
-                checked={consent.marketing}
-                disabled={pending}
-                onChange={(next) => saveConsent({ marketing: next })}
-              />
-            </SettingsCard>
-
-            <SettingsCard
-              title={t("settings.blockedAccounts")}
-              description={t("settings.blockedAccountsDesc")}
-            >
-              {blocked.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("settings.noBlocked")}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {blocked.map((user) => (
-                    <li
-                      key={user.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2"
-                    >
-                      <Link
-                        href={user.username ? `/u/${user.username}` : "#"}
-                        className="flex min-w-0 items-center gap-2"
-                      >
-                        <UserAvatar
-                          username={user.username}
-                          image={user.image}
-                          size="sm"
-                        />
-                        <span className="truncate text-sm font-medium">
-                          @{user.username ?? "unknown"}
-                        </span>
-                      </Link>
-                      {user.username ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={pending}
-                          onClick={() => unblock(user.username!)}
-                        >
-                          {t("settings.unblock")}
-                        </Button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </SettingsCard>
-          </>
+          <PrivacySettings
+            settings={settings}
+            initialConsent={initialConsent}
+            initialBlocked={blocked}
+            onSettingsChange={setSettings}
+            onBlockedChange={setBlocked}
+            flash={flash}
+          />
         ) : null}
 
         {section === "notifications" ? (
-          <>
-            <SettingsCard
-              title={t("settings.notifyPrefs")}
-              description={t("settings.notifyPrefsDesc")}
-            >
-              <ToggleRow
-                label={t("settings.notifyComments")}
-                checked={settings.notifyComments}
-                disabled={pending}
-                onChange={(next) => savePreferences({ notifyComments: next })}
-              />
-              <ToggleRow
-                label={t("settings.notifyFollows")}
-                checked={settings.notifyFollows}
-                disabled={pending}
-                onChange={(next) => savePreferences({ notifyFollows: next })}
-              />
-              <ToggleRow
-                label={t("settings.notifyChat")}
-                checked={settings.notifyChat}
-                disabled={pending}
-                onChange={(next) => savePreferences({ notifyChat: next })}
-              />
-              <ToggleRow
-                label={t("settings.notifyMentions")}
-                checked={settings.notifyMentions}
-                disabled={pending}
-                onChange={(next) => savePreferences({ notifyMentions: next })}
-              />
-            </SettingsCard>
-            <PushSettings
-              available={initialPush.available}
-              configuration={initialPush.configuration}
-              publicKey={initialPush.publicKey}
-              initialSubscribed={initialPush.subscribed}
-            />
-          </>
+          <NotificationSettings
+            settings={settings}
+            initialPush={initialPush}
+            onSettingsChange={setSettings}
+            flash={flash}
+          />
         ) : null}
-      {confirmingUsernameChange ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="username-change-title"
-        >
-          <div className="w-full max-w-md space-y-4 rounded-2xl border border-border/70 bg-card p-5 shadow-xl">
-            <div>
-              <h2 id="username-change-title" className="font-heading text-lg font-semibold">
-                {t("settings.usernameChangeWarning")}
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {t("settings.usernameChangeDetails", {
-                  oldUsername: username,
-                  newUsername: normalizedUsernameInput,
-                })}
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setConfirmingUsernameChange(false)}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button type="button" onClick={confirmUsernameChange}>
-                {t("settings.confirmUsernameChange")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       </div>
-    </div>
-  );
-}
-
-function SettingsCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 sm:p-5">
-      <div>
-        <h2 className="font-heading text-lg font-semibold">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="grid gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function ToggleRow({
-  label,
-  description,
-  checked,
-  disabled,
-  onChange,
-  icon,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (next: boolean) => void;
-  icon?: ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-border/50 px-3 py-3">
-      <div className="min-w-0">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          {icon}
-          {label}
-        </p>
-        {description ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative h-7 w-12 shrink-0 rounded-full transition-colors",
-          checked ? "bg-[var(--brand)]" : "bg-muted"
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow transition-transform",
-            checked && "translate-x-5"
-          )}
-        />
-      </button>
     </div>
   );
 }

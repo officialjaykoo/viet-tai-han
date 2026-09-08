@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
 import type { Locale } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/config";
-import { normalizeAvatarImage } from "@/lib/avatar";
+import { normalizeOwnedAvatarImage } from "@/lib/media";
 import { AuthError } from "@/lib/session";
 export type ThemePreference = "system" | "light" | "dark";
 export type AllowDms = "anyone" | "followers" | "nobody";
@@ -13,6 +13,11 @@ export type UserSettings = {
   usernameChangedAt: string | null;
   name: string;
   contactEmail: string | null;
+  /**
+   * This is intentionally separate from Better Auth's emailVerified.
+   * No contact-email verification workflow exists yet, so provider-verified
+   * login email data never silently upgrades this optional contact field.
+   */
   contactEmailVerified: boolean;
   onboardingComplete: boolean;
   image: string | null;
@@ -148,7 +153,7 @@ export async function updateUserProfile(input: {
       : current.bio;
   const image =
     input.image !== undefined
-      ? normalizeAvatarImage(input.image)
+      ? await normalizeOwnedAvatarImage(input.image, input.userId)
       : current.image;
   const bannerKey =
     input.bannerKey !== undefined ? input.bannerKey : current.bannerKey;
@@ -192,6 +197,18 @@ export async function updateUserPreferences(input: {
   }
   if (input.allowDms !== undefined && !isAllowDms(input.allowDms)) {
     throw new AuthError("Invalid DM preference", 400);
+  }
+  for (const field of [
+    "isNsfw",
+    "showNsfw",
+    "notifyComments",
+    "notifyFollows",
+    "notifyChat",
+    "notifyMentions",
+  ] as const) {
+    if (input[field] !== undefined && typeof input[field] !== "boolean") {
+      throw new AuthError("Invalid settings payload", 400);
+    }
   }
 
   const theme = input.theme ?? current.theme;

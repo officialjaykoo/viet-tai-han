@@ -19,56 +19,80 @@ async function insertPushUser(userId: string) {
 }
 
 describe("push subscriptions (D1)", () => {
-  it("saves, refreshes, and deletes a browser subscription", async () => {
+  it("tracks subscriptions per device and only disables the current device", async () => {
     const userId = `push_user_${crypto.randomUUID()}`;
     const otherUserId = `push_other_${crypto.randomUUID()}`;
     await insertPushUser(userId);
     await insertPushUser(otherUserId);
 
-    const subscription = validatePushSubscription({
-      endpoint: "https://push.example.test/subscription",
-      keys: {
-        p256dh: bytesToBase64Url(
-          Uint8Array.from({ length: 65 }, (_, index) => (index === 0 ? 4 : index))
-        ),
-        auth: bytesToBase64Url(
-          Uint8Array.from({ length: 16 }, (_, index) => index + 1)
-        ),
-      },
-      userAgent: "test-browser",
+    const keys = {
+      p256dh: bytesToBase64Url(
+        Uint8Array.from({ length: 65 }, (_, index) => (index === 0 ? 4 : index))
+      ),
+      auth: bytesToBase64Url(
+        Uint8Array.from({ length: 16 }, (_, index) => index + 1)
+      ),
+    };
+    const subscriptionA = validatePushSubscription({
+      endpoint: "https://push.example.test/subscription-a",
+      keys,
+      userAgent: "test-browser-a",
+    });
+    const subscriptionB = validatePushSubscription({
+      endpoint: "https://push.example.test/subscription-b",
+      keys,
+      userAgent: "test-browser-b",
+    });
+    const subscriptionOther = validatePushSubscription({
+      endpoint: "https://push.example.test/subscription-other",
+      keys,
+      userAgent: "test-browser-other",
     });
 
-    await expect(savePushSubscription(userId, subscription)).resolves.toEqual({
+    await expect(savePushSubscription(userId, subscriptionA)).resolves.toEqual({
       ok: true,
     });
-    await expect(getPushStatus(userId)).resolves.toMatchObject({
-      subscribed: true,
+    await expect(savePushSubscription(userId, subscriptionB)).resolves.toEqual({
+      ok: true,
+    });
+    await expect(getPushStatus(userId, subscriptionA.endpoint)).resolves.toMatchObject({
+      currentDeviceSubscribed: true,
+      activeDeviceCount: 2,
+      hasAnySubscription: true,
+    });
+    await expect(getPushStatus(otherUserId)).resolves.toMatchObject({
+      currentDeviceSubscribed: false,
+      activeDeviceCount: 0,
+      hasAnySubscription: false,
     });
 
     await expect(
-      savePushSubscription(otherUserId, {
-        ...subscription,
-        keys: {
-          p256dh: subscription.keys.p256dh,
-          auth: subscription.keys.auth,
-        },
-      })
+      savePushSubscription(otherUserId, subscriptionOther)
     ).resolves.toEqual({ ok: true });
-    await expect(getPushStatus(userId)).resolves.toMatchObject({
-      subscribed: false,
-    });
-    await expect(getPushStatus(otherUserId)).resolves.toMatchObject({
-      subscribed: true,
+    await expect(
+      getPushStatus(otherUserId, subscriptionOther.endpoint)
+    ).resolves.toMatchObject({
+      currentDeviceSubscribed: true,
+      activeDeviceCount: 1,
+      hasAnySubscription: true,
     });
 
     await expect(
-      deletePushSubscription(userId, subscription.endpoint)
-    ).resolves.toMatchObject({ deleted: false });
-    await expect(
-      deletePushSubscription(otherUserId, subscription.endpoint)
+      deletePushSubscription(otherUserId, subscriptionOther.endpoint)
     ).resolves.toMatchObject({ deleted: true });
-    await expect(getPushStatus(otherUserId)).resolves.toMatchObject({
-      subscribed: false,
+    await expect(
+      getPushStatus(otherUserId, subscriptionOther.endpoint)
+    ).resolves.toMatchObject({
+      currentDeviceSubscribed: false,
+      activeDeviceCount: 0,
+      hasAnySubscription: false,
+    });
+    await expect(
+      getPushStatus(userId, subscriptionA.endpoint)
+    ).resolves.toMatchObject({
+      currentDeviceSubscribed: true,
+      activeDeviceCount: 2,
+      hasAnySubscription: true,
     });
   });
 });

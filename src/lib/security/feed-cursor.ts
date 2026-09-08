@@ -20,6 +20,7 @@ export type FeedCursorContext = {
   subreddit: string | null;
   authorId: string | null;
   viewerId: string | null;
+  scope?: "posts" | "comments";
 };
 
 type SealedPayload = FeedCursorPosition &
@@ -28,7 +29,6 @@ type SealedPayload = FeedCursorPosition &
     iat: number;
     exp: number;
   };
-
 export class InvalidFeedCursorError extends Error {
   constructor(message = "Invalid cursor") {
     super(message);
@@ -73,6 +73,7 @@ function decodePayload(raw: string): SealedPayload | null {
       subreddit: parsed.subreddit ?? null,
       authorId: parsed.authorId ?? null,
       viewerId: parsed.viewerId ?? null,
+      scope: parsed.scope === "comments" ? "comments" : "posts",
       iat: parsed.iat,
       exp: parsed.exp,
     };
@@ -102,6 +103,7 @@ export async function signFeedCursorWithSecret(
     subreddit: context.subreddit,
     authorId: context.authorId,
     viewerId: context.viewerId,
+    scope: context.scope ?? "posts",
     iat: now,
     exp: now + ttlMs,
   };
@@ -147,7 +149,8 @@ export async function openFeedCursorWithSecret(
     payload.mode !== expect.mode ||
     !sameNullable(payload.subreddit, expect.subreddit) ||
     !sameNullable(payload.authorId, expect.authorId) ||
-    !sameNullable(payload.viewerId, expect.viewerId)
+    !sameNullable(payload.viewerId, expect.viewerId) ||
+    payload.scope !== (expect.scope ?? "posts")
   ) {
     throw new InvalidFeedCursorError("Cursor context mismatch");
   }

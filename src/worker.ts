@@ -7,6 +7,7 @@
  */
 
 import { createAuth } from "./lib/auth";
+import { cleanupUnreferencedMedia } from "./lib/media";
 import { guardWorkerRequest } from "./lib/worker-ingress";
 
 import { ChatRoom } from "./workers/ChatRoom";
@@ -224,5 +225,25 @@ export default {
         },
       });
     }
+  },
+  async scheduled(
+    _controller: ScheduledController,
+    env: EnvWithLimits,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    ctx.waitUntil(
+      cleanupUnreferencedMedia({}, env)
+        .then((deleted) => {
+          console.info(JSON.stringify({ msg: "media_cleanup_done", deleted }));
+        })
+        .catch((error) => {
+          console.error(
+            JSON.stringify({
+              msg: "media_cleanup_failed",
+              error: error instanceof Error ? error.message : String(error),
+            })
+          );
+        })
+    );
   },
 } satisfies ExportedHandler<CloudflareEnv>;
