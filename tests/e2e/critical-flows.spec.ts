@@ -41,6 +41,90 @@ test.describe("critical browser flows", () => {
     await expect(page.locator("article").first()).toBeVisible({ timeout: 30_000 });
   });
 
+
+  test("Alice saves Bob's post and opens the saved list", async ({ page }) => {
+    await loginAsSeedUser(page, "alice", BOB_POST);
+    await waitForHydration(page);
+
+    try {
+      const post = page.locator("article").filter({ hasText: BOB_POST_TITLE }).first();
+      const openMenu = () =>
+        post.getByRole("button", { name: /tùy chọn bài đăng/i }).click();
+      await openMenu();
+      const removeFromSaved = page.getByRole("menuitem", { name: /^bỏ lưu$/i });
+      if (await removeFromSaved.isVisible().catch(() => false)) {
+        await removeFromSaved.click();
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await waitForHydration(page);
+        await openMenu();
+      }
+      const savePost = page.getByRole("menuitem", { name: /^lưu bài đăng$/i });
+      await expect(savePost).toBeVisible();
+      await savePost.click();
+      await expect(page.getByRole("status")).toContainText("Đã lưu bài đăng.", {
+        timeout: 30_000,
+      });
+      await page.goto("/saved", { waitUntil: "domcontentloaded" });
+      await expect(page.getByText(BOB_POST_TITLE, { exact: true })).toBeVisible();
+    } finally {
+      await page.goto(BOB_POST, { waitUntil: "domcontentloaded" });
+      await waitForHydration(page);
+      const post = page.locator("article").filter({ hasText: BOB_POST_TITLE }).first();
+      await post.getByRole("button", { name: /tùy chọn bài đăng/i }).click();
+      const removeFromSaved = page.getByRole("menuitem", { name: /^bỏ lưu$/i });
+      if (await removeFromSaved.isVisible().catch(() => false)) {
+        await removeFromSaved.click();
+        await expect(page.getByRole("status")).toContainText("Đã bỏ lưu bài đăng.", {
+          timeout: 30_000,
+        });
+      }
+    }
+  });
+
+  test("Alice mutes Bob in discovery but can still read his post", async ({
+    page,
+  }) => {
+    await loginAsSeedUser(page, "alice", "/u/bob");
+    const muteButton = page.getByRole("button", {
+      name: /^ẩn bài từ tài khoản này$/i,
+    });
+    const unmuteButton = page.getByRole("button", {
+      name: /^hiện lại bài từ tài khoản này$/i,
+    });
+    await expect(muteButton.or(unmuteButton)).toBeVisible({ timeout: 30_000 });
+
+    try {
+      if (await unmuteButton.isVisible().catch(() => false)) {
+        await unmuteButton.click();
+        await expect(muteButton).toBeVisible();
+      }
+      await muteButton.click();
+      await expect(unmuteButton).toBeVisible();
+
+      await page.goto("/?feed=popular", { waitUntil: "domcontentloaded" });
+      await expect(page.getByText(BOB_POST_TITLE, { exact: true })).toHaveCount(0);
+
+      await page.goto(BOB_POST, { waitUntil: "domcontentloaded" });
+      await expect(
+        page.getByRole("link", { name: BOB_POST_TITLE })
+      ).toBeVisible();
+    } finally {
+      await page.goto("/u/bob", { waitUntil: "domcontentloaded" });
+      const cleanupMute = page.getByRole("button", {
+        name: /^ẩn bài từ tài khoản này$/i,
+      });
+      const cleanupUnmute = page.getByRole("button", {
+        name: /^hiện lại bài từ tài khoản này$/i,
+      });
+      await expect(cleanupMute.or(cleanupUnmute)).toBeVisible({
+        timeout: 30_000,
+      });
+      if (await cleanupUnmute.isVisible().catch(() => false)) {
+        await cleanupUnmute.click();
+      }
+    }
+  });
+
   test("Alice asks, Bob answers, and Alice accepts the answer", async ({
     browser,
   }) => {

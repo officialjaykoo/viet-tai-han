@@ -10,8 +10,9 @@ import {
   UserRoundCheckIcon,
   UserRoundXIcon,
   UsersRoundIcon,
+  Volume2Icon,
+  VolumeXIcon,
 } from "lucide-react";
-
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { announceUnreadChanged } from "@/components/notifications/use-unread-count";
@@ -26,6 +27,8 @@ type Action =
   | "unfollow"
   | "block"
   | "unblock"
+  | "mute"
+  | "unmute"
   | "friend_request"
   | "friend_cancel"
   | "friend_remove"
@@ -225,6 +228,27 @@ export function ProfileActions({
           {relationship.followState === "following"
             ? t("profile.unfollow")
             : t("profile.follow")}
+        </Button>
+      ) : null}
+      {!relationship.isSelf ? (
+        <Button
+          type="button"
+          size="sm"
+          variant={relationship.muteState === "muted" ? "secondary" : "outline"}
+          className={buttonClass}
+          disabled={pending}
+          onClick={() =>
+            run(relationship.muteState === "muted" ? "unmute" : "mute")
+          }
+        >
+          {relationship.muteState === "muted" ? (
+            <Volume2Icon className="size-4" aria-hidden />
+          ) : (
+            <VolumeXIcon className="size-4" aria-hidden />
+          )}
+          {relationship.muteState === "muted"
+            ? t("profile.unmute")
+            : t("profile.mute")}
         </Button>
       ) : null}
       {showBlock ? (

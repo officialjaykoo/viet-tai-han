@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createQuestion,
   listQuestions,
+  parseQuestionFilter,
   serializeQuestionSummary,
 } from "@/lib/qna";
 import { parseQuestionPayload } from "@/lib/content-payload";
@@ -23,6 +24,11 @@ export async function GET(request: NextRequest) {
     const subredditName = request.nextUrl.searchParams.get("subreddit");
     const rawLimit = request.nextUrl.searchParams.get("limit");
     const limit = rawLimit ? Number.parseInt(rawLimit, 10) : undefined;
+    const rawFilter = request.nextUrl.searchParams.get("filter");
+    const filter = parseQuestionFilter(rawFilter);
+    if (rawFilter && !filter) {
+      return await jsonLocalizedError("Invalid question filter", 400);
+    }
     if (rawLimit && Number.isNaN(limit)) {
       return await jsonLocalizedError("Invalid limit", 400);
     }
@@ -30,6 +36,7 @@ export async function GET(request: NextRequest) {
     const questions = await listQuestions({
       limit,
       subredditName,
+      filter: filter ?? "newest",
       viewerUserId: session?.user?.id ?? null,
     });
     return NextResponse.json({

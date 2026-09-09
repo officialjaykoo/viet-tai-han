@@ -6,13 +6,14 @@ This document is the Bug11 runtime contract for public post discovery and intera
 
 | Surface | Entry point | Order/personalization |
 | --- | --- | --- |
-| Home | `src/app/page.tsx` → `getFeedPosts({ mode: "home" })` | Subscribed-community recency. |
-| Popular | `src/app/page.tsx` or `/api/posts?feed=popular` → `getFeedPosts({ mode: "popular", sort: "popular" })` | Public canonical engagement rank. |
-| Community | `/r/[name]`, `/api/subreddits/[name]` → `getFeedPosts({ mode: "community" })` | Community recency. |
-| Recommended | `/recommended` → `getRecommendations` | Personalized D1 activity/follow signal. |
-| Profile posts | `/u/[username]`, `/api/profile/[username]` → `getFeedPosts({ sort: "new" })` | Author-scoped recency. |
-| Post detail | `/post/[id]`, `/api/posts/[id]` → `getPostDetail` | One public post projection plus comment tree. |
-| Search | `/search`, `/api/search` → `searchAll` | Public visibility-filtered text search. |
+| Home | `src/app/page.tsx` → `getFeedPosts({ mode: "home" })` | Subscribed-community recency, excluding viewer-muted authors. |
+| Popular | `src/app/page.tsx` or `/api/posts?feed=popular` → `getFeedPosts({ mode: "popular", sort: "popular" })` | Public canonical engagement rank with an explicit UTC window. |
+| Community | `/r/[name]`, `/api/subreddits/[name]` → `getFeedPosts({ mode: "community" })` | Community recency, excluding viewer-muted authors. |
+| Recommended | `/recommended` → `getRecommendations` | Personalized D1 activity/follow signal, excluding viewer-muted authors. |
+| Profile posts | `/u/[username]`, `/api/profile/[username]` → `getFeedPosts({ sort: "new" })` | Author-scoped recency; direct profile reads remain available after mute. |
+| Post detail | `/post/[id]`, `/api/posts/[id]` → `getPostDetail` | One public post projection plus comment tree; direct reads remain available after mute. |
+| Saved posts | `/saved` → `listSavedPosts` | Private viewer library using canonical public visibility. |
+| Search | `/search`, `/api/search` → `searchAll` | Public visibility-filtered text search, excluding viewer-muted authors. |
 | Out/analytics | `/api/posts/[id]/out`, `/view`, `/stats` | Operates only on publicly visible posts. |
 
 All post projections use `src/lib/post-projection.ts`. All public post queries use `src/lib/content-visibility.ts`:
@@ -23,6 +24,8 @@ AND p.is_shadow_hidden = 0
 AND s.is_removed = 0
 ```
 
+
+Public visibility, interaction permission, and viewer attention are separate layers. `user_blocks`/permission rules are not replaced by `user_mutes`; mute only removes discovery projections and ordinary actor notifications. A save remains a private `(user_id, post_id)` relation and is not a public counter.
 Comments shown publicly additionally require live, non-deleted, non-shadow-hidden state. Block state is intentionally separate from visibility: a blocked author's public post can still be read directly, but new positive interactions are denied bilaterally.
 
 ## Feed ranking and pagination
@@ -45,6 +48,8 @@ id DESC
 
 A page requests `limit + 1`, returns at most `limit`, and emits the last returned row as the signed continuation boundary. A rank tie therefore cannot skip or duplicate rows when timestamps and IDs are stable.
 
+Popular supports `window=day|week|month|all`. `day` starts at the current UTC day, `week` at the current UTC Monday, and `month` at the first UTC day of the month. `all` has no cutoff. The default is `all` while production volume is low. Every popular cursor binds the window and exact cutoff in addition to rank and `(created_at, id)`; changing any of them returns a context mismatch.
+
 ## Interaction policy
 
 - Like insert: denied if either direction of `user_blocks` exists; unlike remains allowed.
@@ -52,6 +57,8 @@ A page requests `limit + 1`, returns at most `limit`, and emits the last returne
 - Reply: actor↔post-author and actor↔parent-author block denies the final insert.
 - Q&A answer: actor↔question-author block denies the final insert.
 - Accept answer: question owner↔answer-author block denies new acceptance; clearing an existing acceptance remains allowed.
+- Save/unsave: idempotent private relation writes; no like/comment counter, notification, karma, or popularity effect.
+- Mute/unmute: private viewer-to-author relation; filters discovery only, not direct post/profile reads, interaction permission, follows, friendships, blocks, saves, or DM state.
 - Comment, reply, and mention notifications use the same bilateral block guard, including the final unread/push fanout boundary.
 - Public reads do not use block state as a content-visibility predicate.
 
@@ -66,6 +73,8 @@ Post, comment, question, answer, and listing creation use request IDs when suppl
 ## Canonical truth audit
 
 ```text
+Canonical Saved Relation:           post_saves(user_id, post_id)
+Canonical Mute Relation:            user_mutes(muter_id, muted_id)
 Canonical Post Like Truth:       post_likes(post_id, user_id)
 Canonical Comment Like Truth:    comment_likes(comment_id, user_id)
 Canonical Display Counter:       posts.like_count, comments.like_count, posts.comment_count

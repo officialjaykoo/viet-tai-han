@@ -32,7 +32,9 @@ export default async function SearchPage({
   await redirectIfIncompleteOnboarding(session?.user?.id);
   const params = await searchParams;
   const query = normalizeSearchQuery(params.q ?? "");
-  const results = query ? await searchAll(query) : null;
+  const results = query
+    ? await searchAll(query, {}, session?.user?.id ?? null)
+    : null;
   const { locale } = await getRequestLocale();
 
   return (

@@ -2,6 +2,7 @@ import { getDb, getEnv } from "@/lib/db";
 import { AuthError } from "@/lib/session";
 import { getSiteSetting } from "@/lib/settings";
 import { createPublicId } from "@/lib/id";
+import { isE2eBotBypass } from "@/lib/security/bot-signals";
 
 type RateLimitBindingName =
   | "EDGE_IP_RATE_LIMITER"
@@ -251,6 +252,7 @@ export async function enforceApiMutateRateLimit(input: {
   userId?: string | null;
   ip: string;
 }) {
+  if (process.env.NODE_ENV !== "production" && isE2eBotBypass()) return;
   const perMin = await settingInt("max_api_mutate_per_min", 30);
   const perHour = await settingInt("max_api_mutate_per_hour", 120);
   const ipMin = await settingInt("max_api_mutate_ip_per_min", 40);

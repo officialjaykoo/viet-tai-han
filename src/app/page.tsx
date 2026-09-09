@@ -20,7 +20,14 @@ import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { OnlinePeopleList } from "@/components/online/online-people-list";
 import { withFeedAds } from "@/lib/ads";
-import { getFeedPosts, type FeedMode, type FeedSort } from "@/lib/db";
+import {
+  DEFAULT_POPULAR_WINDOW,
+  getFeedPosts,
+  parsePopularWindow,
+  type FeedMode,
+  type FeedSort,
+  type PopularWindow,
+} from "@/lib/db";
 import { listOnlineUsers } from "@/lib/presence";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -46,6 +53,7 @@ function parseMode(value: string | undefined): "home" | "popular" {
 async function loadInitialFeed(options: {
   sort: FeedSort;
   mode: FeedMode;
+  window: PopularWindow;
   viewerUserId: string | null;
 }): Promise<PaginatedFeed> {
   try {
@@ -54,6 +62,7 @@ async function loadInitialFeed(options: {
       viewerUserId: options.viewerUserId,
       sort: options.sort,
       mode: options.mode,
+      window: options.window,
     });
     return await withFeedAds(feed, options.viewerUserId);
   } catch (error) {
@@ -69,13 +78,14 @@ async function loadOnlineUsers(viewerUserId: string | null) {
     return [];
   }
 }
-
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; feed?: string }>;
+  searchParams: Promise<{ sort?: string; feed?: string; window?: string }>;
 }) {
   const params = await searchParams;
+  const popularWindow =
+    parsePopularWindow(params.window) ?? DEFAULT_POPULAR_WINDOW;
   const session = await getSession();
   const onboarding = session?.user
     ? await getOnboardingState(session.user.id)
@@ -164,6 +174,7 @@ export default async function HomePage({
     loadInitialFeed({
       sort,
       mode,
+      window: popularWindow,
       viewerUserId: session?.user?.id ?? null,
     }),
     signedIn
@@ -240,7 +251,11 @@ export default async function HomePage({
               </p>
             </section>
 
-            <FeedModeTabs current={mode} signedIn={signedIn} />
+            <FeedModeTabs
+              current={mode}
+              signedIn={signedIn}
+              popularWindow={popularWindow}
+            />
 
             <FeedComposer
               signedIn={signedIn}
@@ -256,7 +271,12 @@ export default async function HomePage({
               heading={tLocale(locale, "nav.communities")}
               links={shortcutLinks}
             />
-            <Feed initialFeed={initialFeed} sort={sort} mode={mode} />
+            <Feed
+              initialFeed={initialFeed}
+              sort={sort}
+              mode={mode}
+              window={popularWindow}
+            />
           </div>
 
           {signedIn ? (

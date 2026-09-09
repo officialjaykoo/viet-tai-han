@@ -168,6 +168,16 @@ There is no requirement to adopt one thing from each project.
 - no permanent donor-specific adapter remains without necessity
 - canonical implementation count stays the same or decreases
 - new dependencies/infrastructure are avoided unless strongly justified
+### Bug13 implementation status
+
+Bug13 is implemented as VTH-native convergence, not donor-code import:
+
+- **ADOPT:** GoToSocial's explicit separation of public visibility, interaction permission, and viewer attention preference.
+- **ADAPT:** private idempotent post saves, private user mutes, Popular `day|week|month|all` windows, canonical Q&A filters, and one admin review-queue read model over existing report tables.
+- **VTH-ALREADY-STRONGER:** D1 canonical visibility, positive-like counters, signed cursors, bilateral block guards, and the Bug10/11 runtime boundaries.
+- **REJECT/DEFER:** RED-style infrastructure expansion, donor-specific adapters, federation, scoped mute modes, generic `reviewables` storage, hot-rank jobs, and stored popularity scores.
+
+The current production dataset has three public posts (one from today, three this week, three this month), so Popular defaults to **all time** until volume makes a narrower default more useful. Existing ranking remains `like_count + comment_count * 3`; no score column, cache, queue, Worker, or Durable Object was added.
 
 ## 5. NEXT — Bug14: D1 schema consolidation and legacy retirement
 

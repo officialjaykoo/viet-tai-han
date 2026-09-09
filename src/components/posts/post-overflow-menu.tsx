@@ -2,6 +2,7 @@
 
 import {
   BanIcon,
+  BookmarkIcon,
   CopyIcon,
   EllipsisIcon,
   EyeOffIcon,
@@ -38,18 +39,21 @@ const REPORT_REASONS = [
 type PostOverflowMenuProps = {
   postId: string;
   authorUsername: string;
+  saved?: boolean;
   onDismiss?: () => void;
 };
 
 export function PostOverflowMenu({
   postId,
   authorUsername,
+  saved = false,
   onDismiss,
 }: PostOverflowMenuProps) {
   const router = useRouter();
   const { t } = useI18n();
   const localizeError = useLocalizedError();
   const [pending, startTransition] = useTransition();
+  const [isSaved, setIsSaved] = useState(saved);
   const [mode, setMode] = useState<"menu" | "report">("menu");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +77,30 @@ export function PostOverflowMenu({
     }
     return false;
   }
+  function toggleSave() {
+    if (pending) return;
+    const nextSaved = !isSaved;
+    setError(null);
+    startTransition(async () => {
+      const res = await apiFetch(`/api/posts/${postId}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saved: nextSaved }),
+      });
+      if (requireAuth(res.status)) return;
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(localizeError(payload?.error, t("common.error")));
+        return;
+      }
+      setIsSaved(nextSaved);
+      setMessage(nextSaved ? t("post.postSaved") : t("post.postUnsaved"));
+      router.refresh();
+    });
+  }
+
 
   function hide() {
     setError(null);
@@ -161,6 +189,14 @@ export function PostOverflowMenu({
               >
                 <CopyIcon />
                 {t("post.copyLink")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="min-h-11"
+                disabled={pending}
+                onClick={toggleSave}
+              >
+                <BookmarkIcon />
+                {isSaved ? t("post.unsave") : t("post.savePost")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

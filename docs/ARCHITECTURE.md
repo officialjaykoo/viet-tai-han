@@ -120,6 +120,14 @@ AND s.is_removed = 0
 
 Block state is not itself a public-visibility predicate. A blocked user's ordinary public post may still be directly readable, while new positive interaction/contact is denied.
 
+Viewer-facing policy has three separate layers:
+
+1. **Public visibility:** removed, shadow-hidden, or community-removed content is excluded by the canonical predicate.
+2. **Interaction permission:** block, lock, ownership, and DM policy decide whether a write/contact is allowed.
+3. **Viewer attention preference:** mute, hidden, or saved state changes one viewer's discovery/library projection without changing public content or permission.
+
+Mute is an attention preference. It hides an author's posts from Home, Popular, Recommended, Community, Search, and presence discovery; direct profile/post reads and direct interactions remain governed by their own permission rules. Saves are private viewer state and never become an engagement counter.
+
 Detailed feed/content contract: [`VTH_CONTENT_FEED.md`](VTH_CONTENT_FEED.md).
 
 ## 7. Feed and discovery
@@ -148,11 +156,13 @@ like_count + comment_count * 3
 
 with deterministic:
 
+
 ```text
 created_at DESC, id DESC
 ```
 
 tie-breaks.
+Popular accepts explicit UTC calendar windows: `day`, `week` (Monday start), `month` (first day), and `all`. The cutoff is computed at request time and copied into the signed cursor context, so every page uses one cutoff. The default is `all` while production volume remains low.
 
 Pagination cursors are signed and bound to their complete feed context. A cursor must carry the same ordering tuple used by the SQL query.
 
@@ -172,6 +182,13 @@ Core concepts:
 
 Relationship APIs should return server-derived state rather than asking clients to reconstruct relationship truth from independent requests.
 
+
+Mute semantics are intentionally distinct from block:
+
+- `user_mutes` is a private, unique viewer-to-author relation.
+- mute suppresses discovery and ordinary actor notifications (`comment_on_post`, `reply_to_comment`, `mention`) only.
+- mute does not delete follows, friendships, saves, blocks, or DM relations.
+- security, account, admin, and direct-contact permission rules are not suppressed by mute.
 Block semantics:
 
 - bilateral block prevents new positive interaction/contact
@@ -205,6 +222,7 @@ Messaging invariants include:
 - at most one valid pending request per pair/room contract
 - `clientMessageId` idempotency for uncertain sends
 - `(created_at, id)` message ordering and read boundaries
+
 - signed history/catch-up cursors
 - block/ban connect and broadcast checks
 - terminal revoke of stale sockets
@@ -222,6 +240,7 @@ A user-visible notification should be attributable to a canonical source action 
 Queued or delayed notification delivery must not bypass current block/moderation state when the notification itself represents a social interaction.
 
 Cross-tab unread synchronization may use browser transport such as BroadcastChannel, but final convergence remains server-backed.
+Mute checks are applied at the notification insert boundary for ordinary actor events, before unread fanout and push delivery. Direct messages, security, account, and admin notifications remain unaffected.
 
 ## 11. Q&A
 
@@ -236,6 +255,15 @@ Important invariants:
 - denormalized answer counts remain derived from canonical answer rows
 
 Q&A UX should remain compatible with durable searchable knowledge rather than chat-like transient behavior.
+
+Q&A list filters are shareable and derive solely from canonical fields:
+
+- `newest`: `created_at DESC, id DESC`
+- `unanswered`: `answer_count = 0`
+- `answered`: `answer_count > 0`
+- `solved`: `accepted_answer_id IS NOT NULL`
+
+The admin review queue is a discriminated read model over existing `reports`, listing-report, and chat-report tables. It does not introduce a generic `reviewables` table or expose private DM history. Queue actions reuse existing domain mutations and record moderation effects in `moderation_actions`.
 
 ## 12. Marketplace and businesses
 

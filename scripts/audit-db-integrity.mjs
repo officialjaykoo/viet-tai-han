@@ -124,33 +124,59 @@ const counterRows = query(
        WHERE sub.subreddit_id = s.id
     )`
 );
-const orphanRows = query(
-  options,
-  `SELECT 'comments_parent' AS check_name, COUNT(*) AS count
-     FROM comments c
-     LEFT JOIN comments p ON p.id = c.parent_id
-    WHERE c.parent_id IS NOT NULL AND p.id IS NULL
-   UNION ALL
-   SELECT 'post_likes_post' AS check_name, COUNT(*) AS count
-     FROM post_likes pl
-     LEFT JOIN posts p ON p.id = pl.post_id
-    WHERE p.id IS NULL
-   UNION ALL
-   SELECT 'comment_likes_comment' AS check_name, COUNT(*) AS count
-     FROM comment_likes cl
-     LEFT JOIN comments c ON c.id = cl.comment_id
-    WHERE c.id IS NULL
-   UNION ALL
-   SELECT 'subscriptions_user' AS check_name, COUNT(*) AS count
-     FROM subscriptions s
-     LEFT JOIN "user" u ON u.id = s.user_id
-    WHERE u.id IS NULL
-   UNION ALL
-   SELECT 'subscriptions_subreddit' AS check_name, COUNT(*) AS count
-     FROM subscriptions s
-     LEFT JOIN subreddits sr ON sr.id = s.subreddit_id
-    WHERE sr.id IS NULL`
-);
+const orphanRows = [
+  ...query(
+    options,
+    `SELECT 'comments_parent' AS check_name, COUNT(*) AS count
+       FROM comments c
+       LEFT JOIN comments p ON p.id = c.parent_id
+      WHERE c.parent_id IS NOT NULL AND p.id IS NULL
+     UNION ALL
+     SELECT 'post_likes_post' AS check_name, COUNT(*) AS count
+       FROM post_likes pl
+       LEFT JOIN posts p ON p.id = pl.post_id
+      WHERE p.id IS NULL
+     UNION ALL
+     SELECT 'comment_likes_comment' AS check_name, COUNT(*) AS count
+       FROM comment_likes cl
+       LEFT JOIN comments c ON c.id = cl.comment_id
+      WHERE c.id IS NULL`
+  ),
+  ...query(
+    options,
+    `SELECT 'post_saves_user' AS check_name, COUNT(*) AS count
+       FROM post_saves ps
+       LEFT JOIN "user" u ON u.id = ps.user_id
+      WHERE u.id IS NULL
+     UNION ALL
+     SELECT 'post_saves_post' AS check_name, COUNT(*) AS count
+       FROM post_saves ps
+       LEFT JOIN posts p ON p.id = ps.post_id
+      WHERE p.id IS NULL
+     UNION ALL
+     SELECT 'user_mutes_muter' AS check_name, COUNT(*) AS count
+       FROM user_mutes um
+       LEFT JOIN "user" u ON u.id = um.muter_id
+      WHERE u.id IS NULL`
+  ),
+  ...query(
+    options,
+    `SELECT 'user_mutes_muted' AS check_name, COUNT(*) AS count
+       FROM user_mutes um
+       LEFT JOIN "user" u ON u.id = um.muted_id
+      WHERE u.id IS NULL
+     UNION ALL
+     SELECT 'subscriptions_user' AS check_name, COUNT(*) AS count
+       FROM subscriptions s
+       LEFT JOIN "user" u ON u.id = s.user_id
+      WHERE u.id IS NULL
+     UNION ALL
+     SELECT 'subscriptions_subreddit' AS check_name, COUNT(*) AS count
+       FROM subscriptions s
+       LEFT JOIN subreddits sr ON sr.id = s.subreddit_id
+      WHERE sr.id IS NULL`
+  ),
+];
 
 const legacyRows = {};
 if (tables.has("votes")) {

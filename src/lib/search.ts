@@ -79,7 +79,8 @@ export async function searchAll(
     posts?: number;
     questions?: number;
     listings?: number;
-  } = {}
+  } = {},
+  viewerUserId?: string | null
 ): Promise<SearchResults> {
   const query = normalizeSearchQuery(rawQuery);
   if (query.length < 1) {
@@ -101,8 +102,8 @@ export async function searchAll(
   const pattern = likeContains(query);
   const [communities, accounts, posts, questions, listings] = await Promise.all([
     searchCommunities(pattern, communityLimit),
-    searchAccounts(pattern, accountLimit),
-    searchPosts(pattern, postLimit),
+    searchAccounts(pattern, accountLimit, viewerUserId),
+    searchPosts(pattern, postLimit, viewerUserId),
     searchQuestions(pattern, questionLimit),
     searchListings(pattern, listingLimit),
   ]);
@@ -141,9 +142,13 @@ async function searchCommunities(
 
 async function searchAccounts(
   pattern: string,
-  limit: number
+  limit: number,
+  viewerUserId?: string | null
 ): Promise<SearchAccountHit[]> {
   const db = await getDb();
+  const mutedClause = viewerUserId
+    ? 'AND "user".id NOT IN (SELECT muted_id FROM user_mutes WHERE muter_id = ?)'
+    : "";
   const { results } = await db
     .prepare(
       `SELECT
@@ -159,11 +164,16 @@ async function searchAccounts(
        FROM "user"
        WHERE status = 'active'
          AND username IS NOT NULL
+         ${mutedClause}
          AND (username LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\')
        ORDER BY karma DESC, username ASC
        LIMIT ?`
     )
-    .bind(pattern, pattern, limit)
+    .bind(
+      ...(viewerUserId
+        ? [viewerUserId, pattern, pattern, limit]
+        : [pattern, pattern, limit])
+    )
     .all<{
       username: string;
       name: string;
@@ -194,9 +204,13 @@ async function searchAccounts(
 
 async function searchPosts(
   pattern: string,
-  limit: number
+  limit: number,
+  viewerUserId?: string | null
 ): Promise<SearchPostHit[]> {
   const db = await getDb();
+  const mutedClause = viewerUserId
+    ? "AND p.author_id NOT IN (SELECT muted_id FROM user_mutes WHERE muter_id = ?)"
+    : "";
   const { results } = await db
     .prepare(
       `SELECT
@@ -207,12 +221,17 @@ async function searchPosts(
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id
        WHERE ${publicPostVisibilitySql()}
+         ${mutedClause}
          AND (p.title LIKE ? ESCAPE '\\'
               OR IFNULL(p.body, '') LIKE ? ESCAPE '\\')
        ORDER BY p.like_count DESC, p.created_at DESC
        LIMIT ?`
     )
-    .bind(pattern, pattern, limit)
+    .bind(
+      ...(viewerUserId
+        ? [viewerUserId, pattern, pattern, limit]
+        : [pattern, pattern, limit])
+    )
     .all<{
       id: string;
       title: string;

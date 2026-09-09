@@ -5,12 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BellIcon,
+  BookmarkIcon,
   CircleHelpIcon,
   CircleUserRoundIcon,
   FlameIcon,
   HomeIcon,
-  LogInIcon,
   LogOutIcon,
+  LogInIcon,
   MenuIcon,
   MessageSquareIcon,
   PlusIcon,
@@ -20,7 +21,6 @@ import {
   ShoppingBagIcon,
   SparklesIcon,
   StoreIcon,
-  UserRoundIcon,
   UsersRoundIcon,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -44,7 +44,6 @@ import { UserAvatar } from "@/components/user/user-avatar";
 import { signOut, useSession } from "@/lib/auth-client";
 import { resolveAuthUiState } from "@/lib/auth-ui";
 import { isNavSectionActive } from "@/lib/navigation";
-import { getProfileHref } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
 const iconBtnClass =
@@ -90,7 +89,6 @@ export function SiteHeader() {
     (visibleSession?.user as { username?: string } | undefined)?.username ??
     null;
   const displayName = username ?? visibleSession?.user?.name ?? "user";
-  const profileHref = getProfileHref(visibleSession?.user);
   const karma = (visibleSession?.user as { karma?: number } | undefined)?.karma;
   const isAdmin =
     (visibleSession?.user as { role?: string } | undefined)?.role === "admin";
@@ -322,10 +320,10 @@ export function SiteHeader() {
                   <DropdownMenuGroup>
                     <DropdownMenuItem
                       className="min-h-11"
-                      render={<Link href={profileHref} />}
+                      render={<Link href="/saved" />}
                     >
-                      <UserRoundIcon />
-                      {t("nav.profile")}
+                      <BookmarkIcon />
+                      {t("nav.saved")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="min-h-11"

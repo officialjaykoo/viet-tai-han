@@ -20,6 +20,7 @@ export type RelationshipProjection = {
   friendState: FriendState;
   friendRequestId: string | null;
   blockState: BlockState;
+  muteState: "none" | "muted";
   canViewProfile: boolean;
   canInteract: boolean;
   canMessage: boolean;
@@ -251,6 +252,41 @@ export async function unblockUser(blockerId: string, blockedId: string) {
     .run();
   return { blocked: false as const };
 }
+export async function muteUser(muterId: string, mutedId: string) {
+  if (muterId === mutedId) {
+    throw new AuthError("You can't mute yourself", 400);
+  }
+  const db = await getDb();
+  const user = await db
+    .prepare(`SELECT id FROM "user" WHERE id = ?`)
+    .bind(mutedId)
+    .first<{ id: string }>();
+  if (!user) throw new AuthError("User not found", 404);
+
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO user_mutes (muter_id, muted_id)
+       VALUES (?, ?)`
+    )
+    .bind(muterId, mutedId)
+    .run();
+  return { muteState: "muted" as const };
+}
+
+export async function unmuteUser(muterId: string, mutedId: string) {
+  if (muterId === mutedId) {
+    throw new AuthError("You can't unmute yourself", 400);
+  }
+  const db = await getDb();
+  await db
+    .prepare(
+      `DELETE FROM user_mutes
+       WHERE muter_id = ? AND muted_id = ?`
+    )
+    .bind(muterId, mutedId)
+    .run();
+  return { muteState: "none" as const };
+}
 
 export async function followUser(followerId: string, followingId: string) {
   if (followerId === followingId) {
@@ -426,6 +462,7 @@ export async function getProfileRelation(
       friendState: "none",
       friendRequestId: null,
       blockState: "none",
+      muteState: "none",
       // VTH has public profiles; block currently removes contact permission,
       // not read access. Keep this policy explicit at the service boundary.
       canViewProfile: true,
@@ -436,7 +473,7 @@ export async function getProfileRelation(
   }
 
   const db = await getDb();
-  const [follow, blocks, friend, dm] = await Promise.all([
+  const [follow, blocks, friend, dm, mute] = await Promise.all([
     db
       .prepare(
         `SELECT 1 AS ok FROM user_follows
@@ -460,6 +497,13 @@ export async function getProfileRelation(
       .first<{ blocked_by_me: number; blocked_by_them: number }>(),
     getFriendRelation(viewerId, profileUserId),
     getDmRelationship({ senderId: viewerId, recipientId: profileUserId }),
+    db
+      .prepare(
+        `SELECT 1 AS ok FROM user_mutes
+         WHERE muter_id = ? AND muted_id = ?`
+      )
+      .bind(viewerId, profileUserId)
+      .first(),
   ]);
   const blockedByMe = Boolean(blocks?.blocked_by_me);
   const blockedByThem = Boolean(blocks?.blocked_by_them);
@@ -473,6 +517,7 @@ export async function getProfileRelation(
       : blockedByThem
         ? "blocked_by_peer"
         : "none",
+    muteState: mute ? "muted" : "none",
     canViewProfile: true,
     canInteract: !blockedEitherDirection,
     canMessage: !blockedEitherDirection && dm.canMessage,

@@ -93,6 +93,7 @@ export function serializeFeedPost(
     mediaKey: post.mediaKey,
     likeCount: post.likeCount,
     liked: post.liked,
+    saved: post.saved,
     commentCount: post.commentCount,
     createdAt: post.createdAt,
     translation: post.translation,

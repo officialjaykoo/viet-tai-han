@@ -54,6 +54,10 @@ export async function listOnlineUsers(
          AND NOT EXISTS (
            SELECT 1 FROM user_blocks b
            WHERE b.blocker_id = u.id AND b.blocked_id = ?
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM user_mutes m
+           WHERE m.muter_id = ? AND m.muted_id = u.id
          )`
     : "";
   const relationshipJoins = hasViewer
@@ -83,7 +87,8 @@ export async function listOnlineUsers(
       viewerUserId!,
       viewerUserId!,
       viewerUserId!,
-      viewerUserId!
+      viewerUserId!,
+      viewerUserId!,
     );
   }
   bindings.push(safeLimit);
@@ -161,6 +166,7 @@ export async function listOnlineUsers(
         friendState,
         friendRequestId: row.friend_request_id,
         blockState: "none",
+        muteState: "none",
         canViewProfile: true,
         canInteract,
         canMessage: canInteract && Boolean(row.can_message),

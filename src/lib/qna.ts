@@ -5,6 +5,19 @@ import { enforceCreateRateLimit } from "@/lib/rate-limit";
 import { normalizeRequestId } from "@/lib/idempotency";
 import { AuthError } from "@/lib/session";
 import { publicPostVisibilitySql } from "@/lib/content-visibility";
+export type QuestionFilter = "newest" | "unanswered" | "answered" | "solved";
+
+export function parseQuestionFilter(
+  value: string | null | undefined
+): QuestionFilter | null {
+  return value === "newest" ||
+    value === "unanswered" ||
+    value === "answered" ||
+    value === "solved"
+    ? value
+    : null;
+}
+
 function isUniqueConstraint(error: unknown): boolean {
   return error instanceof Error && /unique|constraint/i.test(error.message);
 }
@@ -178,11 +191,11 @@ function mapAnswer(
 function clampLimit(limit: number | undefined, fallback = 30) {
   return Math.min(Math.max(limit ?? fallback, 1), 100);
 }
-
 export async function listQuestions(options: {
   limit?: number;
   subredditName?: string | null;
   viewerUserId?: string | null;
+  filter?: QuestionFilter;
 } = {}): Promise<QuestionSummary[]> {
   const db = await getDb();
   const where = [
@@ -192,6 +205,11 @@ export async function listQuestions(options: {
   ];
   const params: Array<string | number> = [];
 
+  if (options.filter === "unanswered") where.push("q.answer_count = 0");
+  if (options.filter === "answered") where.push("q.answer_count > 0");
+  if (options.filter === "solved") {
+    where.push("q.accepted_answer_id IS NOT NULL");
+  }
   if (options.subredditName) {
     where.push("s.name = ? COLLATE NOCASE");
     params.push(options.subredditName);

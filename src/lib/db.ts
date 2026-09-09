@@ -13,6 +13,38 @@ const MAX_PAGE_SIZE = 50;
 
 export type FeedSort = "new" | "popular";
 export type FeedMode = "home" | "popular" | "community";
+export const POPULAR_WINDOWS = ["day", "week", "month", "all"] as const;
+export type PopularWindow = (typeof POPULAR_WINDOWS)[number];
+export const DEFAULT_POPULAR_WINDOW: PopularWindow = "all";
+
+export function parsePopularWindow(
+  value: string | null | undefined
+): PopularWindow | null {
+  return value && POPULAR_WINDOWS.includes(value as PopularWindow)
+    ? (value as PopularWindow)
+    : null;
+}
+
+export function popularWindowStart(
+  window: PopularWindow,
+  now = new Date()
+): string | null {
+  if (window === "all") return null;
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const date = now.getUTCDate();
+  const day = now.getUTCDay();
+  const startDate =
+    window === "day"
+      ? date
+      : window === "week"
+        ? date - ((day + 6) % 7)
+        : 1;
+  return new Date(Date.UTC(year, month, startDate))
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+}
 
 export async function getDb(): Promise<D1Database> {
   const { env } = await getCloudflareContext({ async: true });
@@ -36,6 +68,7 @@ export async function getFeedPosts(options: {
   viewerUserId?: string | null;
   sort?: FeedSort;
   mode?: FeedMode;
+  window?: PopularWindow;
 }): Promise<OrganicFeedPage> {
   const db = await getDb();
   const limit = Math.min(
@@ -44,6 +77,9 @@ export async function getFeedPosts(options: {
   );
   const mode = options.mode ?? (options.subreddit ? "community" : "popular");
   const sort = options.sort ?? (mode === "popular" ? "popular" : "new");
+  const popularWindow = options.window ?? DEFAULT_POPULAR_WINDOW;
+  const windowStart =
+    sort === "popular" ? popularWindowStart(popularWindow) : null;
   const viewerUserId = options.viewerUserId ?? null;
   const subreddit = options.subreddit ?? null;
   const authorId = options.authorId ?? null;
@@ -53,6 +89,8 @@ export async function getFeedPosts(options: {
     subreddit,
     authorId,
     viewerId: viewerUserId,
+    popularWindow: sort === "popular" ? popularWindow : null,
+    windowStart,
   };
   const cursor = await openFeedCursor(options.cursor ?? null, cursorContext);
   const engagementRank = "p.like_count + (p.comment_count * 3)";
@@ -66,7 +104,13 @@ export async function getFeedPosts(options: {
          WHERE pl.post_id = p.id AND pl.user_id = ?
        ) AS viewer_liked`
     : "0 AS viewer_liked";
-  if (viewerUserId) params.push(viewerUserId);
+  const viewerSavedSelect = viewerUserId
+    ? `EXISTS (
+         SELECT 1 FROM post_saves ps
+         WHERE ps.post_id = p.id AND ps.user_id = ?
+       ) AS viewer_saved`
+    : "0 AS viewer_saved";
+  if (viewerUserId) params.push(viewerUserId, viewerUserId);
 
   if (viewerUserId) {
     where.push(
@@ -75,6 +119,10 @@ export async function getFeedPosts(options: {
     params.push(viewerUserId);
     where.push(
       "p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)"
+    );
+    params.push(viewerUserId);
+    where.push(
+      "p.author_id NOT IN (SELECT muted_id FROM user_mutes WHERE muter_id = ?)"
     );
     params.push(viewerUserId);
   }
@@ -92,6 +140,11 @@ export async function getFeedPosts(options: {
       "p.subreddit_id IN (SELECT subreddit_id FROM subscriptions WHERE user_id = ?)"
     );
     params.push(viewerUserId);
+  }
+
+  if (sort === "popular" && windowStart) {
+    where.push("p.created_at >= ?");
+    params.push(windowStart);
   }
 
   if (cursor) {
@@ -152,7 +205,8 @@ export async function getFeedPosts(options: {
          s.id AS subreddit_id,
          s.name AS subreddit_name,
          s.title AS subreddit_title,
-         ${viewerLikeSelect}
+         ${viewerLikeSelect},
+         ${viewerSavedSelect}
        FROM posts p
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id

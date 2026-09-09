@@ -79,6 +79,11 @@ const ROUTES: RouteEntry[] = [
   },
   {
     methods: ["POST"],
+    pattern: "/api/posts/:id/save",
+    load: () => import("@/app/api/posts/[id]/save/route"),
+  },
+  {
+    methods: ["POST"],
     pattern: "/api/posts/:id/view",
     load: () => import("@/app/api/posts/[id]/view/route"),
   },

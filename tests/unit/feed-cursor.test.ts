@@ -98,6 +98,26 @@ describe("signed feed cursor", () => {
     ).rejects.toBeInstanceOf(InvalidFeedCursorError);
   });
 
+  it("binds popular cursors to the selected time window", async () => {
+    const popularContext: FeedCursorContext = {
+      ...ctx,
+      sort: "popular",
+      popularWindow: "week",
+      windowStart: "2026-01-05 00:00:00",
+    };
+    const token = await signFeedCursorWithSecret(
+      secret,
+      { rank: 4, createdAt: "2026-01-08 12:00:00", id: "post_window" },
+      popularContext
+    );
+    await expect(
+      openFeedCursorWithSecret(secret, token, {
+        ...popularContext,
+        popularWindow: "month",
+        windowStart: "2026-01-01 00:00:00",
+      })
+    ).rejects.toBeInstanceOf(InvalidFeedCursorError);
+  });
   it("returns null for empty cursor", async () => {
     expect(await openFeedCursorWithSecret(secret, null, ctx)).toBeNull();
   });

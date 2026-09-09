@@ -10,8 +10,11 @@ import {
   getDb,
   getFeedPosts,
   InvalidFeedCursorError,
+  parsePopularWindow,
+  DEFAULT_POPULAR_WINDOW,
   type FeedMode,
   type FeedSort,
+  type PopularWindow,
 } from "@/lib/db";
 import { serializeFeed } from "@/lib/serializers";
 import {
@@ -36,11 +39,17 @@ export async function GET(request: NextRequest) {
     const subreddit = searchParams.get("subreddit");
     const limitParam = searchParams.get("limit");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const windowParam = searchParams.get("window");
+    const parsedWindow = parsePopularWindow(windowParam);
+    if (windowParam && !parsedWindow) {
+      return await jsonLocalizedError("Invalid popular window", 400);
+    }
+    const window: PopularWindow =
+      parsedWindow ?? DEFAULT_POPULAR_WINDOW;
     const modeParam =
       searchParams.get("feed") ?? (subreddit ? "community" : "popular");
     const sortParam =
       searchParams.get("sort") ?? (modeParam === "popular" ? "popular" : "new");
-
     if (limitParam && Number.isNaN(limit)) {
       return await jsonLocalizedError("Invalid limit", 400);
     }
@@ -60,6 +69,7 @@ export async function GET(request: NextRequest) {
       viewerUserId,
       sort: sortParam as FeedSort,
       mode: modeParam as FeedMode,
+      window,
     });
     const withAds = await withFeedAds(feed, viewerUserId);
 

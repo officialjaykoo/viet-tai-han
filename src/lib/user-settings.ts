@@ -312,6 +312,34 @@ export async function listBlockedUsers(userId: string) {
     blockedAt: row.created_at,
   }));
 }
+export async function listMutedUsers(userId: string) {
+  const db = await getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT u.id, u.username, u.name, u.image, m.created_at
+       FROM user_mutes m
+       INNER JOIN "user" u ON u.id = m.muted_id
+       WHERE m.muter_id = ?
+       ORDER BY m.created_at DESC
+       LIMIT 100`
+    )
+    .bind(userId)
+    .all<{
+      id: string;
+      username: string | null;
+      name: string;
+      image: string | null;
+      created_at: string;
+    }>();
+
+  return (results ?? []).map((row) => ({
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    image: row.image,
+    mutedAt: row.created_at,
+  }));
+}
 
 /** Whether recipient accepts a new chat request from sender. */
 export async function canReceiveChatRequest(input: {

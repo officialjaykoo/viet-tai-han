@@ -34,6 +34,7 @@ export type PostProjectionRow = {
   subreddit_name: string;
   subreddit_title: string;
   viewer_liked?: number | null;
+  viewer_saved?: number | null;
 };
 
 export function mapPostTranslation(row: {
@@ -75,10 +76,11 @@ export function mapPostProjection(
     body: row.body,
     url: row.url,
     mediaKey: row.media_key,
-    commentCount: Number(row.comment_count ?? 0),
     createdAt: row.created_at,
+    commentCount: Number(row.comment_count ?? 0),
     likeCount: Number(row.like_count ?? 0),
     liked: Boolean(row.viewer_liked),
+    saved: Boolean(row.viewer_saved),
     translation: mapPostTranslation(row),
     author: {
       id: row.author_id,

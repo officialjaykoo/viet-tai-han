@@ -167,13 +167,17 @@ export async function getPostDetail(
              EXISTS (
                SELECT 1 FROM post_likes pl
                WHERE pl.post_id = p.id AND pl.user_id = ?
-             ) AS viewer_liked
+             ) AS viewer_liked,
+             EXISTS (
+               SELECT 1 FROM post_saves ps
+               WHERE ps.post_id = p.id AND ps.user_id = ?
+             ) AS viewer_saved
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
            WHERE p.id = ? AND ${publicPostVisibilitySql()}`
         )
-        .bind(viewerUserId, postId)
+        .bind(viewerUserId, viewerUserId, postId)
         .first()
     : await db
         .prepare(
@@ -188,7 +192,8 @@ export async function getPostDetail(
              ${AUTHOR_TAG_SELECT},
              s.id AS subreddit_id, s.name AS subreddit_name,
              s.title AS subreddit_title,
-             0 AS viewer_liked
+             0 AS viewer_liked,
+             0 AS viewer_saved
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
@@ -513,7 +518,11 @@ export async function getRecommendations(userId: string, limit = 10) {
          EXISTS (
            SELECT 1 FROM post_likes pl
            WHERE pl.post_id = p.id AND pl.user_id = ?
-         ) AS viewer_liked
+         ) AS viewer_liked,
+         EXISTS (
+           SELECT 1 FROM post_saves ps
+           WHERE ps.post_id = p.id AND ps.user_id = ?
+         ) AS viewer_saved
        FROM posts p
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id
@@ -525,11 +534,14 @@ export async function getRecommendations(userId: string, limit = 10) {
          AND p.author_id != ?
          AND p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)
          AND p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)
+         AND p.author_id NOT IN (
+           SELECT muted_id FROM user_mutes WHERE muter_id = ?
+         )
        ORDER BY activity_match DESC, followed_author DESC,
                 p.created_at DESC, p.id DESC
        LIMIT ?`
     )
-    .bind(userId, userId, userId, userId, userId, userId, limit)
+    .bind(userId, userId, userId, userId, userId, userId, userId, userId, limit)
     .all();
 
   return (results ?? []).map((row) =>

@@ -74,10 +74,11 @@ export interface FeedPost {
   body: string | null;
   url: string | null;
   mediaKey: string | null;
+  likeCount: number;
   commentCount: number;
   createdAt: string;
-  likeCount: number;
   liked: ViewerLike;
+  saved: boolean;
   translation: ContentTranslation | null;
   author: {
     /** Internal only — omitted from public API serializers. */

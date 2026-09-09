@@ -3,25 +3,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import {
   cancelFriendRequestByUsers,
-  removeFriend,
   sendFriendRequest,
 } from "@/lib/friends";
 import {
   followUser,
   getProfileRelation,
+  muteUser,
   reportTarget,
   unfollowUser,
+  unmuteUser,
 } from "@/lib/user-actions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { parseUserActionPayload } from "@/lib/relationship-payload";
 import { readApiJson } from "@/lib/security/guard";
-
 async function resolveUserId(username: string) {
   const db = await getDb();
   return db
-    .prepare(`SELECT id FROM "user" WHERE username = ? COLLATE NOCASE`)
-    .bind(username)
+    .prepare(
+      `SELECT id FROM "user"
+       WHERE username = ? COLLATE NOCASE OR id = ?`
+    )
+    .bind(username, username)
     .first<{ id: string }>();
 }
 
@@ -74,15 +77,21 @@ export async function POST(
           user.id,
           201
         );
-      case "friend_remove":
-        return relationResponse(
-          await removeFriend(session.user.id, user.id),
-          session.user.id,
-          user.id
-        );
       case "friend_cancel":
         return relationResponse(
           await cancelFriendRequestByUsers(session.user.id, user.id),
+          session.user.id,
+          user.id
+        );
+      case "mute":
+        return relationResponse(
+          await muteUser(session.user.id, user.id),
+          session.user.id,
+          user.id
+        );
+      case "unmute":
+        return relationResponse(
+          await unmuteUser(session.user.id, user.id),
           session.user.id,
           user.id
         );

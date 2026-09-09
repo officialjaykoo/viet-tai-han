@@ -1,3 +1,4 @@
+import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -127,5 +128,93 @@ describe("Q&A lifecycle (D1)", () => {
         answerId: answer.id,
       })
     ).resolves.toEqual({ acceptedAnswerId: null });
+  });
+  it("filters questions from canonical answer fields", async () => {
+    const { authorId, actorId, subredditId } = await seedUsersAndSubreddit();
+    const unansweredId = `question_unanswered_${crypto.randomUUID()}`;
+    const answeredId = `question_answered_${crypto.randomUUID()}`;
+    const solvedId = `question_solved_${crypto.randomUUID()}`;
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO questions (id, subreddit_id, author_id, title, body)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(
+        unansweredId,
+        subredditId,
+        authorId,
+        "Unanswered filter question",
+        "This question has no answer."
+      ),
+      env.DB.prepare(
+        `INSERT INTO questions (id, subreddit_id, author_id, title, body)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(
+        answeredId,
+        subredditId,
+        authorId,
+        "Answered filter question",
+        "This question has a non-accepted answer."
+      ),
+      env.DB.prepare(
+        `INSERT INTO questions (id, subreddit_id, author_id, title, body)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(
+        solvedId,
+        subredditId,
+        authorId,
+        "Solved filter question",
+        "This question has an accepted answer."
+      ),
+    ]);
+    const answeredAnswerId = `answer_answered_${crypto.randomUUID()}`;
+    const solvedAnswerId = `answer_solved_${crypto.randomUUID()}`;
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO answers (id, question_id, author_id, body)
+         VALUES (?, ?, ?, ?)`
+      ).bind(answeredAnswerId, answeredId, actorId, "A useful answer."),
+      env.DB.prepare(
+        `INSERT INTO answers (id, question_id, author_id, body, is_accepted)
+         VALUES (?, ?, ?, ?, 1)`
+      ).bind(solvedAnswerId, solvedId, actorId, "The accepted answer."),
+      env.DB.prepare(
+        `UPDATE questions SET answer_count = 1 WHERE id IN (?, ?)`
+      ).bind(answeredId, solvedId),
+      env.DB.prepare(
+        `UPDATE questions SET accepted_answer_id = ? WHERE id = ?`
+      ).bind(solvedAnswerId, solvedId),
+    ]);
+    const unanswered = { id: unansweredId };
+    const answered = { id: answeredId };
+    const solved = { id: solvedId };
+
+    await expect(
+      listQuestions({ filter: "unanswered" })
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: unanswered.id }),
+    ]));
+    await expect(
+      listQuestions({ filter: "unanswered" })
+    ).resolves.not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: answered.id }),
+      expect.objectContaining({ id: solved.id }),
+    ]));
+    await expect(
+      listQuestions({ filter: "answered" })
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: answered.id }),
+      expect.objectContaining({ id: solved.id }),
+    ]));
+    await expect(
+      listQuestions({ filter: "solved" })
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: solved.id }),
+    ]));
+    await expect(
+      listQuestions({ filter: "solved" })
+    ).resolves.not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: unanswered.id }),
+      expect.objectContaining({ id: answered.id }),
+    ]));
   });
 });

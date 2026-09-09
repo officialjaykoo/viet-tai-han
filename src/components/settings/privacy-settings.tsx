@@ -32,11 +32,19 @@ export type BlockedUser = {
   image: string | null;
   blockedAt: string;
 };
+export type MutedUser = {
+  id: string;
+  username: string | null;
+  name: string;
+  image: string | null;
+  mutedAt: string;
+};
 
 export function PrivacySettings({
   settings,
   initialConsent,
   initialBlocked,
+  initialMuted,
   onSettingsChange,
   onBlockedChange,
   flash,
@@ -44,6 +52,7 @@ export function PrivacySettings({
   settings: UserSettings;
   initialConsent: ConsentRecord | null;
   initialBlocked: BlockedUser[];
+  initialMuted: MutedUser[];
   onSettingsChange: SettingsChange;
   onBlockedChange: (blocked: BlockedUser[]) => void;
   flash: SettingsFeedback;
@@ -56,6 +65,7 @@ export function PrivacySettings({
     marketing: initialConsent?.marketing ?? false,
   });
   const [blocked, setBlocked] = useState(initialBlocked);
+  const [muted, setMuted] = useState(initialMuted);
   const [pending, startTransition] = useTransition();
 
   function savePreferences(
@@ -142,6 +152,32 @@ export function PrivacySettings({
         flash(
           null,
           settingsErrorMessage(cause, localizeError, t("settings.unblockFailed"))
+        );
+      }
+    });
+  }
+  function unmute(user: MutedUser) {
+    flash(null, null);
+    startTransition(async () => {
+      try {
+        const data = await settingsRequest<{ muteState?: string }>(
+          `/api/users/${encodeURIComponent(user.username ?? user.id)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "unmute" }),
+          },
+          t("settings.unmuteFailed")
+        );
+        if (data.muteState !== "none") {
+          throw new Error(t("settings.unmuteFailed"));
+        }
+        setMuted((current) => current.filter((candidate) => candidate.id !== user.id));
+        flash(t("settings.unmuted"), null);
+      } catch (cause) {
+        flash(
+          null,
+          settingsErrorMessage(cause, localizeError, t("settings.unmuteFailed"))
         );
       }
     });
@@ -259,6 +295,46 @@ export function PrivacySettings({
                   onClick={() => unblock(user)}
                 >
                   {t("settings.unblock")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SettingsCard>
+      <SettingsCard
+        title={t("settings.mutedAccounts")}
+        description={t("settings.mutedAccountsDesc")}
+      >
+        {muted.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("settings.noMuted")}</p>
+        ) : (
+          <ul className="space-y-2">
+            {muted.map((user) => (
+              <li
+                key={user.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2"
+              >
+                {user.username ? (
+                  <Link
+                    href={`/u/${encodeURIComponent(user.username)}`}
+                    className="flex min-w-0 items-center gap-2"
+                  >
+                    <UserAvatar username={user.username} image={user.image} size="sm" />
+                    <span className="truncate text-sm font-medium">@{user.username}</span>
+                  </Link>
+                ) : (
+                  <span className="truncate text-sm font-medium">
+                    {user.name || t("settings.unknownUser")}
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => unmute(user)}
+                >
+                  {t("settings.unmute")}
                 </Button>
               </li>
             ))}

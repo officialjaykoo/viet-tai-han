@@ -115,6 +115,11 @@ Integration tests should prove domain state transitions across D1 and server log
 Priority areas:
 
 - canonical post/comment/like writes
+- private post-save idempotency, visibility projection, and counter neutrality
+- user-mute discovery filtering, direct-read preservation, and ordinary-notification suppression
+- Popular UTC-window boundaries, rank ties, and cursor context binding
+- Q&A filter derivation from `answer_count` and `accepted_answer_id`
+- unified review-queue projection, dismissal/action transitions, and moderation audit
 - bilateral block guards
 - request-ID replay/conflict behavior
 - content moderation visibility
@@ -124,7 +129,6 @@ Priority areas:
 - friendship/follow/block transitions
 - DM request/message/read state
 - counter reconciliation
-
 Race-sensitive rules should be tested at the final write boundary where possible, not only as precheck unit tests.
 
 ## 8. Database integrity tests
@@ -141,6 +145,7 @@ post comment counter drift
 question answer counter drift
 subscriber counter drift
 comment parent/orphan integrity
+post_saves/user_mutes relation orphan integrity
 legacy reaction row counts/status
 important index/query-plan expectations
 ```
@@ -285,6 +290,30 @@ Alice asks
 
 Permission/race edge cases belong primarily in integration tests.
 
+### Saved posts, mute, Popular windows, and review queue
+
+```text
+Alice saves a visible post twice
+→ one private relation row
+→ like/comment counters and notifications unchanged
+→ `/saved` keeps the post through mute/block but excludes removed/shadow/community-removed content
+
+Alice mutes Bob
+→ Bob disappears from Home/Popular/Recommended/Community/Search/presence discovery
+→ Bob's direct profile/post remains readable
+→ ordinary actor notifications are suppressed
+→ unmute restores discovery
+
+Popular `day|week|month|all`
+→ uses the same UTC cutoff on every page
+→ cursor binds window, cutoff, rank, timestamp, and ID
+
+Admin opens Pending/All and source filters
+→ post/comment/listing/chat reports share one queue DTO
+→ dismiss changes report state only
+→ actioned removal changes target and writes `moderation_actions`
+```
+
 ### Marketplace
 
 At minimum:
@@ -368,15 +397,7 @@ Current browser configuration includes multiple desktop/mobile projects, while t
 
 It is acceptable to stabilize Chromium first.
 
-Do not require a full five-browser certification suite for every small change unless the product has reached a stage where that cost is justified.
-
-When hardening a critical E2E journey, use a repeated run such as:
-
-```bash
-npx playwright test --project=chromium-desktop --repeat-each=3
-```
-
-or an equivalent critical subset.
+For a small change, the Chromium critical subset or an equivalent critical subset is sufficient; a full five-browser certification suite is not required until product scale justifies it.
 
 Target:
 
@@ -400,10 +421,14 @@ After deployment, perform low-risk smoke checks on core public surfaces such as:
 
 - `/`
 - `/?feed=popular`
+- `/?feed=popular&window=week`
 - `/login`
 - `/questions`
+- `/questions?filter=unanswered`
+- `/saved` authenticated boundary
 - `/marketplace`
 - `/messages` access boundary
+- `/admin/reports` admin boundary
 
 Do not use production automation to bypass normal authentication or mutate real user data merely to satisfy a smoke checklist.
 

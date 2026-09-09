@@ -1,4 +1,4 @@
-import type { FeedMode, FeedSort } from "@/lib/db";
+import type { FeedMode, FeedSort, PopularWindow } from "@/lib/db";
 import {
   base64UrlToBytes,
   bytesToBase64Url,
@@ -23,6 +23,8 @@ export type FeedCursorContext = {
   authorId: string | null;
   viewerId: string | null;
   scope?: "posts" | "comments";
+  popularWindow?: PopularWindow | null;
+  windowStart?: string | null;
 };
 
 type SealedPayload = FeedCursorPosition &
@@ -84,6 +86,15 @@ function decodePayload(raw: string): SealedPayload | null {
       authorId: parsed.authorId ?? null,
       viewerId: parsed.viewerId ?? null,
       scope: parsed.scope === "comments" ? "comments" : "posts",
+      popularWindow:
+        parsed.popularWindow === "day" ||
+        parsed.popularWindow === "week" ||
+        parsed.popularWindow === "month" ||
+        parsed.popularWindow === "all"
+          ? parsed.popularWindow
+          : null,
+      windowStart:
+        typeof parsed.windowStart === "string" ? parsed.windowStart : null,
       iat: parsed.iat,
       exp: parsed.exp,
     };
@@ -115,6 +126,8 @@ export async function signFeedCursorWithSecret(
     authorId: context.authorId,
     viewerId: context.viewerId,
     scope: context.scope ?? "posts",
+    popularWindow: context.popularWindow ?? null,
+    windowStart: context.windowStart ?? null,
     iat: now,
     exp: now + ttlMs,
   };
@@ -162,7 +175,10 @@ export async function openFeedCursorWithSecret(
     !sameNullable(payload.authorId, expect.authorId) ||
     !sameNullable(payload.viewerId, expect.viewerId) ||
     payload.scope !== (expect.scope ?? "posts") ||
-    (expect.sort === "popular" && payload.rank === undefined)
+    (expect.sort === "popular" &&
+      (payload.rank === undefined ||
+        payload.popularWindow !== (expect.popularWindow ?? null) ||
+        payload.windowStart !== (expect.windowStart ?? null)))
   ) {
     throw new InvalidFeedCursorError("Cursor context mismatch");
   }

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceExpensiveIpRateLimit } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/security/challenge";
 import { searchAll, searchCommunitiesQuery } from "@/lib/search";
-import { AuthError, jsonAuthError } from "@/lib/session";
+import { AuthError, getSession, jsonAuthError } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
 
 export async function GET(request: NextRequest) {
@@ -20,11 +20,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ communities });
     }
 
+    const session = await getSession();
     const results = await searchAll(
       q,
       suggest
         ? { communities: 4, accounts: 4, posts: 5, questions: 5, listings: 5 }
-        : undefined
+        : undefined,
+      session?.user?.id ?? null
     );
     return NextResponse.json(results);
   } catch (error) {

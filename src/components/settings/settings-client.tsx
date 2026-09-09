@@ -16,6 +16,7 @@ import { NotificationSettings } from "@/components/settings/notification-setting
 import {
   PrivacySettings,
   type BlockedUser,
+  type MutedUser,
 } from "@/components/settings/privacy-settings";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import type { PushConfigState } from "@/lib/push";
@@ -65,6 +66,7 @@ const SECTIONS: { id: Section; labelKey: MessageKey; icon: ReactNode }[] = [
 export function SettingsClient({
   initialSettings,
   initialBlocked,
+  initialMuted,
   initialSection = "profile",
   initialPush,
   initialIdentityError,
@@ -74,6 +76,7 @@ export function SettingsClient({
 }: {
   initialSettings: UserSettings;
   initialBlocked: BlockedUser[];
+  initialMuted: MutedUser[];
   initialSection?: Section;
   initialPush: {
     available: boolean;
@@ -201,6 +204,7 @@ export function SettingsClient({
             settings={settings}
             initialConsent={initialConsent}
             initialBlocked={blocked}
+            initialMuted={initialMuted}
             onSettingsChange={setSettings}
             onBlockedChange={setBlocked}
             flash={flash}

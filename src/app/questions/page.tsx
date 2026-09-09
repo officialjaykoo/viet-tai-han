@@ -9,18 +9,26 @@ import { buttonVariants } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
-import { listQuestions } from "@/lib/qna";
+import { listQuestions, parseQuestionFilter, type QuestionFilter } from "@/lib/qna";
 import { getSession } from "@/lib/session";
 import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
-export default async function QuestionsPage() {
+export default async function QuestionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const params = await searchParams;
+  const filter: QuestionFilter =
+    parseQuestionFilter(params.filter) ?? "newest";
   const session = await getSession();
   await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const questions = await listQuestions({
     limit: 50,
+    filter,
     viewerUserId: session?.user?.id ?? null,
   });
 
@@ -42,6 +50,33 @@ export default async function QuestionsPage() {
           />
 
           <section className="space-y-3" aria-labelledby="question-list-title">
+            <div
+              className="flex flex-wrap gap-2"
+              role="tablist"
+              aria-label={tLocale(locale, "questions.filterLabel")}
+            >
+              {(
+                [
+                  ["newest", "filterNewest"],
+                  ["unanswered", "filterUnanswered"],
+                  ["answered", "filterAnswered"],
+                  ["solved", "filterSolved"],
+                ] as const
+              ).map(([id, labelKey]) => (
+                <Link
+                  key={id}
+                  href={id === "newest" ? "/questions" : `/questions?filter=${id}`}
+                  role="tab"
+                  aria-selected={filter === id}
+                  className={buttonVariants({
+                    size: "sm",
+                    variant: filter === id ? "default" : "outline",
+                  })}
+                >
+                  {tLocale(locale, `questions.${labelKey}`)}
+                </Link>
+              ))}
+            </div>
             <h2 id="question-list-title" className="font-heading text-xl font-semibold">
               {tLocale(locale, "questions.latest")}
             </h2>

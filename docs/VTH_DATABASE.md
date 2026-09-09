@@ -17,9 +17,9 @@ This document records the Bug12 D1 audit and the Bug11 canonical runtime contrac
 | --- | --- | --- |
 | Identity | `user`, `session`, `account`, `verification`, `passkey`, `username_history` | Better Auth sessions/provider identities, passkeys, and username history. |
 | Community | `subreddits`, `subscriptions`, `subreddit_moderators` | Community ownership, membership, and moderation. |
-| Public content | `posts`, `comments`, `post_likes`, `comment_likes`, `hidden_posts` | One post/comment graph and one positive-like model. |
-| Q&A | `questions`, `answers` | Community questions, answers, and accepted-answer state. |
-| Social policy | `user_blocks`, `user_follows`, `user_friendships`, `user_presence` | Bilateral blocks, follows, friends, and presence. |
+| Public content | `posts`, `comments`, `post_likes`, `comment_likes`, `hidden_posts`, `post_saves` | One post/comment graph, positive-like model, hidden projection, and private saved-post relation. |
+| Q&A | `questions`, `answers` | Community questions, answers, accepted-answer state, and canonical filter fields. |
+| Social policy | `user_blocks`, `user_follows`, `user_friendships`, `user_mutes`, `user_presence` | Bilateral blocks, follows, friends, private mutes, and presence. |
 | Messaging | `chat_rooms`, `chat_room_members`, `chat_requests`, `chat_messages`, `chat_message_reports`, `chat_room_reports`, `unread_fanout` | D1 canonical message/request history and read state; realtime is delivery only. Bug10 files remain frozen. |
 | Notifications | `notifications`, `push_subscriptions` | Notification rows, push subscriptions, and delivery state. |
 | Moderation | `moderation_actions`, `user_warnings`, `banned_words`, `reports` | Auditable user/content moderation. |
@@ -57,10 +57,11 @@ AND s.is_removed = 0
 
 - Home uses subscribed-community recency.
 - Community and profile feeds use recency.
-- Popular uses `like_count + comment_count * 3`, then `(created_at, id)` descending.
+- Popular uses `like_count + (comment_count * 3)`, then `(created_at, id)` descending.
+- Popular `window=day|week|month|all` uses UTC calendar cutoffs; the cutoff and window are signed into the cursor. Default is `all` while production volume is low.
 - Recommended remains personalized D1 ranking and reuses the canonical post projection.
-- Popular cursors carry rank and deterministic tie-break fields and are bound to the complete feed context.
 - A block is not a public-visibility predicate. Direct public reads remain possible; new likes, comments, replies, Q&A answers, accept actions, and guarded notifications are denied bilaterally. Unlike and accepted-answer cleanup remain allowed.
+- Saves are private viewer state. Mute is private discovery/attention state: it filters discovery and ordinary actor notifications without deleting saves, follows, friendships, blocks, or DM relations.
 
 ## Counter invariants
 
@@ -123,6 +124,13 @@ The reusable audit reports all five counter drifts and fails in `--strict` mode 
 | `0041_media_ownership_registry` | R2 ownership metadata | `CANONICAL`. |
 | `0042_public_content_indexes` | Public feed/comment indexes | `CANONICAL`; indexes use canonical counters and visibility flags. |
 | `0043_remove_legacy_feed_indexes` | Redundant pre-canonical feed/tree indexes | `REMOVED` via forward-only `DROP INDEX IF EXISTS`; no runtime or migration dependency. |
+| `0044_personal_content_controls` | Private post saves and user mutes | `CANONICAL`; composite primary keys enforce idempotency, foreign keys cascade user-owned state, and viewer discovery/notification filters use these relations. |
+
+## Personal content controls
+
+`post_saves` has primary key `(user_id, post_id)`, foreign keys to `user`/`posts` with `ON DELETE CASCADE`, and `idx_post_saves_user_created` for the private `/saved` list. It stores no public save count or saver list.
+
+`user_mutes` has primary key `(muter_id, muted_id)`, foreign keys to `user` with `ON DELETE CASCADE`, and a self-mute check. `idx_user_mutes_muter_created` supports settings/discovery queries and `idx_user_mutes_muted` supports dependent lookups. Mute is not a block, permission, or content-removal state.
 
 ## Object classification and cleanup evidence
 

@@ -16,6 +16,7 @@ import {
   reviewChatRoomReport,
 } from "@/lib/dm-moderation";
 import { reviewListingReport } from "@/lib/marketplace";
+import { reviewContentReport } from "@/lib/review-queue";
 import {
   setSiteSetting,
   setSiteSettings,
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       reportId?: string;
       reportStatus?: "reviewed" | "dismissed";
       removeListing?: boolean;
+      removeTarget?: boolean;
       removeMessage?: boolean;
       resolutionNote?: string;
       verificationId?: string;
@@ -161,6 +163,22 @@ export async function POST(request: NextRequest) {
         const { removeBannedWord } = await import("@/lib/admin");
         await removeBannedWord(body.wordId);
         return NextResponse.json({ ok: true });
+      }
+      case "review_content_report": {
+        if (
+          !body.reportId ||
+          !body.reportStatus ||
+          !["reviewed", "dismissed"].includes(body.reportStatus)
+        ) {
+          return await jsonLocalizedError("Missing content report fields", 400);
+        }
+        const result = await reviewContentReport({
+          reportId: body.reportId,
+          reviewerId: actor.id,
+          status: body.reportStatus,
+          removeTarget: body.removeTarget,
+        });
+        return NextResponse.json(result);
       }
       case "review_listing_report": {
         if (

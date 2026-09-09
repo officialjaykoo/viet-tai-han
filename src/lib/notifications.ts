@@ -26,6 +26,11 @@ const BLOCK_GUARDED_NOTIFICATION_KINDS: ReadonlySet<NotificationKind> = new Set(
   "chat_request",
   "chat_accepted",
 ]);
+const MUTE_GUARDED_NOTIFICATION_KINDS: ReadonlySet<NotificationKind> = new Set([
+  "comment_on_post",
+  "reply_to_comment",
+  "mention",
+]);
 export async function canNotifyChat(
   userId: string,
   actorId?: string | null
@@ -125,6 +130,10 @@ export async function createNotification(input: {
   );
   const requestGuarded =
     input.kind === "friend_request" || input.kind === "chat_request";
+  const muteGuarded = Boolean(
+    input.actorId &&
+      MUTE_GUARDED_NOTIFICATION_KINDS.has(input.kind)
+  );
   const [notificationInsert] = await db.batch([
     db
       .prepare(
@@ -167,6 +176,13 @@ export async function createNotification(input: {
                )
              )
            )
+           AND (
+             ? = 0
+             OR NOT EXISTS (
+               SELECT 1 FROM user_mutes
+               WHERE muter_id = ? AND muted_id = ?
+             )
+           )
          )`
       )
       .bind(
@@ -193,7 +209,10 @@ export async function createNotification(input: {
         input.kind,
         input.sourceRequestId ?? null,
         input.actorId ?? null,
-        input.userId
+        input.userId,
+        muteGuarded ? 1 : 0,
+        input.userId,
+        input.actorId ?? null
       ),
     db
       .prepare(

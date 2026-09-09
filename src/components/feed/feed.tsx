@@ -9,7 +9,7 @@ import { PostCard } from "@/components/feed/post-card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiFetch } from "@/lib/api-client";
-import type { FeedMode, FeedSort } from "@/lib/db";
+import type { FeedMode, FeedSort, PopularWindow } from "@/lib/db";
 import type { FeedItem, PaginatedFeed } from "@/lib/types";
 
 interface FeedProps {
@@ -17,6 +17,7 @@ interface FeedProps {
   subreddit?: string;
   sort?: FeedSort;
   mode?: FeedMode;
+  window?: PopularWindow;
 }
 
 function discoveryForMode(
@@ -32,6 +33,7 @@ export function Feed({
   subreddit,
   sort = "new",
   mode = "popular",
+  window = "all",
 }: FeedProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<FeedItem[]>(initialFeed.posts);
@@ -64,8 +66,9 @@ export function Feed({
         limit: "20",
         sort,
         feed: mode,
+        window,
+        ...(subreddit ? { subreddit } : {}),
       });
-      if (subreddit) params.set("subreddit", subreddit);
       const response = await apiFetch(`/api/posts?${params.toString()}`);
 
       if (!response.ok) {
@@ -85,7 +88,7 @@ export function Feed({
     } finally {
       setLoading(false);
     }
-  }, [cursor, hasMore, loading, subreddit, sort, mode, t]);
+  }, [cursor, hasMore, loading, subreddit, sort, mode, window, t]);
 
   if (items.length === 0) {
     return (

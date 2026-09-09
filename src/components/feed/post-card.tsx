@@ -239,6 +239,7 @@ export function PostCard({
                 <PostOverflowMenu
                   postId={post.id}
                   authorUsername={post.author.username}
+                  saved={post.saved}
                   onDismiss={() => setDismissed(true)}
                 />
               </div>
