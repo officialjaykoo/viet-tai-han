@@ -30,7 +30,7 @@ This document records the Bug12 D1 audit and the Bug11 canonical runtime contrac
 | Security and configuration | `security_rate_events`, `rate_limits`, `api_keys`, `site_settings` | Rate controls, API credentials, and operator settings. |
 | Achievements | `achievements`, `user_achievements` | Achievement catalog and user progress. |
 
-`d1_migrations` is Wrangler metadata. `_cf_METADATA` and `sqlite_sequence` are runtime-managed SQLite metadata and are excluded from application object classification.
+`d1_migrations` is Wrangler metadata. `_cf_*` and `sqlite_sequence` are runtime-managed SQLite metadata and are excluded from application object classification.
 
 ## Complete schema inventory
 
