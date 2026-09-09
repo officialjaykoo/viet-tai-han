@@ -53,6 +53,28 @@ describe("chat message client state", () => {
     expect(afterHttp[0]?.id).toBe("server-1");
   });
 
+  it("keeps a newer live message when catch-up arrives late", () => {
+    const live = message({
+      id: "server-4",
+      clientMessageId: null,
+      createdAt: "2026-08-14T12:04:00.000Z",
+      isMine: false,
+    });
+    const catchUp = [
+      message({
+        id: "server-2",
+        clientMessageId: null,
+        createdAt: "2026-08-14T12:02:00.000Z",
+        isMine: false,
+      }),
+      live,
+    ];
+
+    const merged = mergeMessages([live], catchUp);
+
+    expect(merged.map((item) => item.id)).toEqual(["server-2", "server-4"]);
+  });
+
   it("keeps a failed bubble and retries with the same client ID", () => {
     const optimistic = message({ id: "local:client-1" });
     const failed = updateLocalDeliveryState(

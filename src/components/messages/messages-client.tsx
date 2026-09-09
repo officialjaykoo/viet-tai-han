@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
-import { announceUnreadChanged } from "@/components/notifications/use-unread-count";
+import {
+  announceUnreadChanged,
+  subscribeUnreadChanged,
+} from "@/components/notifications/use-unread-count";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -25,6 +28,7 @@ import {
   updateLocalDeliveryState,
   type LocalChatMessage,
 } from "@/lib/chat-message-state";
+import { retryOnceAfterTransportError } from "@/lib/chat-send-recovery";
 import { cn } from "@/lib/utils";
 
 type Room = {
@@ -166,6 +170,16 @@ const CHAT_REPORT_REASONS: ChatReportReason[] = [
   "nsfw",
   "other",
 ];
+type CanonicalReconciliationReason =
+  | "reconnect"
+  | "catch_up"
+  | "visibility_restore"
+  | "network_restore"
+  | "revoked"
+  | "transport_uncertain"
+  | "duplicate_or_ordering_uncertainty"
+  | "multi_tab";
+
 
 export function MessagesClient() {
   const router = useRouter();
@@ -213,6 +227,16 @@ export function MessagesClient() {
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [composeSending, setComposeSending] = useState(false);
   const shouldStickToBottomRef = useRef(true);
+  const inboxLoadInFlightRef = useRef<Promise<boolean> | null>(null);
+  const inboxRefreshQueuedRef = useRef(false);
+  const inboxRefreshNotifyQueuedRef = useRef(false);
+  const canonicalReconciliationTimerRef = useRef<number | null>(null);
+  const canonicalReconciliationReasonsRef = useRef(
+    new Set<CanonicalReconciliationReason>()
+  );
+  const loadInboxRef = useRef<
+    ((notifyCanonical?: boolean) => Promise<boolean>) | null
+  >(null);
 
   useEffect(() => {
     // URL query changes intentionally seed the compose field.
@@ -255,6 +279,15 @@ export function MessagesClient() {
     },
     []
   );
+  const replaceCanonicalRoomMessages = useCallback(
+    (roomId: string, messageIds: readonly string[]) => {
+      seenRoomMessageIdsRef.current.set(
+        roomId,
+        rememberCanonicalMessageIds(new Set(), messageIds)
+      );
+    },
+    []
+  );
 
   const reconcileRoomLatest = useCallback(
     (roomId: string, message: ChatMessage) => {
@@ -270,17 +303,16 @@ export function MessagesClient() {
     },
     [rememberRoomLatestMessage]
   );
-
-  const loadInbox = useCallback(() => {
-    startTransition(async () => {
+  const refreshInbox = useCallback(async (): Promise<boolean> => {
+    try {
       const res = await apiFetch("/api/messages");
       if (res.status === 401) {
         router.push("/login?next=/messages");
-        return;
+        return false;
       }
       if (!res.ok) {
         setError(localizeError("Couldn't load messages"));
-        return;
+        return false;
       }
       const data = (await res.json()) as {
         rooms: Room[];
@@ -289,7 +321,7 @@ export function MessagesClient() {
       };
       for (const room of data.rooms) {
         if (room.lastMessageId) {
-          rememberCanonicalRoomMessages(room.id, [room.lastMessageId]);
+          replaceCanonicalRoomMessages(room.id, [room.lastMessageId]);
         }
       }
       let nextRooms = data.rooms;
@@ -301,8 +333,77 @@ export function MessagesClient() {
       setRequests(data.requests);
       setOutgoingRequests(data.outgoingRequests ?? []);
       setLoaded(true);
-    });
-  }, [localizeError, rememberCanonicalRoomMessages, router]);
+      return true;
+    } catch {
+      setError(localizeError("Couldn't load messages"));
+      return false;
+    }
+  }, [localizeError, replaceCanonicalRoomMessages, router]);
+
+  const loadInbox = useCallback(
+    (notifyCanonical = false): Promise<boolean> => {
+      const inFlight = inboxLoadInFlightRef.current;
+      if (inFlight) {
+        inboxRefreshQueuedRef.current = true;
+        inboxRefreshNotifyQueuedRef.current ||= notifyCanonical;
+        return inFlight;
+      }
+
+      const request = refreshInbox();
+      inboxLoadInFlightRef.current = request;
+      startTransition(() => {
+        void request;
+      });
+      void request
+        .then((reconciled) => {
+          if (notifyCanonical && reconciled) {
+            announceUnreadChanged({ reconcile: true });
+          }
+        })
+        .finally(() => {
+          if (inboxLoadInFlightRef.current !== request) return;
+          inboxLoadInFlightRef.current = null;
+          if (!inboxRefreshQueuedRef.current) return;
+          inboxRefreshQueuedRef.current = false;
+          const shouldNotify = inboxRefreshNotifyQueuedRef.current;
+          inboxRefreshNotifyQueuedRef.current = false;
+          void loadInboxRef.current?.(shouldNotify);
+        });
+      return request;
+    },
+    [refreshInbox]
+  );
+  useEffect(() => {
+    loadInboxRef.current = loadInbox;
+    return () => {
+      if (loadInboxRef.current === loadInbox) {
+        loadInboxRef.current = null;
+      }
+    };
+  }, [loadInbox]);
+  const scheduleCanonicalReconciliation = useCallback(
+    (reason: CanonicalReconciliationReason) => {
+      canonicalReconciliationReasonsRef.current.add(reason);
+      if (canonicalReconciliationTimerRef.current !== null) return;
+      canonicalReconciliationTimerRef.current = window.setTimeout(() => {
+        canonicalReconciliationTimerRef.current = null;
+        const reasons = Array.from(
+          canonicalReconciliationReasonsRef.current
+        );
+        canonicalReconciliationReasonsRef.current.clear();
+        console.info(
+          JSON.stringify({
+            level: "info",
+            msg: "dm_canonical_reconcile",
+            reasons,
+          })
+        );
+        void loadInbox(true);
+      }, 250);
+    },
+    [loadInbox]
+  );
+
 
   const applyRoomMessage = useCallback(
     (roomId: string, message: ChatMessage) => {
@@ -317,6 +418,11 @@ export function MessagesClient() {
         seenMessageIds
       );
       seenRoomMessageIdsRef.current.set(roomId, result.seenMessageIds);
+      if (result.needsCanonicalReconciliation) {
+        scheduleCanonicalReconciliation(
+          "duplicate_or_ordering_uncertainty"
+        );
+      }
       if (result.rooms === roomsRef.current && result.unreadDelta === 0) {
         return;
       }
@@ -326,7 +432,7 @@ export function MessagesClient() {
         announceUnreadChanged({ messageDelta: result.unreadDelta });
       }
     },
-    [rememberRoomLatestMessage]
+    [rememberRoomLatestMessage, scheduleCanonicalReconciliation]
   );
 
   const catchUpRoom = useCallback(
@@ -347,6 +453,7 @@ export function MessagesClient() {
           );
           if (!res.ok) return;
           const page = (await res.json()) as ChatHistoryPage;
+          if (activeRoomRef.current !== roomId) return;
           if (page.messages.length === 0) return;
           setMessages((current) => mergeMessages(current, page.messages));
           for (const message of page.messages) {
@@ -361,9 +468,12 @@ export function MessagesClient() {
         // D1 catch-up is retried by the next reconnect/ready cycle.
       } finally {
         catchUpInFlightRef.current = false;
+        if (activeRoomRef.current === roomId) {
+          scheduleCanonicalReconciliation("catch_up");
+        }
       }
     },
-    [applyRoomMessage]
+    [applyRoomMessage, scheduleCanonicalReconciliation]
   );
   const loadOlderMessages = useCallback(async () => {
     const roomId = activeRoomRef.current;
@@ -417,7 +527,7 @@ export function MessagesClient() {
         }
         const page = (await res.json()) as ChatHistoryPage;
         if (activeRoomRef.current !== roomId) return;
-        rememberCanonicalRoomMessages(
+        replaceCanonicalRoomMessages(
           roomId,
           page.messages.map((message) => message.id)
         );
@@ -438,13 +548,41 @@ export function MessagesClient() {
         }
       }
     },
-    [catchUpRoom, localizeError, reconcileRoomLatest, rememberCanonicalRoomMessages]
+    [
+      catchUpRoom,
+      localizeError,
+      reconcileRoomLatest,
+      replaceCanonicalRoomMessages,
+    ]
   );
 
 
   useEffect(() => {
     loadInbox();
   }, [loadInbox]);
+  useEffect(() => {
+    const unsubscribe = subscribeUnreadChanged((change, source) => {
+      if (
+        source !== "remote" ||
+        (!change.reconcile && typeof change.messageDelta !== "number")
+      ) {
+        return;
+      }
+      scheduleCanonicalReconciliation("multi_tab");
+    });
+    return unsubscribe;
+  }, [scheduleCanonicalReconciliation]);
+
+  useEffect(
+    () => () => {
+      if (canonicalReconciliationTimerRef.current !== null) {
+        window.clearTimeout(canonicalReconciliationTimerRef.current);
+        canonicalReconciliationTimerRef.current = null;
+      }
+      canonicalReconciliationReasonsRef.current.clear();
+    },
+    []
+  );
 
   useEffect(() => {
     activeRoomRef.current = selectedRoom;
@@ -507,8 +645,7 @@ export function MessagesClient() {
           roomsRef.current = reconciliation.rooms;
           setRooms(reconciliation.rooms);
         }
-        void loadInbox();
-        announceUnreadChanged({ reconcile: true });
+        void loadInbox(true);
       } catch {
         // The next explicit read or inbox refresh reconciles the boundary.
       }
@@ -557,13 +694,19 @@ export function MessagesClient() {
       ) {
         return;
       }
+      scheduleCanonicalReconciliation("visibility_restore");
       const lastMessage = messages[messages.length - 1];
       scheduleChatRead(selectedRoom, lastMessage.id);
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibility);
-  }, [messages, scheduleChatRead, selectedRoom]);
+  }, [
+    messages,
+    scheduleCanonicalReconciliation,
+    scheduleChatRead,
+    selectedRoom,
+  ]);
 
 
   useEffect(() => {
@@ -608,6 +751,7 @@ export function MessagesClient() {
       try {
         socket = new WebSocket(endpoint);
       } catch {
+        scheduleCanonicalReconciliation("transport_uncertain");
         scheduleReconnect();
         return;
       }
@@ -628,7 +772,7 @@ export function MessagesClient() {
         if (live.type === "revoked") {
           revoked = true;
           socketReadyRoomRef.current = null;
-          void loadInbox();
+          void loadInbox(true);
           announceUnreadChanged({ reconcile: true });
           router.push("/messages");
           socket?.close(4003, live.reason);
@@ -637,6 +781,7 @@ export function MessagesClient() {
         if (live.type === "ready") {
           socketReadyRoomRef.current = selectedRoom;
           reconnectAttempt = 0;
+          scheduleCanonicalReconciliation("reconnect");
           void catchUpRoom(selectedRoom);
           return;
         }
@@ -645,6 +790,9 @@ export function MessagesClient() {
         applyRoomMessage(live.roomId, live.message);
       };
       socket.onerror = () => {
+        if (canConnect()) {
+          scheduleCanonicalReconciliation("transport_uncertain");
+        }
         socket?.close();
       };
       socket.onclose = () => {
@@ -652,7 +800,12 @@ export function MessagesClient() {
         if (socketReadyRoomRef.current === selectedRoom) {
           socketReadyRoomRef.current = null;
         }
-        if (!revoked) scheduleReconnect();
+        if (!revoked) {
+          if (canConnect()) {
+            scheduleCanonicalReconciliation("transport_uncertain");
+          }
+          scheduleReconnect();
+        }
       };
     };
 
@@ -665,7 +818,12 @@ export function MessagesClient() {
       reconnectAttempt = 0;
       connect();
     };
-    const handleOnline = () => reconnectNow();
+    const handleOnline = () => {
+      if (canConnect()) {
+        scheduleCanonicalReconciliation("network_restore");
+      }
+      reconnectNow();
+    };
     const handleOffline = () => {
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);
@@ -675,6 +833,7 @@ export function MessagesClient() {
     };
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
+        scheduleCanonicalReconciliation("visibility_restore");
         reconnectNow();
       } else {
         handleOffline();
@@ -696,7 +855,14 @@ export function MessagesClient() {
       }
       socket?.close(1000, "room changed");
     };
-  }, [selectedRoom, catchUpRoom, applyRoomMessage, loadInbox, router]);
+  }, [
+    selectedRoom,
+    catchUpRoom,
+    applyRoomMessage,
+    loadInbox,
+    router,
+    scheduleCanonicalReconciliation,
+  ]);
   function startConversation(e: React.FormEvent) {
     e.preventDefault();
     const toUsername = composeUser.trim();
@@ -709,26 +875,52 @@ export function MessagesClient() {
     setComposeSending(true);
     startTransition(async () => {
       try {
-        const res = await apiFetch("/api/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            toUsername,
-            body: openerBody,
-            clientMessageId,
-          }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as {
+        const { value, retried } =
+          await retryOnceAfterTransportError(async () => {
+            const response = await apiFetch("/api/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                toUsername,
+                body: openerBody,
+                clientMessageId,
+              }),
+            });
+            if (!response.ok) {
+              return {
+                response,
+                result: null as {
+                  conversationType?: "direct" | "request";
+                  roomId?: string;
+                } | null,
+              };
+            }
+            return {
+              response,
+              result: (await response.json()) as {
+                conversationType?: "direct" | "request";
+                roomId?: string;
+              },
+            };
+          });
+        if (retried) {
+          console.info(
+            JSON.stringify({
+              level: "info",
+              msg: "dm_transport_uncertain",
+              clientMessageId,
+              recovered: true,
+            })
+          );
+        }
+        if (!value.response.ok || !value.result) {
+          const payload = (await value.response.json().catch(() => null)) as {
             error?: string;
           } | null;
           setError(localizeError(payload?.error, "Couldn't send message"));
           return;
         }
-        const result = (await res.json()) as {
-          conversationType?: "direct" | "request";
-          roomId?: string;
-        };
+        const result = value.result;
         const draftIsCurrent =
           composeClientMessageIdRef.current === clientMessageId &&
           composeDraftFingerprintRef.current === draftFingerprint;
@@ -748,6 +940,7 @@ export function MessagesClient() {
         }
         loadInbox();
       } catch {
+        scheduleCanonicalReconciliation("transport_uncertain");
         setError(t("common.networkError"));
       } finally {
         setComposeSending(false);
@@ -807,40 +1000,77 @@ export function MessagesClient() {
 
   const sendReplyRequest = useCallback(
     async (roomId: string, body: string, clientMessageId: string) => {
-      try {
-        const res = await apiFetch(`/api/messages/${roomId}`, {
+      const attempt = async () => {
+        const response = await apiFetch(`/api/messages/${roomId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ body, clientMessageId }),
         });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as {
+        if (!response.ok) {
+          return { response, message: null as ChatMessage | null };
+        }
+        return {
+          response,
+          message: (await response.json()) as ChatMessage,
+        };
+      };
+
+      try {
+        const { value, retried } =
+          await retryOnceAfterTransportError(attempt);
+        if (retried) {
+          console.info(
+            JSON.stringify({
+              level: "info",
+              msg: "dm_transport_uncertain",
+              roomId,
+              clientMessageId,
+              recovered: true,
+            })
+          );
+        }
+        if (!value.response.ok || !value.message) {
+          const payload = (await value.response.json().catch(() => null)) as {
             error?: string;
           } | null;
+          if (activeRoomRef.current === roomId) {
+            setMessages((current) =>
+              updateLocalDeliveryState(current, clientMessageId, "failed")
+            );
+            setError(localizeError(payload?.error, t("messages.sendFailed")));
+          }
+          return;
+        }
+        const message = value.message;
+        if (activeRoomRef.current === roomId) {
+          setMessages((current) =>
+            mergeMessages(current, [
+              { ...message, localDeliveryState: "sent" },
+            ])
+          );
+          setError(null);
+        }
+        applyRoomMessage(roomId, message);
+      } catch {
+        scheduleCanonicalReconciliation("transport_uncertain");
+        if (activeRoomRef.current === roomId) {
           setMessages((current) =>
             updateLocalDeliveryState(current, clientMessageId, "failed")
           );
-          setError(localizeError(payload?.error, t("messages.sendFailed")));
-          return;
+          void loadRoom(roomId);
+          setError(t("messages.sendFailed"));
         }
-        const message = (await res.json()) as ChatMessage;
-        setMessages((current) =>
-          mergeMessages(current, [
-            { ...message, localDeliveryState: "sent" },
-          ])
-        );
-        applyRoomMessage(roomId, message);
-        setError(null);
-      } catch {
-        setMessages((current) =>
-          updateLocalDeliveryState(current, clientMessageId, "failed")
-        );
-        setError(t("messages.sendFailed"));
       } finally {
         sendingClientMessageIdsRef.current.delete(clientMessageId);
       }
     },
-    [applyRoomMessage, localizeError, t]
+    [
+      applyRoomMessage,
+      loadRoom,
+      localizeError,
+      scheduleCanonicalReconciliation,
+      t,
+    ]
   );
 
   const retryMessage = useCallback(

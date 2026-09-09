@@ -109,6 +109,7 @@ export function applyIncomingRoomMessage<T extends ChatRoomState>(
   rooms: T[];
   unreadDelta: number;
   duplicate: boolean;
+  needsCanonicalReconciliation: boolean;
   seenMessageIds: Set<string>;
 } {
   const index = rooms.findIndex((room) => room.id === roomId);
@@ -117,6 +118,7 @@ export function applyIncomingRoomMessage<T extends ChatRoomState>(
       rooms,
       unreadDelta: 0,
       duplicate: true,
+      needsCanonicalReconciliation: false,
       seenMessageIds: new Set(seenMessageIds),
     };
   }
@@ -129,6 +131,10 @@ export function applyIncomingRoomMessage<T extends ChatRoomState>(
   const sameMessage = room.lastMessageId === message.id;
   const updatePreview =
     sameMessage || isAtOrAfterRoomLatest(room, message);
+  const needsCanonicalReconciliation =
+    (!duplicate &&
+      seenMessageIds.size >= CHAT_ROOM_SEEN_MESSAGE_LIMIT) ||
+    (!duplicate && !updatePreview);
   const unreadDelta =
     !duplicate && !message.isMine && !isNearBottom ? 1 : 0;
   const nextRoom = {
@@ -152,6 +158,7 @@ export function applyIncomingRoomMessage<T extends ChatRoomState>(
       rooms,
       unreadDelta: 0,
       duplicate,
+      needsCanonicalReconciliation,
       seenMessageIds: nextSeenMessageIds,
     };
   }
@@ -163,6 +170,7 @@ export function applyIncomingRoomMessage<T extends ChatRoomState>(
     rooms: nextRooms,
     unreadDelta,
     duplicate,
+    needsCanonicalReconciliation,
     seenMessageIds: nextSeenMessageIds,
   };
 }

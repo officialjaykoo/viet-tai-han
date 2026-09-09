@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyIncomingRoomMessage,
+  CHAT_ROOM_SEEN_MESSAGE_LIMIT,
   reconcileChatRoomRead,
   reconcileRoomLatestMessage,
+  rememberCanonicalMessageIds,
   type ChatRoomState,
 } from "@/lib/chat-room-state";
 
@@ -159,5 +161,46 @@ describe("chat room state", () => {
     });
     expect(duplicate.unreadDelta).toBe(0);
     expect(duplicate.rooms[0]?.unreadCount).toBe(2);
+  });
+  it("marks bounded-cache misses for canonical unread reconciliation", () => {
+    const seen = rememberCanonicalMessageIds(
+      new Set<string>(),
+      Array.from(
+        { length: CHAT_ROOM_SEEN_MESSAGE_LIMIT },
+        (_, index) => `message-${index}`
+      )
+    );
+    const result = applyIncomingRoomMessage(
+      [room({ unreadCount: 0 })],
+      "room-1",
+      incoming({
+        id: "delayed-duplicate",
+        createdAt: "2026-08-14 11:58:00.000",
+      }),
+      false,
+      seen
+    );
+
+    expect(result.duplicate).toBe(false);
+    expect(result.unreadDelta).toBe(1);
+    expect(result.needsCanonicalReconciliation).toBe(true);
+  });
+
+  it("does not reconcile duplicates still inside the fast cache", () => {
+    const seen = rememberCanonicalMessageIds(
+      new Set<string>(),
+      ["message-4"]
+    );
+    const result = applyIncomingRoomMessage(
+      [room({ unreadCount: 0 })],
+      "room-1",
+      incoming({ id: "message-4" }),
+      false,
+      seen
+    );
+
+    expect(result.duplicate).toBe(true);
+    expect(result.unreadDelta).toBe(0);
+    expect(result.needsCanonicalReconciliation).toBe(false);
   });
 });

@@ -67,6 +67,24 @@ A block removes or overrides applicable contact relationships and prevents new s
 - Canonical message ordering and read boundaries use `(created_at, id)`.
 - `clientMessageId` and request identifiers make retries safe without duplicate canonical messages or notification side effects.
 
+
+### DM convergence and transport recovery
+
+The DM client keeps the Bug8 authority boundary: D1 is canonical, HTTP performs mutations, ChatRoom delivers committed realtime events, and React state is disposable projection.
+
+- The 256-entry message-ID set is only a fast duplicate cache. When the cache cannot prove uniqueness or an event arrives out of order, the client keeps the immediate local projection and schedules a coalesced canonical inbox refresh.
+- Canonical inbox refresh runs after reconnect/catch-up, visibility or network restoration, transport uncertainty, revocation, and remote-tab unread changes. Normal realtime events do not wait for D1 or trigger a per-message inbox read.
+- An uncertain HTTP send retries at most once with the same `clientMessageId`. If both attempts are uncertain, the active room history is selectively refreshed; explicit HTTP errors are not retried.
+- `vth-unread` `BroadcastChannel` synchronizes unread changes between tabs. `localStorage` storage events are the fallback when `BroadcastChannel` is unavailable.
+- Active-room history, conversation-list previews, and global unread counts reconcile independently. A room switch drops late history responses before they can update the selected room.
+
+Bug10 classifications:
+
+- `[HARDENED]` bounded-cache unread misses, coalesced canonical unread reconciliation, uncertain sends, catch-up/live overlap, cross-tab unread refresh, and late catch-up responses.
+- `[ADOPTED FROM CLONAGRAM]` fast local projection followed by selective canonical reconciliation, plus independent conversation-list and active-room refreshes.
+- `[ALREADY SAFE]` D1 idempotency, canonical ordering, monotonic read boundaries, moderation filtering, block/ban socket revocation, and notification/push guards.
+- `[REJECTED FROM CLONAGRAM]` React Query adoption, polling, per-event full invalidation, current-time read models, and a weaker INSERT-only send path.
+
 ## 8. Media
 
 R2 binding `MEDIA_BUCKET` stores uploaded media in bucket `vth-media`. D1 stores media keys and application metadata. Upload authorization, ownership, content constraints, and deletion behavior are enforced by the application; an R2 object is not a substitute for an authorized D1 record.
