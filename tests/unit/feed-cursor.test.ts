@@ -70,6 +70,33 @@ describe("signed feed cursor", () => {
       openFeedCursorWithSecret(secret, token, ctx, now + 120_000)
     ).rejects.toBeInstanceOf(InvalidFeedCursorError);
   });
+  it("round-trips the rank position for popular feeds", async () => {
+    const popularContext: FeedCursorContext = {
+      ...ctx,
+      sort: "popular",
+    };
+    const token = await signFeedCursorWithSecret(
+      secret,
+      { rank: 7, createdAt: "2026-01-01 12:00:00", id: "post_ranked" },
+      popularContext
+    );
+    await expect(
+      openFeedCursorWithSecret(secret, token, popularContext)
+    ).resolves.toEqual({
+      rank: 7,
+      createdAt: "2026-01-01 12:00:00",
+      id: "post_ranked",
+    });
+
+    const legacyPopularToken = await signFeedCursorWithSecret(
+      secret,
+      { createdAt: "2026-01-01 12:00:00", id: "post_legacy" },
+      popularContext
+    );
+    await expect(
+      openFeedCursorWithSecret(secret, legacyPopularToken, popularContext)
+    ).rejects.toBeInstanceOf(InvalidFeedCursorError);
+  });
 
   it("returns null for empty cursor", async () => {
     expect(await openFeedCursorWithSecret(secret, null, ctx)).toBeNull();

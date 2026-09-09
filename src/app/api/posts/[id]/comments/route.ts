@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createComment } from "@/lib/actions";
+import { parseCommentPayload } from "@/lib/content-payload";
 import { requestIdFromHeaders } from "@/lib/idempotency";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
@@ -18,15 +19,9 @@ export async function POST(
   try {
     const session = await requireSession();
     const { id: postId } = await context.params;
-    const body = requireBotAttestation(await readApiJson(request)) as {
-      body?: string;
-      parentId?: string | null;
-      requestId?: string;
-    };
-
-    if (!body.body?.trim()) {
-      return await jsonLocalizedError("body is required", 400);
-    }
+    const body = parseCommentPayload(
+      requireBotAttestation(await readApiJson(request))
+    );
 
     const user = session.user as { id: string; status?: string | null };
     const result = await createComment({

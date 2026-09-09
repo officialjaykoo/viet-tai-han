@@ -4,6 +4,7 @@ import { moderateText } from "@/lib/moderation";
 import { enforceCreateRateLimit } from "@/lib/rate-limit";
 import { normalizeRequestId } from "@/lib/idempotency";
 import { AuthError } from "@/lib/session";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 function isUniqueConstraint(error: unknown): boolean {
   return error instanceof Error && /unique|constraint/i.test(error.message);
 }
@@ -75,6 +76,51 @@ type AnswerRow = {
   author_display_name: string | null;
   author_image: string | null;
 };
+type ExistingQuestionIdempotencyRow = {
+  id: string;
+  title: string;
+  body: string;
+  subreddit_name: string;
+};
+
+type ExistingAnswerIdempotencyRow = {
+  id: string;
+  question_id: string;
+  body: string;
+};
+
+function resolveExistingQuestion(
+  existing: ExistingQuestionIdempotencyRow,
+  input: { subredditName: string; title: string; body: string }
+) {
+  if (
+    existing.subreddit_name.toLowerCase() !== input.subredditName.toLowerCase() ||
+    existing.title !== input.title ||
+    existing.body !== input.body
+  ) {
+    throw new AuthError(
+      "Request ID was already used for a different question",
+      409
+    );
+  }
+  return { id: existing.id };
+}
+
+function resolveExistingAnswer(
+  existing: ExistingAnswerIdempotencyRow,
+  input: { questionId: string; body: string }
+) {
+  if (
+    existing.question_id !== input.questionId ||
+    existing.body !== input.body
+  ) {
+    throw new AuthError(
+      "Request ID was already used for a different answer",
+      409
+    );
+  }
+  return { id: existing.id };
+}
 
 function mapAuthor(
   row: Pick<
@@ -231,6 +277,21 @@ export async function createQuestion(input: {
   body: string;
   requestId?: string | null;
 }) {
+  if (
+    typeof input.subredditName !== "string" ||
+    typeof input.title !== "string" ||
+    typeof input.body !== "string"
+  ) {
+    throw new AuthError("Invalid question payload", 400);
+  }
+  if (
+    input.requestId !== undefined &&
+    input.requestId !== null &&
+    typeof input.requestId !== "string"
+  ) {
+    throw new AuthError("Invalid question payload", 400);
+  }
+  const communityName = input.subredditName.trim();
   const title = input.title.trim();
   const body = input.body.trim();
   if (title.length < 3 || title.length > 300) {
@@ -243,10 +304,21 @@ export async function createQuestion(input: {
   const db = await getDb();
   if (requestId) {
     const existing = await db
-      .prepare(`SELECT id FROM questions WHERE author_id = ? AND request_id = ?`)
+      .prepare(
+        `SELECT q.id, q.title, q.body, s.name AS subreddit_name
+         FROM questions q
+         INNER JOIN subreddits s ON s.id = q.subreddit_id
+         WHERE q.author_id = ? AND q.request_id = ?`
+      )
       .bind(input.userId, requestId)
-      .first<{ id: string }>();
-    if (existing) return { id: existing.id };
+      .first<ExistingQuestionIdempotencyRow>();
+    if (existing) {
+      return resolveExistingQuestion(existing, {
+        subredditName: communityName,
+        title,
+        body,
+      });
+    }
   }
 
   await enforceCreateRateLimit(input.userId, "question");
@@ -261,7 +333,7 @@ export async function createQuestion(input: {
       `SELECT id FROM subreddits
        WHERE name = ? COLLATE NOCASE AND is_removed = 0`
     )
-    .bind(input.subredditName.trim())
+    .bind(communityName)
     .first<{ id: string }>();
   if (!community) throw new AuthError("Community not found", 404);
 
@@ -280,18 +352,26 @@ export async function createQuestion(input: {
     if (isUniqueConstraint(error) && requestId) {
       const existing = await db
         .prepare(
-          `SELECT id FROM questions WHERE author_id = ? AND request_id = ?`
+          `SELECT q.id, q.title, q.body, s.name AS subreddit_name
+           FROM questions q
+           INNER JOIN subreddits s ON s.id = q.subreddit_id
+           WHERE q.author_id = ? AND q.request_id = ?`
         )
         .bind(input.userId, requestId)
-        .first<{ id: string }>();
-      if (existing) return { id: existing.id };
+        .first<ExistingQuestionIdempotencyRow>();
+      if (existing) {
+        return resolveExistingQuestion(existing, {
+          subredditName: communityName,
+          title,
+          body,
+        });
+      }
     }
     throw error;
   }
 
   return { id };
 }
-
 export async function createAnswer(input: {
   userId: string;
   userStatus?: string | null;
@@ -299,6 +379,16 @@ export async function createAnswer(input: {
   body: string;
   requestId?: string | null;
 }) {
+  if (typeof input.body !== "string" || typeof input.questionId !== "string") {
+    throw new AuthError("Invalid answer payload", 400);
+  }
+  if (
+    input.requestId !== undefined &&
+    input.requestId !== null &&
+    typeof input.requestId !== "string"
+  ) {
+    throw new AuthError("Invalid answer payload", 400);
+  }
   const body = input.body.trim();
   if (body.length < 2 || body.length > 10_000) {
     throw new AuthError("Answer must be 2–10000 characters", 400);
@@ -308,23 +398,32 @@ export async function createAnswer(input: {
   if (requestId) {
     const existing = await db
       .prepare(
-        `SELECT id FROM answers WHERE author_id = ? AND request_id = ?`
+        `SELECT id, question_id, body
+         FROM answers WHERE author_id = ? AND request_id = ?`
       )
       .bind(input.userId, requestId)
-      .first<{ id: string }>();
-    if (existing) return { id: existing.id };
+      .first<ExistingAnswerIdempotencyRow>();
+    if (existing) {
+      return resolveExistingAnswer(existing, {
+        questionId: input.questionId,
+        body,
+      });
+    }
   }
 
   await enforceCreateRateLimit(input.userId, "answer");
 
   const question = await db
     .prepare(
-      `SELECT id, is_locked, is_removed, is_shadow_hidden
-       FROM questions WHERE id = ?`
+      `SELECT q.id, q.author_id, q.is_locked, q.is_removed, q.is_shadow_hidden
+       FROM questions q
+       INNER JOIN subreddits s ON s.id = q.subreddit_id
+       WHERE q.id = ? AND s.is_removed = 0`
     )
     .bind(input.questionId)
     .first<{
       id: string;
+      author_id: string;
       is_locked: number;
       is_removed: number;
       is_shadow_hidden: number;
@@ -342,15 +441,36 @@ export async function createAnswer(input: {
 
   const id = createPublicId();
   const shadow = moderation.shadow || input.userStatus === "shadowbanned" ? 1 : 0;
+  let results: D1Result<unknown>[];
   try {
-    await db.batch([
+    results = await db.batch([
       db
         .prepare(
           `INSERT INTO answers (
              id, question_id, author_id, body, is_shadow_hidden, request_id
-           ) VALUES (?, ?, ?, ?, ?, ?)`
+           )
+           SELECT ?, q.id, ?, ?, ?, ?
+           FROM questions q
+           INNER JOIN subreddits s ON s.id = q.subreddit_id
+           WHERE q.id = ?
+             AND ${publicPostVisibilitySql("q", "s")}
+             AND q.is_locked = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = ? AND b.blocked_id = q.author_id)
+                  OR (b.blocker_id = q.author_id AND b.blocked_id = ?)
+             )`
         )
-        .bind(id, input.questionId, input.userId, body, shadow, requestId),
+        .bind(
+          id,
+          input.userId,
+          body,
+          shadow,
+          requestId,
+          input.questionId,
+          input.userId,
+          input.userId
+        ),
       ...(shadow
         ? []
         : [
@@ -358,22 +478,43 @@ export async function createAnswer(input: {
               .prepare(
                 `UPDATE questions
                  SET answer_count = answer_count + 1, updated_at = datetime('now')
-                 WHERE id = ?`
+                 WHERE id = ?
+                   AND EXISTS (SELECT 1 FROM answers WHERE id = ?)`
               )
-              .bind(input.questionId),
+              .bind(input.questionId, id),
           ]),
     ]);
   } catch (error) {
     if (isUniqueConstraint(error) && requestId) {
       const existing = await db
         .prepare(
-          `SELECT id FROM answers WHERE author_id = ? AND request_id = ?`
+          `SELECT id, question_id, body
+           FROM answers WHERE author_id = ? AND request_id = ?`
         )
         .bind(input.userId, requestId)
-        .first<{ id: string }>();
-      if (existing) return { id: existing.id };
+        .first<ExistingAnswerIdempotencyRow>();
+      if (existing) {
+        return resolveExistingAnswer(existing, {
+          questionId: input.questionId,
+          body,
+        });
+      }
     }
     throw error;
+  }
+
+  if (Number(results[0]?.meta.changes ?? 0) !== 1) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`
+      )
+      .bind(input.userId, question.author_id, question.author_id, input.userId)
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+    throw new AuthError("Question not found", 404);
   }
 
   return { id };
@@ -384,11 +525,20 @@ export async function toggleAcceptedAnswer(input: {
   questionId: string;
   answerId: string;
 }) {
+  if (
+    typeof input.questionId !== "string" ||
+    typeof input.answerId !== "string"
+  ) {
+    throw new AuthError("Invalid accept-answer payload", 400);
+  }
   const db = await getDb();
   const question = await db
     .prepare(
-      `SELECT id, author_id, accepted_answer_id, is_removed, is_shadow_hidden
-       FROM questions WHERE id = ?`
+      `SELECT q.id, q.author_id, q.accepted_answer_id, q.is_removed,
+              q.is_shadow_hidden
+       FROM questions q
+       INNER JOIN subreddits s ON s.id = q.subreddit_id
+       WHERE q.id = ? AND s.is_removed = 0`
     )
     .bind(input.questionId)
     .first<{
@@ -408,29 +558,70 @@ export async function toggleAcceptedAnswer(input: {
 
   const answer = await db
     .prepare(
-      `SELECT id FROM answers
+      `SELECT id, author_id FROM answers
        WHERE id = ? AND question_id = ?
          AND is_removed = 0 AND is_shadow_hidden = 0`
     )
     .bind(input.answerId, input.questionId)
-    .first<{ id: string }>();
+    .first<{ id: string; author_id: string }>();
   if (!answer) throw new AuthError("Answer not found", 404);
 
   const nextAcceptedId =
     question.accepted_answer_id === input.answerId ? null : input.answerId;
+  if (nextAcceptedId) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`
+      )
+      .bind(input.userId, answer.author_id, answer.author_id, input.userId)
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+  }
+  const blockParams = [
+    input.userId,
+    answer.author_id,
+    answer.author_id,
+    input.userId,
+  ];
   const statements = [
     db
-      .prepare(`UPDATE answers SET is_accepted = 0 WHERE question_id = ?`)
-      .bind(input.questionId),
+      .prepare(
+        `UPDATE answers
+         SET is_accepted = 0
+         WHERE question_id = ?
+           AND (
+             ? IS NULL OR NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )
+           )`
+      )
+      .bind(input.questionId, nextAcceptedId, ...blockParams),
   ];
   if (nextAcceptedId) {
     statements.push(
       db
         .prepare(
           `UPDATE answers SET is_accepted = 1
-           WHERE id = ? AND question_id = ?`
+           WHERE id = ? AND question_id = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )`
         )
-        .bind(nextAcceptedId, input.questionId)
+        .bind(
+          nextAcceptedId,
+          input.questionId,
+          input.userId,
+          answer.author_id,
+          answer.author_id,
+          input.userId
+        )
     );
   }
   statements.push(
@@ -438,11 +629,30 @@ export async function toggleAcceptedAnswer(input: {
       .prepare(
         `UPDATE questions
          SET accepted_answer_id = ?, updated_at = datetime('now')
-         WHERE id = ? AND author_id = ?`
+         WHERE id = ? AND author_id = ?
+           AND (
+             ? IS NULL OR NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )
+           )`
       )
-      .bind(nextAcceptedId, input.questionId, input.userId)
+      .bind(
+        nextAcceptedId,
+        input.questionId,
+        input.userId,
+        nextAcceptedId,
+        ...blockParams
+      )
   );
-  await db.batch(statements);
+  const results = await db.batch(statements);
+  if (
+    nextAcceptedId &&
+    Number(results.at(-1)?.meta.changes ?? 0) !== 1
+  ) {
+    throw new AuthError("Interaction blocked", 403);
+  }
 
   return { acceptedAnswerId: nextAcceptedId };
 }

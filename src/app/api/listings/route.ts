@@ -7,10 +7,11 @@ import {
   listListings,
   serializeListingSummary,
 } from "@/lib/marketplace";
+import { parseListingPayload } from "@/lib/content-payload";
+import { jsonLocalizedError } from "@/lib/public-error";
 import { requestIdFromHeaders } from "@/lib/idempotency";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
 import { readApiJson } from "@/lib/security/guard";
-import { jsonLocalizedError } from "@/lib/public-error";
 import {
   AuthError,
   getSession,
@@ -69,24 +70,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
-    const body = requireBotAttestation(await readApiJson(request)) as {
-      kind?: string;
-      category?: string;
-      title?: string;
-      body?: string;
-      price?: string | null;
-      location?: string;
-      requestId?: string;
-    };
-    if (
-      !body.kind ||
-      !body.category ||
-      !body.title ||
-      !body.body ||
-      !body.location
-    ) {
-      return await jsonLocalizedError("Required listing fields are missing", 400);
-    }
+    const body = parseListingPayload(
+      requireBotAttestation(await readApiJson(request))
+    );
 
     const user = session.user as { id: string; status?: string | null };
     const result = await createListing({

@@ -199,7 +199,10 @@ export async function blockUser(blockerId: string, blockedId: string) {
              'friend_request',
              'friend_accepted',
              'chat_request',
-             'chat_accepted'
+             'chat_accepted',
+             'comment_on_post',
+             'reply_to_comment',
+             'mention'
            )
            AND (
              (user_id = ? AND actor_id = ?)

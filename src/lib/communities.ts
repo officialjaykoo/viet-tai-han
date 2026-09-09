@@ -38,20 +38,30 @@ export async function subscribeToSubreddit(userId: string, subredditId: string) 
     .first();
   if (!sub) throw new AuthError("Community not found", 404);
 
-  if (await isSubscribed(userId, subredditId)) {
-    const count = await recountSubscribers(subredditId);
-    return { subscribed: true, subscriberCount: count };
-  }
+  await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO subscriptions (user_id, subreddit_id)
+         VALUES (?, ?)`
+      )
+      .bind(userId, subredditId),
+    db
+      .prepare(
+        `UPDATE subreddits
+         SET subscriber_count = (
+           SELECT COUNT(*) FROM subscriptions WHERE subreddit_id = subreddits.id
+         ),
+         updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .bind(subredditId),
+  ]);
 
-  await db
-    .prepare(
-      `INSERT INTO subscriptions (user_id, subreddit_id) VALUES (?, ?)`
-    )
-    .bind(userId, subredditId)
-    .run();
-
-  const count = await recountSubscribers(subredditId);
-  return { subscribed: true, subscriberCount: count };
+  const count = await db
+    .prepare(`SELECT subscriber_count FROM subreddits WHERE id = ?`)
+    .bind(subredditId)
+    .first<{ subscriber_count: number }>();
+  return { subscribed: true, subscriberCount: Number(count?.subscriber_count ?? 0) };
 }
 
 export async function unsubscribeFromSubreddit(
@@ -59,12 +69,27 @@ export async function unsubscribeFromSubreddit(
   subredditId: string
 ) {
   const db = await getDb();
-  await db
-    .prepare(
-      `DELETE FROM subscriptions WHERE user_id = ? AND subreddit_id = ?`
-    )
-    .bind(userId, subredditId)
-    .run();
-  const count = await recountSubscribers(subredditId);
-  return { subscribed: false, subscriberCount: count };
+  await db.batch([
+    db
+      .prepare(
+        `DELETE FROM subscriptions WHERE user_id = ? AND subreddit_id = ?`
+      )
+      .bind(userId, subredditId),
+    db
+      .prepare(
+        `UPDATE subreddits
+         SET subscriber_count = (
+           SELECT COUNT(*) FROM subscriptions WHERE subreddit_id = subreddits.id
+         ),
+         updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .bind(subredditId),
+  ]);
+
+  const count = await db
+    .prepare(`SELECT subscriber_count FROM subreddits WHERE id = ?`)
+    .bind(subredditId)
+    .first<{ subscriber_count: number }>();
+  return { subscribed: false, subscriberCount: Number(count?.subscriber_count ?? 0) };
 }

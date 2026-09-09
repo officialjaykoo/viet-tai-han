@@ -9,6 +9,7 @@ import {
 import { requireAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError } from "@/lib/session";
 import { normalizeRequestId } from "@/lib/idempotency";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 import {
   MAX_POST_BODY_LENGTH,
   MAX_POST_TITLE_LENGTH,
@@ -27,6 +28,34 @@ type ExistingPostIdempotencyRow = {
   url: string | null;
   media_key: string | null;
 };
+type ExistingCommentIdempotencyRow = {
+  id: string;
+  post_id: string;
+  parent_id: string | null;
+  body: string;
+  depth: number;
+};
+
+function resolveExistingComment(
+  existing: ExistingCommentIdempotencyRow,
+  input: {
+    postId: string;
+    parentId: string | null;
+    body: string;
+  }
+) {
+  if (
+    existing.post_id !== input.postId ||
+    existing.parent_id !== input.parentId ||
+    existing.body !== input.body
+  ) {
+    throw new AuthError(
+      "Request ID was already used for a different comment",
+      409
+    );
+  }
+  return { id: existing.id, depth: existing.depth };
+}
 
 function resolveExistingPost(
   existing: ExistingPostIdempotencyRow,
@@ -257,34 +286,65 @@ export async function createComment(input: {
   body: string;
   requestId?: string | null;
 }) {
+  if (typeof input.body !== "string") {
+    throw new AuthError("Invalid comment payload", 400);
+  }
+  if (
+    input.parentId !== undefined &&
+    input.parentId !== null &&
+    typeof input.parentId !== "string"
+  ) {
+    throw new AuthError("Invalid comment payload", 400);
+  }
+  if (
+    input.requestId !== undefined &&
+    input.requestId !== null &&
+    typeof input.requestId !== "string"
+  ) {
+    throw new AuthError("Invalid comment payload", 400);
+  }
   const body = input.body.trim();
+  const parentId = input.parentId ?? null;
 
   const requestId = normalizeRequestId(input.requestId);
   const db = await getDb();
   if (requestId) {
     const existing = await db
       .prepare(
-        `SELECT id, depth FROM comments WHERE author_id = ? AND request_id = ?`
+        `SELECT id, post_id, parent_id, body, depth
+         FROM comments WHERE author_id = ? AND request_id = ?`
       )
       .bind(input.userId, requestId)
-      .first<{ id: string; depth: number }>();
-    if (existing) return { id: existing.id, depth: existing.depth };
+      .first<ExistingCommentIdempotencyRow>();
+    if (existing) {
+      return resolveExistingComment(existing, {
+        postId: input.postId,
+        parentId,
+        body,
+      });
+    }
   }
 
   await enforceCreateRateLimit(input.userId, "comment");
   const post = await db
     .prepare(
-      `SELECT id, subreddit_id, is_locked, is_removed FROM posts WHERE id = ?`
+      `SELECT p.id, p.subreddit_id, p.author_id, p.is_locked,
+              p.is_removed, p.is_shadow_hidden
+       FROM posts p
+       INNER JOIN subreddits s ON s.id = p.subreddit_id
+       WHERE p.id = ? AND s.is_removed = 0`
     )
     .bind(input.postId)
     .first<{
       id: string;
       subreddit_id: string;
+      author_id: string;
       is_locked: number;
       is_removed: number;
+      is_shadow_hidden: number;
     }>();
 
-  if (!post || post.is_removed) {
+  if (!post || post.is_removed || post.is_shadow_hidden) {
     throw new AuthError("Post not found", 404);
   }
   if (post.is_locked) {
@@ -292,14 +352,16 @@ export async function createComment(input: {
   }
 
   let depth = 0;
-  if (input.parentId) {
+  if (parentId) {
     const parent = await db
       .prepare(
-        `SELECT id, depth, is_removed, is_deleted FROM comments WHERE id = ? AND post_id = ?`
+        `SELECT id, author_id, depth, is_removed, is_deleted
+         FROM comments WHERE id = ? AND post_id = ?`
       )
-      .bind(input.parentId, input.postId)
+      .bind(parentId, input.postId)
       .first<{
         id: string;
+        author_id: string;
         depth: number;
         is_removed: number;
         is_deleted: number;
@@ -321,8 +383,7 @@ export async function createComment(input: {
   const shadow =
     moderation.shadow || input.userStatus === "shadowbanned" ? 1 : 0;
   const id = createPublicId();
-
-  const insert = input.parentId
+  const insert = parentId
     ? db
         .prepare(
           `INSERT INTO comments (
@@ -332,13 +393,21 @@ export async function createComment(input: {
            SELECT ?, p.id, ?, parent.id, ?, parent.depth + 1, ?, ?
            FROM posts p
            INNER JOIN comments parent ON parent.post_id = p.id
+           INNER JOIN subreddits s ON s.id = p.subreddit_id
            WHERE p.id = ?
-             AND p.is_removed = 0
+             AND ${publicPostVisibilitySql()}
              AND p.is_locked = 0
              AND parent.id = ?
              AND parent.is_removed = 0
              AND parent.is_deleted = 0
-             AND parent.depth < ?`
+             AND parent.depth < ?
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = ? AND b.blocked_id = p.author_id)
+                  OR (b.blocker_id = p.author_id AND b.blocked_id = ?)
+                  OR (b.blocker_id = ? AND b.blocked_id = parent.author_id)
+                  OR (b.blocker_id = parent.author_id AND b.blocked_id = ?)
+             )`
         )
         .bind(
           id,
@@ -347,8 +416,12 @@ export async function createComment(input: {
           shadow,
           requestId,
           input.postId,
-          input.parentId,
-          MAX_COMMENT_DEPTH
+          parentId,
+          MAX_COMMENT_DEPTH,
+          input.userId,
+          input.userId,
+          input.userId,
+          input.userId
         )
     : db
         .prepare(
@@ -358,9 +431,14 @@ export async function createComment(input: {
            )
            SELECT ?, p.id, ?, NULL, ?, 0, ?, ?
            FROM posts p
+           INNER JOIN subreddits s ON s.id = p.subreddit_id
            WHERE p.id = ?
-             AND p.is_removed = 0
-             AND p.is_locked = 0`
+             AND ${publicPostVisibilitySql()}
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = ? AND b.blocked_id = p.author_id)
+                  OR (b.blocker_id = p.author_id AND b.blocked_id = ?)
+             )`
         )
         .bind(
           id,
@@ -368,7 +446,9 @@ export async function createComment(input: {
           body,
           shadow,
           requestId,
-          input.postId
+          input.postId,
+          input.userId,
+          input.userId
         );
 
   let results: D1Result<unknown>[];
@@ -392,19 +472,52 @@ export async function createComment(input: {
     if (!requestId) throw error;
     const existing = await db
       .prepare(
-        `SELECT id, depth FROM comments WHERE author_id = ? AND request_id = ?`
+        `SELECT id, post_id, parent_id, body, depth
+         FROM comments WHERE author_id = ? AND request_id = ?`
       )
       .bind(input.userId, requestId)
-      .first<{ id: string; depth: number }>();
-    if (existing) return { id: existing.id, depth: existing.depth };
+      .first<ExistingCommentIdempotencyRow>();
+    if (existing) {
+      return resolveExistingComment(existing, {
+        postId: input.postId,
+        parentId,
+        body,
+      });
+    }
     throw error;
   }
 
   if (Number(results[0]?.meta.changes ?? 0) !== 1) {
-    throw new AuthError(
-      input.parentId ? "Parent comment not found" : "Post not found",
-      404
-    );
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked
+         FROM posts p
+         LEFT JOIN comments parent ON parent.id = ?
+         WHERE p.id = ?
+           AND (
+             EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = ? AND b.blocked_id = p.author_id)
+                  OR (b.blocker_id = p.author_id AND b.blocked_id = ?)
+             )
+             OR EXISTS (
+               SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = ? AND b.blocked_id = parent.author_id)
+                  OR (b.blocker_id = parent.author_id AND b.blocked_id = ?)
+             )
+           )`
+      )
+      .bind(
+        parentId,
+        input.postId,
+        input.userId,
+        input.userId,
+        input.userId,
+        input.userId
+      )
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+    throw new AuthError(parentId ? "Parent comment not found" : "Post not found", 404);
   }
 
   await bumpUserActivity(input.userId, post.subreddit_id, 1);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAnswer } from "@/lib/qna";
+import { parseAnswerPayload } from "@/lib/content-payload";
 import { requestIdFromHeaders } from "@/lib/idempotency";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { requireBotAttestation } from "@/lib/security/bot-guard";
@@ -15,13 +16,9 @@ export async function POST(
     const session = await requireSession();
     const user = session.user;
     const { id: questionId } = await context.params;
-    const body = requireBotAttestation(await readApiJson(request)) as {
-      body?: string;
-      requestId?: string | null;
-    };
-    if (!body.body?.trim()) {
-      return await jsonLocalizedError("body is required", 400);
-    }
+    const body = parseAnswerPayload(
+      requireBotAttestation(await readApiJson(request))
+    );
 
     const result = await createAnswer({
       userId: user.id,

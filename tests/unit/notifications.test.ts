@@ -75,4 +75,26 @@ describe("notification insert invariants", () => {
     expect(batch).toHaveBeenCalledOnce();
     expect(queuePushDelivery).not.toHaveBeenCalled();
   });
+  it.each(["comment_on_post", "reply_to_comment", "mention"] as const)(
+    "applies bilateral block guard to %s",
+    async (kind) => {
+      const { batch, prepare } = setupDatabase(0);
+
+      await expect(
+        createNotification({
+          userId: "recipient-1",
+          actorId: "blocked-actor",
+          kind,
+          title: "Blocked content event",
+        })
+      ).resolves.toBeNull();
+
+      expect(batch).toHaveBeenCalledOnce();
+      expect(
+        prepare.mock.calls.some(([sql]) =>
+          String(sql).includes("FROM user_blocks")
+        )
+      ).toBe(true);
+    }
+  );
 });

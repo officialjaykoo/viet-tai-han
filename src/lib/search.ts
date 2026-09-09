@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 import { resolveAccountTags, type AccountTag } from "@/lib/tags";
 
 const MAX_QUERY_LENGTH = 80;
@@ -205,8 +206,7 @@ async function searchPosts(
        FROM posts p
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id
-       WHERE p.is_removed = 0
-         AND p.is_shadow_hidden = 0
+       WHERE ${publicPostVisibilitySql()}
          AND (p.title LIKE ? ESCAPE '\\'
               OR IFNULL(p.body, '') LIKE ? ESCAPE '\\')
        ORDER BY p.like_count DESC, p.created_at DESC

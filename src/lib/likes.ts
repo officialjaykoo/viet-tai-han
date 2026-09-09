@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 import { enforceCreateRateLimit } from "@/lib/rate-limit";
 import { AuthError } from "@/lib/session";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 import type { CommentLikeResult, LikeResult } from "@/lib/types";
 
 async function mutatePostLike(input: {
@@ -11,11 +12,13 @@ async function mutatePostLike(input: {
   const db = await getDb();
   const post = await db
     .prepare(
-      `SELECT id, like_count FROM posts
-       WHERE id = ? AND is_removed = 0 AND is_shadow_hidden = 0`
+      `SELECT p.id, p.author_id, p.like_count
+       FROM posts p
+       INNER JOIN subreddits s ON s.id = p.subreddit_id
+       WHERE p.id = ? AND ${publicPostVisibilitySql()}`
     )
     .bind(input.postId)
-    .first<{ id: string; like_count: number }>();
+    .first<{ id: string; author_id: string; like_count: number }>();
   if (!post) throw new AuthError("Post not found", 404);
 
   const existing = await db
@@ -33,15 +36,40 @@ async function mutatePostLike(input: {
     };
   }
 
+  if (input.liked) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`
+      )
+      .bind(input.userId, post.author_id, post.author_id, input.userId)
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+  }
+
   await enforceCreateRateLimit(input.userId, "like");
   const statements = input.liked
     ? [
         db
           .prepare(
             `INSERT OR IGNORE INTO post_likes (post_id, user_id, created_at)
-             VALUES (?, ?, datetime('now'))`
+             SELECT ?, ?, datetime('now')
+             WHERE NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )`
           )
-          .bind(input.postId, input.userId),
+          .bind(
+            input.postId,
+            input.userId,
+            input.userId,
+            post.author_id,
+            post.author_id,
+            input.userId
+          ),
       ]
     : [
         db
@@ -62,7 +90,19 @@ async function mutatePostLike(input: {
       )
       .bind(input.postId)
   );
-  await db.batch(statements);
+  const [likeWrite] = await db.batch(statements);
+  if (input.liked && Number(likeWrite?.meta.changes ?? 0) === 0) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`
+      )
+      .bind(input.userId, post.author_id, post.author_id, input.userId)
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+  }
 
   const updated = await db
     .prepare(`SELECT like_count FROM posts WHERE id = ?`)
@@ -83,18 +123,18 @@ async function mutateCommentLike(input: {
   const db = await getDb();
   const comment = await db
     .prepare(
-      `SELECT c.id, c.like_count
+      `SELECT c.id, c.author_id, c.like_count
        FROM comments c
        INNER JOIN posts p ON p.id = c.post_id
+       INNER JOIN subreddits s ON s.id = p.subreddit_id
        WHERE c.id = ?
          AND c.is_removed = 0
          AND c.is_deleted = 0
          AND c.is_shadow_hidden = 0
-         AND p.is_removed = 0
-         AND p.is_shadow_hidden = 0`
+         AND ${publicPostVisibilitySql()}`
     )
     .bind(input.commentId)
-    .first<{ id: string; like_count: number }>();
+    .first<{ id: string; author_id: string; like_count: number }>();
   if (!comment) throw new AuthError("Comment not found", 404);
 
   const existing = await db
@@ -112,15 +152,40 @@ async function mutateCommentLike(input: {
     };
   }
 
+  if (input.liked) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`
+      )
+      .bind(input.userId, comment.author_id, comment.author_id, input.userId)
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+  }
+
   await enforceCreateRateLimit(input.userId, "like");
   const statements = input.liked
     ? [
         db
           .prepare(
             `INSERT OR IGNORE INTO comment_likes (comment_id, user_id, created_at)
-             VALUES (?, ?, datetime('now'))`
+             SELECT ?, ?, datetime('now')
+             WHERE NOT EXISTS (
+               SELECT 1 FROM user_blocks
+               WHERE (blocker_id = ? AND blocked_id = ?)
+                  OR (blocker_id = ? AND blocked_id = ?)
+             )`
           )
-          .bind(input.commentId, input.userId),
+          .bind(
+            input.commentId,
+            input.userId,
+            input.userId,
+            comment.author_id,
+            comment.author_id,
+            input.userId
+          ),
       ]
     : [
         db
@@ -141,7 +206,19 @@ async function mutateCommentLike(input: {
       )
       .bind(input.commentId)
   );
-  await db.batch(statements);
+  const [likeWrite] = await db.batch(statements);
+  if (input.liked && Number(likeWrite?.meta.changes ?? 0) === 0) {
+    const blocked = await db
+      .prepare(
+        `SELECT 1 AS blocked FROM user_blocks
+         WHERE (blocker_id = ? AND blocked_id = ?)
+            OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`
+      )
+      .bind(input.userId, comment.author_id, comment.author_id, input.userId)
+      .first();
+    if (blocked) throw new AuthError("Interaction blocked", 403);
+  }
 
   const updated = await db
     .prepare(`SELECT like_count FROM comments WHERE id = ?`)

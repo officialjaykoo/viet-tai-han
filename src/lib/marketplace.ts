@@ -111,6 +111,42 @@ type ListingRow = {
   seller_image: string | null;
   is_saved?: number | null;
 };
+type ExistingListingIdempotencyRow = {
+  id: string;
+  kind: ListingKind;
+  category: string;
+  title: string;
+  body: string;
+  price: string | null;
+  location: string;
+};
+
+function resolveExistingListing(
+  existing: ExistingListingIdempotencyRow,
+  input: {
+    kind: ListingKind;
+    category: string;
+    title: string;
+    body: string;
+    price: string | null;
+    location: string;
+  }
+) {
+  if (
+    existing.kind !== input.kind ||
+    existing.category !== input.category ||
+    existing.title !== input.title ||
+    existing.body !== input.body ||
+    existing.price !== input.price ||
+    existing.location !== input.location
+  ) {
+    throw new AuthError(
+      "Request ID was already used for a different listing",
+      409
+    );
+  }
+  return { id: existing.id };
+}
 
 function isListingKind(value: string): value is ListingKind {
   return (LISTING_KINDS as readonly string[]).includes(value);
@@ -289,9 +325,25 @@ export async function createListing(input: {
   location: string;
   requestId?: string | null;
 }) {
+  if (
+    typeof input.kind !== "string" ||
+    typeof input.category !== "string" ||
+    typeof input.title !== "string" ||
+    typeof input.body !== "string" ||
+    typeof input.location !== "string" ||
+    (input.price !== undefined &&
+      input.price !== null &&
+      typeof input.price !== "string") ||
+    (input.requestId !== undefined &&
+      input.requestId !== null &&
+      typeof input.requestId !== "string")
+  ) {
+    throw new AuthError("Invalid listing payload", 400);
+  }
   if (!isListingKind(input.kind)) {
     throw new AuthError("Invalid listing type", 400);
   }
+  const kind = input.kind;
   const category = normalizeText(input.category, 80);
   const title = normalizeText(input.title, 200);
   const body = normalizeText(input.body, 10_000);
@@ -317,11 +369,21 @@ export async function createListing(input: {
   if (requestId) {
     const existing = await db
       .prepare(
-        `SELECT id FROM listings WHERE seller_id = ? AND request_id = ?`
+        `SELECT id, kind, category, title, body, price, location
+         FROM listings WHERE seller_id = ? AND request_id = ?`
       )
       .bind(input.sellerId, requestId)
-      .first<{ id: string }>();
-    if (existing) return { id: existing.id };
+      .first<ExistingListingIdempotencyRow>();
+    if (existing) {
+      return resolveExistingListing(existing, {
+        kind,
+        category,
+        title,
+        body,
+        price,
+        location,
+      });
+    }
   }
 
   await enforceCreateRateLimit(input.sellerId, "listing");
@@ -349,7 +411,7 @@ export async function createListing(input: {
       .bind(
         id,
         input.sellerId,
-        input.kind,
+        kind,
         category,
         title,
         body,
@@ -363,11 +425,21 @@ export async function createListing(input: {
     if (!requestId) throw error;
     const existing = await db
       .prepare(
-        `SELECT id FROM listings WHERE seller_id = ? AND request_id = ?`
+        `SELECT id, kind, category, title, body, price, location
+         FROM listings WHERE seller_id = ? AND request_id = ?`
       )
       .bind(input.sellerId, requestId)
-      .first<{ id: string }>();
-    if (existing) return { id: existing.id };
+      .first<ExistingListingIdempotencyRow>();
+    if (existing) {
+      return resolveExistingListing(existing, {
+        kind,
+        category,
+        title,
+        body,
+        price,
+        location,
+      });
+    }
     throw error;
   }
 

@@ -5,6 +5,7 @@ import {
   listQuestions,
   serializeQuestionSummary,
 } from "@/lib/qna";
+import { parseQuestionPayload } from "@/lib/content-payload";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { requestIdFromHeaders } from "@/lib/idempotency";
 import { readApiJson } from "@/lib/security/guard";
@@ -43,18 +44,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
-    const body = requireBotAttestation(await readApiJson(request)) as {
-      community?: string;
-      title?: string;
-      body?: string;
-      requestId?: string | null;
-    };
-    if (!body.community || !body.title || !body.body) {
-      return await jsonLocalizedError(
-        "community, title, and body are required",
-        400
-      );
-    }
+    const body = parseQuestionPayload(
+      requireBotAttestation(await readApiJson(request))
+    );
 
     const user = session.user as { id: string; status?: string | null };
     const result = await createQuestion({

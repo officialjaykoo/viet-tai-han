@@ -33,7 +33,8 @@ import type { PaginatedFeed } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function parseSort(_value: string | undefined): FeedSort {
+function parseSort(value: string | undefined, mode: "home" | "popular"): FeedSort {
+  if (value === "popular" || mode === "popular") return "popular";
   return "new";
 }
 
@@ -157,8 +158,8 @@ export default async function HomePage({
       icon: StoreIcon,
     },
   ];
-  const sort = parseSort(params.sort);
   const mode = parseMode(params.feed);
+  const sort = parseSort(params.sort, mode);
   const [initialFeed, onlineUsers] = await Promise.all([
     loadInitialFeed({
       sort,

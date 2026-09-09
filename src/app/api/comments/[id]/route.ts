@@ -6,6 +6,7 @@ import {
   removeCommentForModeration,
 } from "@/lib/actions";
 import { getDb } from "@/lib/db";
+import { parseCommentPayload } from "@/lib/content-payload";
 import { requireModeratorOrAdmin, type SessionUser } from "@/lib/permissions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 import { jsonLocalizedError } from "@/lib/public-error";
@@ -18,10 +19,7 @@ export async function PATCH(
   try {
     const session = await requireSession();
     const { id } = await context.params;
-    const body = (await readApiJson(request)) as { body?: string };
-    if (!body.body?.trim()) {
-      return await jsonLocalizedError("body is required", 400);
-    }
+    const body = parseCommentPayload(await readApiJson(request));
 
     const result = await editComment({
       commentId: id,

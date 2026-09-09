@@ -17,6 +17,9 @@ export type NotificationKind =
   | "mention";
 
 const BLOCK_GUARDED_NOTIFICATION_KINDS: ReadonlySet<NotificationKind> = new Set([
+  "comment_on_post",
+  "reply_to_comment",
+  "mention",
   "follow",
   "friend_request",
   "friend_accepted",

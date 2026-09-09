@@ -137,6 +137,31 @@ The current architecture does not include:
 - a separate recommendation service or recommendation infrastructure
 - federation
 
+## 14. Public content convergence
+
+Bug11 keeps one canonical public-content path:
+
+- `src/lib/post-projection.ts` maps Feed, Community, Popular, Recommended, Profile Posts, and Post Detail to the same `FeedPost` projection.
+- `src/lib/content-visibility.ts` owns the public post predicate: post not removed, post not shadow-hidden, and community not removed.
+- `src/lib/content-payload.ts` owns strict runtime parsing for like, comment, Q&A, accept-answer, and listing writes.
+- `post_likes` and `comment_likes` are the only runtime positive-reaction tables. Their counters are the only engagement inputs to Popular.
+- Public reads do not use `user_blocks` as visibility. Bilateral block checks are applied at final positive-interaction and guarded-notification writes.
+
+Home is subscribed-community recency, Community/Profile are recency, Popular is all public canonical engagement, and Recommended is personalized D1 ranking. Popular uses `like_count + comment_count * 3`, followed by `(created_at, id)` descending. Its signed cursor carries the rank and deterministic tie-break fields and is bound to the complete feed context.
+
+Bug11 classifications:
+
+- `[HARDENED]` public visibility parity across discovery/detail/search/out/analytics, bilateral block enforcement at final writes, strict malformed-payload rejection, request-ID payload conflict detection, canonical counter reconciliation, and migration/seed audit.
+- `[ADOPTED FROM CLONAGRAM]` a small shared post projection, centralized visibility/payload helpers, canonical engagement ranking, and deterministic signed pagination.
+- `[ALREADY SAFE]` D1 as source of truth, immutable `user.id` identity, Better Auth, Cloudflare/OpenNext/D1/R2/DO boundaries, forward-only migrations, and Bug10 DM convergence.
+- `[REJECTED FROM CLONAGRAM]` parallel RED/VTH/Clonagram content models, giant Post DTOs, ORM/repository layers, Supabase, ML/vector recommendation infrastructure, and React Query/polling invalidation.
+
+Bug11 does not modify the frozen Bug10 messaging paths. Messaging schema objects remain inventoried in `docs/VTH_DATABASE.md` and are not copied into a second scheduler or transport.
+
+## 15. Database audit and cleanup policy
+
+`docs/VTH_DATABASE.md` is the canonical schema audit. It inventories all applied migrations, identifies Better Auth `user.id` as the identity key, lists canonical relations and counter invariants, and records why legacy `users`, `votes`, and score columns/indexes remain. No applied migration is rewritten or dropped. Cleanup candidates require a separate forward migration backed by production row-count, foreign-key, and rollback evidence.
+
 ## UI layout and content density
 
 Consumer pages use one `PageShell` width system:

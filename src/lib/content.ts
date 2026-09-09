@@ -1,15 +1,15 @@
 import { getDb } from "@/lib/db";
 import { openFeedCursor, signFeedCursor } from "@/lib/security/feed-cursor";
-import type {
-  ContentSourceLang,
-  ContentTranslation,
-  ContentTranslationStatus,
-  FeedPost,
-  ViewerLike,
-} from "@/lib/types";
+import type { ContentTranslation, FeedPost, ViewerLike } from "@/lib/types";
 import type { AccountBadge } from "@/lib/achievement-levels";
 import { resolveAccountBadges } from "@/lib/achievement-levels";
 import { resolveAccountTags, type AccountTag } from "@/lib/tags";
+import {
+  mapPostProjection,
+  mapPostTranslation,
+  type PostProjectionRow,
+} from "@/lib/post-projection";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 
 export interface CommentNode {
   id: string;
@@ -71,98 +71,6 @@ export interface ProfileRecord extends PublicProfile {
   isNsfw: boolean;
 }
 
-function mapTranslation(row: {
-  source_lang?: string | null;
-  translation_target_lang?: string | null;
-  translation_status?: string | null;
-  title_translated?: string | null;
-  body_translated?: string | null;
-}): ContentTranslation | null {
-  const status = (row.translation_status ??
-    "pending") as ContentTranslationStatus;
-  if (status !== "ready") {
-    return {
-      sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
-      targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
-      status,
-      titleTranslated: null,
-      bodyTranslated: null,
-    };
-  }
-  return {
-    sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
-    targetLang: (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
-    status,
-    titleTranslated: row.title_translated ?? null,
-    bodyTranslated: row.body_translated ?? null,
-  };
-}
-
-function mapFeedRow(
-  row: {
-    id: string;
-    title: string;
-    body: string | null;
-    url: string | null;
-    media_key: string | null;
-    like_count: number;
-    comment_count: number;
-    created_at: string;
-    source_lang?: string | null;
-    translation_target_lang?: string | null;
-    title_translated?: string | null;
-    body_translated?: string | null;
-    translation_status?: string | null;
-    author_id: string;
-    author_username: string | null;
-    author_display_name: string | null;
-    author_image?: string | null;
-    author_role?: string | null;
-    author_is_nsfw?: number | null;
-    author_created_at?: string | null;
-    author_karma?: number | null;
-    author_is_community_mod?: number | null;
-    author_has_veteran?: number | null;
-    subreddit_id: string;
-    subreddit_name: string;
-    subreddit_title: string;
-    viewer_liked?: number | null;
-  },
-  viewerUserId?: string | null
-): FeedPost {
-  return {
-    id: row.id,
-    title: row.title,
-    body: row.body,
-    url: row.url,
-    mediaKey: row.media_key,
-    commentCount: row.comment_count,
-    createdAt: row.created_at,
-    likeCount: Number(row.like_count ?? 0),
-    liked: Boolean(row.viewer_liked),
-    translation: mapTranslation(row),
-    author: {
-      id: row.author_id,
-      username: row.author_username ?? "unknown",
-      displayName: row.author_display_name,
-      image: row.author_image ?? null,
-      tags: resolveAccountTags({
-        role: row.author_role,
-        isNsfw: row.author_is_nsfw,
-        createdAt: row.author_created_at,
-        karma: row.author_karma,
-        isCommunityMod: Boolean(row.author_is_community_mod),
-        hasVeteranAchievement: Boolean(row.author_has_veteran),
-      }),
-      isAuthor: Boolean(viewerUserId && viewerUserId === row.author_id),
-    },
-    subreddit: {
-      id: row.subreddit_id,
-      name: row.subreddit_name,
-      title: row.subreddit_title,
-    },
-  };
-}
 
 const AUTHOR_TAG_SELECT = `
   u.role AS author_role,
@@ -200,7 +108,7 @@ export async function getSubredditByName(name: string) {
   return db
     .prepare(
       `SELECT id, name, title, description, subscriber_count, created_at, created_by, is_removed
-       FROM subreddits WHERE name = ? COLLATE NOCASE`
+       FROM subreddits WHERE name = ? COLLATE NOCASE AND is_removed = 0`
     )
     .bind(name)
     .first<{
@@ -263,7 +171,7 @@ export async function getPostDetail(
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
-           WHERE p.id = ? AND p.is_removed = 0`
+           WHERE p.id = ? AND ${publicPostVisibilitySql()}`
         )
         .bind(viewerUserId, postId)
         .first()
@@ -284,7 +192,7 @@ export async function getPostDetail(
            FROM posts p
            INNER JOIN "user" u ON u.id = p.author_id
            INNER JOIN subreddits s ON s.id = p.subreddit_id
-           WHERE p.id = ? AND p.is_removed = 0`
+           WHERE p.id = ? AND ${publicPostVisibilitySql()}`
         )
         .bind(postId)
         .first();
@@ -407,7 +315,7 @@ export async function getPostDetail(
       liked: Boolean(row.viewer_liked),
       translation: row.is_deleted || row.is_removed
         ? null
-        : mapTranslation({
+        : mapPostTranslation({
             source_lang: row.source_lang,
             translation_target_lang: row.translation_target_lang,
             translation_status: row.translation_status,
@@ -453,7 +361,7 @@ export async function getPostDetail(
   }
 
   return {
-    ...mapFeedRow(post as Parameters<typeof mapFeedRow>[0], viewerUserId),
+    ...mapPostProjection(post as PostProjectionRow, viewerUserId),
     isLocked: Boolean((post as { is_locked: number }).is_locked),
     comments: roots,
   };
@@ -613,8 +521,7 @@ export async function getRecommendations(userId: string, limit = 10) {
          ON ua.subreddit_id = p.subreddit_id AND ua.user_id = ?
        LEFT JOIN user_follows uf
          ON uf.follower_id = ? AND uf.following_id = p.author_id
-       WHERE p.is_removed = 0
-         AND p.is_shadow_hidden = 0
+       WHERE ${publicPostVisibilitySql()}
          AND p.author_id != ?
          AND p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = ?)
          AND p.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)
@@ -626,7 +533,7 @@ export async function getRecommendations(userId: string, limit = 10) {
     .all();
 
   return (results ?? []).map((row) =>
-    mapFeedRow(row as Parameters<typeof mapFeedRow>[0], userId)
+    mapPostProjection(row as PostProjectionRow, userId)
   );
 }
 
@@ -691,7 +598,8 @@ export async function listUserCommentsPage(
          AND c.is_removed = 0
          AND c.is_deleted = 0
          AND c.is_shadow_hidden = 0
-         AND p.is_removed = 0${cursorClause}
+         AND ${publicPostVisibilitySql()}
+         ${cursorClause}
        ORDER BY c.created_at DESC, c.id DESC
        LIMIT ?`
     )

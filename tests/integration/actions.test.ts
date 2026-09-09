@@ -13,6 +13,7 @@ import {
 } from "@/lib/actions";
 import { uploadPostImage } from "@/lib/media";
 import { ensureProfileCommunity } from "@/lib/profile-community";
+import { getPostDetail } from "@/lib/content";
 import { getFeedPosts } from "@/lib/db";
 import { AuthError } from "@/lib/session";
 import {
@@ -30,6 +31,10 @@ import {
   unlikeComment,
   unlikePost,
 } from "@/lib/likes";
+import {
+  subscribeToSubreddit,
+  unsubscribeFromSubreddit,
+} from "@/lib/communities";
 
 import {
   getCommentRow,
@@ -208,14 +213,196 @@ describe("content lifecycle (D1)", () => {
       requestId: commentRequestId,
     });
     expect(retriedComment).toEqual(firstComment);
+    await expect(
+      createComment({
+        userId: authorId,
+        postId: firstPost.id,
+        body: "Different comment retry payload.",
+        requestId: commentRequestId,
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      message: "Request ID was already used for a different comment",
+    });
 
     const commentCount = await env.DB
       .prepare(`SELECT COUNT(*) AS count FROM comments WHERE id = ?`)
       .bind(firstComment.id)
+
       .first<{ count: number }>();
     expect(Number(commentCount?.count)).toBe(1);
   });
 });
+describe("community counter hardening", () => {
+  it("keeps subscriber_count derived from subscriptions", async () => {
+    const { actorId, subredditId } = await seedUsersAndSubreddit();
+
+    await expect(
+      subscribeToSubreddit(actorId, subredditId)
+    ).resolves.toMatchObject({
+      subscribed: true,
+      subscriberCount: 1,
+    });
+    await expect(
+      subscribeToSubreddit(actorId, subredditId)
+    ).resolves.toMatchObject({
+      subscribed: true,
+      subscriberCount: 1,
+    });
+    await expect(
+      unsubscribeFromSubreddit(actorId, subredditId)
+    ).resolves.toMatchObject({
+      subscribed: false,
+      subscriberCount: 0,
+    });
+
+    const row = await env.DB
+      .prepare(
+        `SELECT s.subscriber_count,
+                (SELECT COUNT(*) FROM subscriptions
+                 WHERE subreddit_id = s.id) AS actual_count
+         FROM subreddits s WHERE s.id = ?`
+      )
+      .bind(subredditId)
+      .first<{ subscriber_count: number; actual_count: number }>();
+    expect(row).toEqual({ subscriber_count: 0, actual_count: 0 });
+  });
+});
+describe("public feed hardening", () => {
+  it("ranks popular posts by canonical engagement with a stable cursor", async () => {
+    const { authorId, actorId, adminId, subredditId } =
+      await seedUsersAndSubreddit();
+    const recentLow = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Recent low engagement post",
+      body: "This post is newer but has no reactions.",
+    });
+    const popular = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Older popular post",
+      body: "This post has canonical likes and a comment.",
+    });
+    await likePost(popular.id, actorId);
+    await likePost(popular.id, adminId);
+    await createComment({
+      userId: authorId,
+      postId: popular.id,
+      body: "A real comment increases the engagement rank.",
+    });
+
+    const first = await getFeedPosts({
+      mode: "popular",
+      sort: "popular",
+      limit: 1,
+    });
+    expect(first.posts[0]?.id).toBe(popular.id);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await getFeedPosts({
+      mode: "popular",
+      sort: "popular",
+      cursor: first.nextCursor,
+      limit: 10,
+    });
+    expect(second.posts.map((post) => post.id)).toContain(recentLow.id);
+    expect(second.posts.map((post) => post.id)).not.toContain(popular.id);
+  });
+
+  it("uses the same moderation visibility for feed and post detail", async () => {
+    const { authorId, subredditId, subredditName } =
+      await seedUsersAndSubreddit();
+    const visible = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Visible public post",
+      body: "This post should remain in the public feed.",
+    });
+    const shadow = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Shadow hidden public post",
+      body: "This post is hidden by moderation.",
+    });
+    await env.DB.prepare(
+      `UPDATE posts SET is_shadow_hidden = 1 WHERE id = ?`
+    )
+      .bind(shadow.id)
+      .run();
+
+    const feed = await getFeedPosts({
+      subreddit: subredditName,
+      sort: "new",
+      mode: "community",
+      limit: 20,
+    });
+    expect(feed.posts.map((post) => post.id)).toContain(visible.id);
+    expect(feed.posts.map((post) => post.id)).not.toContain(shadow.id);
+    expect(await getPostDetail(shadow.id)).toBeNull();
+  });
+  it("separates public reads from blocked positive interactions", async () => {
+    const { authorId, actorId, adminId, subredditId } =
+      await seedUsersAndSubreddit();
+    const post = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "Public post remains readable after block",
+      body: "Blocking changes interaction policy, not public visibility.",
+    });
+
+    await likePost(post.id, actorId);
+    await blockUser(actorId, authorId);
+    expect(await getPostDetail(post.id, actorId)).toBeTruthy();
+    const newPost = await createPost({
+      userId: authorId,
+      subredditId,
+      title: "A new post after the block",
+      body: "A new positive interaction must be denied.",
+    });
+    await expect(likePost(newPost.id, actorId)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      createComment({
+        userId: actorId,
+        postId: post.id,
+        body: "This new comment must be denied.",
+      })
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(unlikePost(post.id, actorId)).resolves.toMatchObject({
+      liked: false,
+    });
+
+    const parent = await createComment({
+      userId: adminId,
+      postId: post.id,
+      body: "Parent comment for bilateral reply policy.",
+    });
+    await likeComment(parent.id, actorId);
+    await blockUser(actorId, adminId);
+    const secondComment = await createComment({
+      userId: adminId,
+      postId: post.id,
+      body: "A second comment tests a new blocked like.",
+    });
+    await expect(likeComment(secondComment.id, actorId)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(unlikeComment(parent.id, actorId)).resolves.toMatchObject({
+      liked: false,
+    });
+    await expect(
+      createComment({
+        userId: actorId,
+        postId: post.id,
+        parentId: parent.id,
+        body: "This reply must be denied by the parent block.",
+      })
+    ).rejects.toMatchObject({ status: 403 });
+  });
+});
+
 
 
 describe("user actions (hide / block / follow / report)", () => {

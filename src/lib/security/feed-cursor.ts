@@ -10,6 +10,8 @@ export const FEED_CURSOR_TTL_MS = 24 * 60 * 60_000;
 const CURSOR_VERSION = 1 as const;
 
 export type FeedCursorPosition = {
+  /** Required for popularity ordering; omitted for recency cursors. */
+  rank?: number;
   createdAt: string;
   id: string;
 };
@@ -53,6 +55,13 @@ function decodePayload(raw: string): SealedPayload | null {
   try {
     const json = new TextDecoder().decode(base64UrlToBytes(raw));
     const parsed = JSON.parse(json) as Partial<SealedPayload>;
+    const rank = parsed.rank;
+    if (
+      rank !== undefined &&
+      (typeof rank !== "number" || !Number.isFinite(rank))
+    ) {
+      return null;
+    }
     if (
       parsed.v !== CURSOR_VERSION ||
       typeof parsed.createdAt !== "string" ||
@@ -66,6 +75,7 @@ function decodePayload(raw: string): SealedPayload | null {
     }
     return {
       v: CURSOR_VERSION,
+      rank,
       createdAt: parsed.createdAt,
       id: parsed.id,
       sort: parsed.sort as FeedSort,
@@ -96,6 +106,7 @@ export async function signFeedCursorWithSecret(
 ): Promise<string> {
   const payload: SealedPayload = {
     v: CURSOR_VERSION,
+    ...(position.rank === undefined ? {} : { rank: position.rank }),
     createdAt: position.createdAt,
     id: position.id,
     sort: context.sort,
@@ -150,15 +161,22 @@ export async function openFeedCursorWithSecret(
     !sameNullable(payload.subreddit, expect.subreddit) ||
     !sameNullable(payload.authorId, expect.authorId) ||
     !sameNullable(payload.viewerId, expect.viewerId) ||
-    payload.scope !== (expect.scope ?? "posts")
+    payload.scope !== (expect.scope ?? "posts") ||
+    (expect.sort === "popular" && payload.rank === undefined)
   ) {
     throw new InvalidFeedCursorError("Cursor context mismatch");
   }
 
-  return {
-    createdAt: payload.createdAt,
-    id: payload.id,
-  };
+  return payload.rank === undefined
+    ? {
+        createdAt: payload.createdAt,
+        id: payload.id,
+      }
+    : {
+        rank: payload.rank,
+        createdAt: payload.createdAt,
+        id: payload.id,
+      };
 }
 
 /** Issue a tamper-evident cursor bound to feed context. */

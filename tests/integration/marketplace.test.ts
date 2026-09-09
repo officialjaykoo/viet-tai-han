@@ -75,6 +75,26 @@ describe("marketplace lifecycle (D1)", () => {
     const search = await searchAll("compact desk");
     expect(search.listings.some((item) => item.id === listing.id)).toBe(true);
   });
+  it("returns the same listing and rejects conflicting request payloads", async () => {
+    const { authorId } = await seedUsersAndSubreddit();
+    const requestId = crypto.randomUUID();
+    const input = {
+      sellerId: authorId,
+      sellerStatus: "active",
+      kind: "market",
+      category: "Furniture",
+      title: "Retry-safe listing",
+      body: "This listing must be safe to retry without duplicate rows.",
+      price: "10000 KRW",
+      location: "Seoul",
+      requestId,
+    } as const;
+    const first = await createListing(input);
+    expect(await createListing(input)).toEqual(first);
+    await expect(
+      createListing({ ...input, price: "20000 KRW" })
+    ).rejects.toMatchObject({ status: 409 });
+  });
 
   it("rejects public contact details and duplicate reports", async () => {
     const { authorId, actorId } = await seedUsersAndSubreddit();

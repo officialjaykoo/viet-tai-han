@@ -1,13 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-
-import type {
-  ContentSourceLang,
-  ContentTranslation,
-  ContentTranslationStatus,
-  FeedPost,
-  OrganicFeedPage,
-} from "@/lib/types";
-import { resolveAccountTags } from "@/lib/tags";
+import type { OrganicFeedPage } from "@/lib/types";
+import { mapPostProjection, type PostProjectionRow } from "@/lib/post-projection";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 import {
   InvalidFeedCursorError,
   openFeedCursor,
@@ -17,8 +11,7 @@ import {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
-/** The feed is intentionally recency-first; recommendations are D1-only. */
-export type FeedSort = "new";
+export type FeedSort = "new" | "popular";
 export type FeedMode = "home" | "popular" | "community";
 
 export async function getDb(): Promise<D1Database> {
@@ -31,98 +24,9 @@ export async function getEnv(): Promise<CloudflareEnv> {
   return env;
 }
 
-function mapTranslation(row: {
-  source_lang?: string | null;
-  translation_target_lang?: string | null;
-  translation_status?: string | null;
-  title_translated?: string | null;
-  body_translated?: string | null;
-}): ContentTranslation | null {
-  const status = (row.translation_status ?? "pending") as ContentTranslationStatus;
-  if (status !== "ready") {
-    return {
-      sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
-      targetLang:
-        (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
-      status,
-      titleTranslated: null,
-      bodyTranslated: null,
-    };
-  }
-  return {
-    sourceLang: (row.source_lang as ContentSourceLang | null) ?? null,
-    targetLang:
-      (row.translation_target_lang as ContentTranslation["targetLang"]) ?? null,
-    status,
-    titleTranslated: row.title_translated ?? null,
-    bodyTranslated: row.body_translated ?? null,
-  };
-}
-
-interface FeedQueryRow {
-  id: string;
-  title: string;
-  body: string | null;
-  url: string | null;
-  media_key: string | null;
-  like_count: number;
-  comment_count: number;
-  created_at: string;
-  source_lang: string | null;
-  translation_target_lang: string | null;
-  title_translated: string | null;
-  body_translated: string | null;
-  translation_status: string | null;
-  author_id: string;
-  author_username: string;
-  author_display_name: string | null;
-  author_image: string | null;
-  author_role: string | null;
-  author_is_nsfw: number | null;
-  author_created_at: string | null;
-  author_karma: number | null;
-  author_is_community_mod: number | null;
-  author_has_veteran: number | null;
-  subreddit_id: string;
-  subreddit_name: string;
-  subreddit_title: string;
-  viewer_liked: number | null;
-}
-
-function mapFeedPost(row: FeedQueryRow, viewerUserId?: string | null): FeedPost {
-  return {
-    id: row.id,
-    title: row.title,
-    body: row.body,
-    url: row.url,
-    mediaKey: row.media_key,
-    commentCount: row.comment_count,
-    createdAt: row.created_at,
-    likeCount: Number(row.like_count ?? 0),
-    liked: Boolean(row.viewer_liked),
-    translation: mapTranslation(row),
-    author: {
-      id: row.author_id,
-      username: row.author_username,
-      displayName: row.author_display_name,
-      image: row.author_image,
-      tags: resolveAccountTags({
-        role: row.author_role,
-        isNsfw: row.author_is_nsfw,
-        createdAt: row.author_created_at,
-        karma: row.author_karma,
-        isCommunityMod: Boolean(row.author_is_community_mod),
-        hasVeteranAchievement: Boolean(row.author_has_veteran),
-      }),
-      isAuthor: Boolean(viewerUserId && viewerUserId === row.author_id),
-    },
-    subreddit: {
-      id: row.subreddit_id,
-      name: row.subreddit_name,
-      title: row.subreddit_title,
-    },
-  };
-}
+type FeedQueryRow = PostProjectionRow & {
+  engagement_rank?: number;
+};
 
 export async function getFeedPosts(options: {
   limit?: number;
@@ -138,8 +42,8 @@ export async function getFeedPosts(options: {
     Math.max(options.limit ?? DEFAULT_PAGE_SIZE, 1),
     MAX_PAGE_SIZE
   );
-  const sort = options.sort ?? "new";
   const mode = options.mode ?? (options.subreddit ? "community" : "popular");
+  const sort = options.sort ?? (mode === "popular" ? "popular" : "new");
   const viewerUserId = options.viewerUserId ?? null;
   const subreddit = options.subreddit ?? null;
   const authorId = options.authorId ?? null;
@@ -151,9 +55,10 @@ export async function getFeedPosts(options: {
     viewerId: viewerUserId,
   };
   const cursor = await openFeedCursor(options.cursor ?? null, cursorContext);
+  const engagementRank = "p.like_count + (p.comment_count * 3)";
 
   const params: Array<string | number> = [];
-  const where: string[] = ["p.is_removed = 0", "p.is_shadow_hidden = 0"];
+  const where: string[] = [publicPostVisibilitySql()];
 
   const viewerLikeSelect = viewerUserId
     ? `EXISTS (
@@ -190,10 +95,26 @@ export async function getFeedPosts(options: {
   }
 
   if (cursor) {
-    where.push("(p.created_at < ? OR (p.created_at = ? AND p.id < ?))");
-    params.push(cursor.createdAt, cursor.createdAt, cursor.id);
+    if (sort === "popular") {
+      if (cursor.rank === undefined) {
+        throw new InvalidFeedCursorError("Popular cursor is missing rank");
+      }
+      where.push(
+        `(${engagementRank} < ? OR (${engagementRank} = ? AND
+          (p.created_at < ? OR (p.created_at = ? AND p.id < ?))))`
+      );
+      params.push(
+        cursor.rank,
+        cursor.rank,
+        cursor.createdAt,
+        cursor.createdAt,
+        cursor.id
+      );
+    } else {
+      where.push("(p.created_at < ? OR (p.created_at = ? AND p.id < ?))");
+      params.push(cursor.createdAt, cursor.createdAt, cursor.id);
+    }
   }
-
   const statement = db
     .prepare(
       `SELECT
@@ -204,6 +125,7 @@ export async function getFeedPosts(options: {
          p.media_key,
          p.like_count,
          p.comment_count,
+         ${engagementRank} AS engagement_rank,
          p.created_at,
          p.source_lang,
          p.translation_target_lang,
@@ -235,7 +157,9 @@ export async function getFeedPosts(options: {
        INNER JOIN "user" u ON u.id = p.author_id
        INNER JOIN subreddits s ON s.id = p.subreddit_id
        WHERE ${where.join(" AND ")}
-       ORDER BY p.created_at DESC, p.id DESC
+       ORDER BY ${
+         sort === "popular" ? `${engagementRank} DESC,` : ""
+       } p.created_at DESC, p.id DESC
        LIMIT ?`
     )
     .bind(...params, limit + 1);
@@ -247,11 +171,18 @@ export async function getFeedPosts(options: {
   const last = page.at(-1);
 
   return {
-    posts: page.map((row) => mapFeedPost(row, viewerUserId)),
+    posts: page.map((row) => mapPostProjection(row, viewerUserId)),
     nextCursor:
       hasMore && last
         ? await signFeedCursor(
-            { createdAt: last.created_at, id: last.id },
+            {
+              rank:
+                sort === "popular"
+                  ? Number(last.engagement_rank ?? 0)
+                  : undefined,
+              createdAt: last.created_at,
+              id: last.id,
+            },
             cursorContext
           )
         : null,

@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { parseDiscoverySource, type DiscoverySource } from "@/lib/discovery";
+import { publicPostVisibilitySql } from "@/lib/content-visibility";
 import { AuthError } from "@/lib/session";
 
 function dayKey(now = new Date()): string {
@@ -15,7 +16,12 @@ export async function recordPostView(input: {
 }) {
   const db = await getDb();
   const post = await db
-    .prepare(`SELECT id FROM posts WHERE id = ? AND is_removed = 0`)
+    .prepare(
+      `SELECT p.id
+       FROM posts p
+       INNER JOIN subreddits s ON s.id = p.subreddit_id
+       WHERE p.id = ? AND ${publicPostVisibilitySql()}`
+    )
     .bind(input.postId)
     .first();
   if (!post) return { recorded: false };
@@ -53,7 +59,12 @@ export async function recordPostLinkClick(input: {
 }): Promise<string | null> {
   const db = await getDb();
   const post = await db
-    .prepare(`SELECT url FROM posts WHERE id = ? AND is_removed = 0`)
+    .prepare(
+      `SELECT p.url
+       FROM posts p
+       INNER JOIN subreddits s ON s.id = p.subreddit_id
+       WHERE p.id = ? AND ${publicPostVisibilitySql()}`
+    )
     .bind(input.postId)
     .first<{ url: string | null }>();
   if (!post?.url) return null;
@@ -82,8 +93,10 @@ export async function getPostAnalytics(input: {
   const db = await getDb();
   const post = await db
     .prepare(
-      `SELECT id, author_id, title, url, like_count, comment_count, created_at
-       FROM posts WHERE id = ? AND is_removed = 0`
+      `SELECT p.id, p.author_id, p.title, p.url, p.like_count, p.comment_count, p.created_at
+       FROM posts p
+       INNER JOIN subreddits s ON s.id = p.subreddit_id
+       WHERE p.id = ? AND ${publicPostVisibilitySql()}`
     )
     .bind(input.postId)
     .first<{

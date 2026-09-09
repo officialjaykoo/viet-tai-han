@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { parseAcceptAnswerPayload } from "@/lib/content-payload";
 import { toggleAcceptedAnswer } from "@/lib/qna";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
@@ -12,10 +13,7 @@ export async function POST(
   try {
     const session = await requireSession();
     const { id: questionId } = await context.params;
-    const body = (await readApiJson(request)) as { answerId?: string };
-    if (!body.answerId?.trim()) {
-      return await jsonLocalizedError("answerId is required", 400);
-    }
+    const body = parseAcceptAnswerPayload(await readApiJson(request));
 
     const result = await toggleAcceptedAnswer({
       userId: session.user.id,
