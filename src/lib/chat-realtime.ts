@@ -1,4 +1,4 @@
-import { getEnv } from "@/lib/db";
+import { getDb, getEnv } from "@/lib/db";
 
 export type ChatRealtimeMessage = {
   roomId: string;
@@ -48,4 +48,63 @@ export async function broadcastChatMessage(input: ChatRealtimeMessage) {
       })
     );
   }
+}
+export async function revokeChatRoom(
+  roomId: string,
+  reason: "membership_revoked" | "account_banned" = "membership_revoked"
+) {
+  try {
+    const env = await getEnv();
+    const chatRoom = (env as CloudflareEnv & {
+      CHAT_ROOM?: DurableObjectNamespace;
+    }).CHAT_ROOM;
+    if (!chatRoom) return;
+
+    const stub = chatRoom.get(chatRoom.idFromName(roomId));
+    const response = await stub.fetch(
+      `https://vth-chat-room/revoke?room=${encodeURIComponent(roomId)}&reason=${encodeURIComponent(reason)}`,
+      {
+        method: "POST",
+        headers: {
+          "X-VTH-Realtime-Token": env.BETTER_AUTH_SECRET,
+        },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Chat realtime revoke failed (${response.status})`);
+    }
+    console.info(
+      JSON.stringify({
+        level: "info",
+        msg: "chat_realtime_revoked",
+        roomId,
+        reason,
+      })
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "warn",
+        msg: "chat_realtime_revoke_failed",
+        roomId,
+        reason,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+  }
+}
+
+export async function revokeChatRoomsForUser(userId: string) {
+  const db = await getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT room_id
+       FROM chat_room_members
+       WHERE user_id = ?`
+    )
+    .bind(userId)
+    .all<{ room_id: string }>();
+  await Promise.allSettled(
+    (results ?? []).map((row) => revokeChatRoom(row.room_id, "account_banned"))
+  );
 }

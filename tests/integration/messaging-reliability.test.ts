@@ -258,22 +258,31 @@ describe("chat reliability (D1)", () => {
     await getChatMessages({ roomId, userId: actorId });
     expect((await getUnreadCounts(actorId)).messageCount).toBe(4);
 
-    expect(
-      await markChatMessagesRead({
-        roomId,
-        userId: actorId,
+    const firstRead = await markChatMessagesRead({
+      roomId,
+      userId: actorId,
+      messageId: "read_03",
+    });
+    expect(firstRead).toMatchObject({
+      messageId: "read_03",
+      readThrough: {
         messageId: "read_03",
-      })
-    ).toMatchObject({ messageId: "read_03", updated: true });
+        createdAt: expect.any(String),
+      },
+      updated: true,
+    });
     expect((await getUnreadCounts(actorId)).messageCount).toBe(1);
 
-    expect(
-      await markChatMessagesRead({
-        roomId,
-        userId: actorId,
-        messageId: "read_02",
-      })
-    ).toMatchObject({ messageId: "read_02", updated: false });
+    const staleRead = await markChatMessagesRead({
+      roomId,
+      userId: actorId,
+      messageId: "read_02",
+    });
+    expect(staleRead).toMatchObject({
+      messageId: "read_02",
+      readThrough: firstRead.readThrough,
+      updated: false,
+    });
     expect((await getUnreadCounts(actorId)).messageCount).toBe(1);
 
     await markChatMessagesRead({

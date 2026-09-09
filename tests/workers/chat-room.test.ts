@@ -110,6 +110,154 @@ describe("ChatRoom", () => {
     sender.socket.close();
     recipient.socket.close();
   });
+  it("revokes connected sockets before a delayed post-block broadcast", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const roomId = `room_block_${suffix}`;
+    const senderId = `sender_block_${suffix}`;
+    const recipientId = `recipient_block_${suffix}`;
+
+    await env.DB.batch([
+      env.DB
+        .prepare(
+          `INSERT INTO "user" (id, name, email, emailVerified, username)
+           VALUES (?, 'Sender', ?, 1, ?)`
+        )
+        .bind(senderId, `${senderId}@test.local`, senderId),
+      env.DB
+        .prepare(
+          `INSERT INTO "user" (id, name, email, emailVerified, username)
+           VALUES (?, 'Recipient', ?, 1, ?)`
+        )
+        .bind(recipientId, `${recipientId}@test.local`, recipientId),
+      env.DB
+        .prepare(
+          `INSERT INTO chat_rooms (id, kind, pair_key, created_by)
+           VALUES (?, 'dm', ?, ?)`
+        )
+        .bind(roomId, [senderId, recipientId].sort().join(":"), senderId),
+      env.DB
+        .prepare(
+          `INSERT INTO chat_room_members (room_id, user_id, role, membership_status)
+           VALUES (?, ?, 'owner', 'active'), (?, ?, 'member', 'active')`
+        )
+        .bind(roomId, senderId, roomId, recipientId),
+    ]);
+
+    const sender = await connect(roomId, senderId);
+    const recipient = await connect(roomId, recipientId);
+    await sender.ready;
+    await recipient.ready;
+    const senderRevoked = messageFrom(sender.socket);
+    const recipientRevoked = messageFrom(recipient.socket);
+
+    await env.DB.batch([
+      env.DB
+        .prepare(`INSERT INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)`)
+        .bind(recipientId, senderId),
+      env.DB
+        .prepare(
+          `UPDATE chat_room_members
+           SET membership_status = 'left', joined_at = NULL
+           WHERE room_id = ?`
+        )
+        .bind(roomId),
+    ]);
+
+    const delayedBroadcast = await env.CHAT_ROOM.getByName(roomId).fetch(
+      new Request(`https://vth-chat-room/broadcast?room=${roomId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-VTH-Realtime-Token": env.BETTER_AUTH_SECRET,
+        },
+        body: JSON.stringify({
+          roomId,
+          id: `message_block_${suffix}`,
+          clientMessageId: `client_block_${suffix}`,
+          body: "Must not leak after block",
+          createdAt: "2026-08-14T00:00:00.000Z",
+          senderId,
+          senderUsername: senderId,
+        }),
+      })
+    );
+
+    expect(await delayedBroadcast.json()).toEqual({ delivered: 0 });
+    expect(JSON.parse(await senderRevoked)).toMatchObject({
+      type: "revoked",
+      roomId,
+      reason: "membership_revoked",
+    });
+    expect(JSON.parse(await recipientRevoked)).toMatchObject({
+      type: "revoked",
+      roomId,
+      reason: "membership_revoked",
+    });
+    sender.socket.close();
+    recipient.socket.close();
+  });
+
+  it("closes an existing socket with the banned terminal reason", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const roomId = `room_ban_${suffix}`;
+    const senderId = `sender_ban_${suffix}`;
+    const recipientId = `recipient_ban_${suffix}`;
+
+    await env.DB.batch([
+      env.DB
+        .prepare(
+          `INSERT INTO "user" (id, name, email, emailVerified, username)
+           VALUES (?, 'Sender', ?, 1, ?)`
+        )
+        .bind(senderId, `${senderId}@test.local`, senderId),
+      env.DB
+        .prepare(
+          `INSERT INTO "user" (id, name, email, emailVerified, username)
+           VALUES (?, 'Recipient', ?, 1, ?)`
+        )
+        .bind(recipientId, `${recipientId}@test.local`, recipientId),
+      env.DB
+        .prepare(
+          `INSERT INTO chat_rooms (id, kind, pair_key, created_by)
+           VALUES (?, 'dm', ?, ?)`
+        )
+        .bind(roomId, [senderId, recipientId].sort().join(":"), senderId),
+      env.DB
+        .prepare(
+          `INSERT INTO chat_room_members (room_id, user_id, role, membership_status)
+           VALUES (?, ?, 'owner', 'active'), (?, ?, 'member', 'active')`
+        )
+        .bind(roomId, senderId, roomId, recipientId),
+    ]);
+
+    const sender = await connect(roomId, senderId);
+    await sender.ready;
+    const revoked = messageFrom(sender.socket);
+    await env.DB
+      .prepare(`UPDATE "user" SET status = 'banned' WHERE id = ?`)
+      .bind(senderId)
+      .run();
+
+    const revoke = await env.CHAT_ROOM.getByName(roomId).fetch(
+      new Request(
+        `https://vth-chat-room/revoke?room=${roomId}&reason=account_banned`,
+        {
+          method: "POST",
+          headers: {
+            "X-VTH-Realtime-Token": env.BETTER_AUTH_SECRET,
+          },
+        }
+      )
+    );
+
+    expect(await revoke.json()).toEqual({ revoked: 1 });
+    expect(JSON.parse(await revoked)).toMatchObject({
+      type: "revoked",
+      roomId,
+      reason: "account_banned",
+    });
+    sender.socket.close();
+  });
 
   it("rejects pending members and blocked peers", async () => {
     const suffix = crypto.randomUUID().slice(0, 8);

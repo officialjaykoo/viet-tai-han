@@ -11,6 +11,20 @@ VTH DM의 canonical state와 write path는 D1과 HTTP API입니다. Cloudflare D
 
 Durable Object 내부에 history를 저장하거나 WebSocket을 메시지 작성 API로 사용하지 않습니다.
 
+### 1.1 State / Event / Authority
+
+| State | Canonical authority | Client/transport projection | Recovery |
+| --- | --- | --- | --- |
+| room and membership | D1 `chat_rooms`, `chat_room_members` | selected room and open socket | inbox/history authorization |
+| request status | D1 `chat_requests` | request lists and action state | inbox reload |
+| message existence/order | D1 `chat_messages`, `(created_at, id)` | sorted React message list and room preview | signed history/catch-up |
+| read boundary | D1 member `(last_read_at, last_read_message_id)` | read acknowledgment and room badge | read response tuple plus inbox/unread refresh |
+| unread | D1 predicate/read boundary | room/global counters | authoritative `/api/messages` and `/api/unread` |
+| socket permission | D1 membership/block/account status | open WebSocket | connect check, broadcast check, terminal revoke |
+| optimistic delivery | D1 canonical message existence | local `sending`/`sent`/`failed` row | same `clientMessageId` retry or catch-up |
+
+HTTP is the only canonical mutation path. `ready`, `message`, and `revoked` are transport events; a missing or duplicated event never changes D1 truth.
+
 ## 2. 전체 흐름
 
 ```mermaid
@@ -109,7 +123,11 @@ Block은 단순 UI 숨김이 아닙니다. D1 transaction/batch 경계에서 다
 - unread count를 재계산하여 과거 unread가 다시 나타나지 않게 합니다.
 - 이후 send, request, room connect, unread fanout은 bilateral block을 거부/제외합니다.
 
-기존에 열린 socket은 다음 write/connect 검증에서 계속 차단됩니다. block 이후 stale WebSocket event, old unread row, old request notification이 contact 권한을 복구하지 않습니다.
+Block commit 이후 `revokeChatRoom()`이 room DO에 best-effort revoke command를 보냅니다. DO는 해당 room의 기존 socket에 `revoked` terminal event를 보낸 뒤 close code `4003`으로 닫습니다. revoke command가 지연되거나 실패해도 `/broadcast`는 전송 직전에 D1에서 active membership, 양방향 block, 양쪽 account status를 한 번 확인하고 허가된 room만 fan-out합니다. 따라서 block 성공 response 이후 stale broadcast가 기존 socket으로 전달되지 않습니다.
+
+클라이언트는 `revoked`를 받으면 reconnect backoff를 중단하고 `/messages`로 나가며 inbox와 global unread를 authoritative refresh합니다. banned account도 동일한 revoke 경로를 사용합니다.
+
+Block→unblock의 delivered history 수명은 **NEEDS PRODUCT DECISION**입니다. 현재 안전한 기본 동작은 delivered row를 삭제하지 않고, block 중에는 두 membership을 `left`로 만들어 history를 숨기며, unblock 후 정상적인 room 재활성화 시 기존 history를 다시 보여주는 것입니다. 영구 비공개가 제품 정책이면 message generation/redaction 규칙과 migration이 별도로 필요합니다.
 
 ## 7. Ordering과 history
 
@@ -120,9 +138,12 @@ Block은 단순 UI 숨김이 아닙니다. D1 transaction/batch 경계에서 다
 - room 선택 시 D1 history page를 로드합니다.
 - `before` signed cursor로 과거 history를 prepend합니다.
 - WebSocket `ready` 후 `after` signed cursor로 reconnect catch-up을 수행합니다.
-- HTTP 응답과 live event를 message ID로 merge/dedupe합니다.
+- canonical message ID를 room별 bounded set으로 dedupe합니다. preview 최신성, message dedupe, unread accounting은 서로 독립적으로 처리합니다.
+- WebSocket/REST가 `M2 → M1` 순서로 도착해도 preview는 max tuple을 유지하고 각 unique inbound message의 unread를 한 번만 반영합니다.
+- HTTP 응답과 live event를 message ID 및 own `clientMessageId`로 merge/dedupe합니다. canonical evidence가 있는 row는 늦은 transport error로 `failed`가 되지 않습니다.
 - live event마다 room 전체 GET을 수행하지 않습니다.
 - 하단 viewport일 때만 명시적인 read endpoint를 호출합니다.
+- read response의 authoritative `readThrough { messageId, createdAt }`를 사용하며, 새 `M4`가 도착한 뒤 `M3` acknowledgment가 와도 `M4` unread를 지웁지 않습니다. 성공한 read response 뒤 inbox/unread를 재검증합니다.
 - 연결이 끊기면 jitter가 있는 exponential backoff로 reconnect합니다: 1초 → 2초 → 4초 → 8초 → 최대 10초.
 - offline/hidden 상태에서 연결을 중지하고 online/visible 상태에서 복구합니다.
 - room 변경 또는 페이지 이탈 시 이전 연결을 정리합니다.
@@ -156,7 +177,7 @@ Push는 VAPID key, browser permission, service-worker subscription이 모두 필
 }
 ```
 
-`src/worker.ts`는 Wrangler가 migration 대상 class를 발견하도록 `ChatRoom`을 export합니다. `ChatRoom`은 내부 token, room/user header, D1 active membership, bilateral block을 검증한 뒤 socket을 관리합니다. broadcast payload에는 이미 D1에 commit된 message ID와 `(createdAt, id)` 순서 정보만 전달합니다.
+`src/worker.ts`는 Wrangler가 migration 대상 class를 발견하도록 `ChatRoom`을 export합니다. `ChatRoom`은 내부 token, room/user header, D1 active membership, bilateral block, account status를 connect와 broadcast 양쪽에서 검증합니다. `/revoke`는 기존 room socket을 terminal `revoked` event와 close code `4003`으로 종료합니다. broadcast payload에는 이미 D1에 commit된 message ID와 `(createdAt, id)` 순서 정보만 전달됩니다.
 
 ## 10. 개발·배포 확인
 
@@ -182,19 +203,22 @@ npm run preview
 ## 11. 구현 파일
 
 - `src/worker.ts`: WebSocket upgrade, session 검증, DO 라우팅
-- `src/workers/ChatRoom.ts`: room별 hibernatable WebSocket과 fan-out
-- `src/lib/chat-realtime.ts`: D1 commit 후 DO broadcast
-- `src/lib/messages.ts`: room/request/message canonical state transition
+- `src/workers/ChatRoom.ts`: room별 hibernatable WebSocket, connect/broadcast D1 authorization, terminal revoke
+- `src/lib/chat-realtime.ts`: D1 commit 후 DO broadcast와 block/ban revoke command
+- `src/lib/messages.ts`: room/request/message canonical state transition과 tuple read acknowledgment
+- `src/lib/dm-relationships.ts`: established room을 포함한 DM access projection
 - `src/lib/security/chat-cursor.ts`: room/user/direction signed cursor
 - `src/app/api/messages/route.ts`: room 목록, request 목록, conversation start
 - `src/app/api/messages/[roomId]/route.ts`: history page와 message write
 - `src/app/api/messages/requests/[id]/route.ts`: accept/decline/cancel
-- `src/app/api/messages/[roomId]/read/route.ts`: monotonic read boundary
-- `src/components/messages/messages-client.tsx`: history, catch-up, receive, reconnect, dedupe
+- `src/app/api/messages/[roomId]/read/route.ts`: malformed payload rejection과 monotonic read boundary
+- `src/components/messages/messages-client.tsx`: history, catch-up, receive, reconnect, revoke, dedupe
+- `src/lib/chat-message-state.ts`: optimistic/canonical merge와 delivery precedence
+- `src/lib/chat-room-state.ts`: preview ordering, bounded live dedupe, unread/read projection
 - `migrations/0036_chat_reliability.sql`: retry/read reliability
 - `migrations/0038_chat_request_integrity.sql`: request/room integrity
 - `migrations/0039_cancel_orphan_pending_chat_requests.sql`: orphan request cleanup
 - `migrations/0040_notification_request_identity.sql`: request-specific notifications
 - `wrangler.jsonc`: production DO binding/migration
 - `wrangler.test.jsonc`: Worker test DO binding/migration
-- `tests/workers/chat-room.test.ts`: auth, auto-response, fan-out, pending/block rejection
+- `tests/workers/chat-room.test.ts`: auth, auto-response, fan-out, delayed-broadcast barrier, ban/block revoke

@@ -2181,11 +2181,16 @@ export async function markChatMessagesRead(input: {
   const db = await getDb();
   const membership = await db
     .prepare(
-      `SELECT membership_status FROM chat_room_members
+      `SELECT membership_status, last_read_at, last_read_message_id
+       FROM chat_room_members
        WHERE room_id = ? AND user_id = ?`
     )
     .bind(input.roomId, input.userId)
-    .first<{ membership_status: string }>();
+    .first<{
+      membership_status: string;
+      last_read_at: string | null;
+      last_read_message_id: string | null;
+    }>();
   if (!membership || membership.membership_status !== "active") {
     throw new AuthError("Chat not found", 404);
   }
@@ -2228,7 +2233,12 @@ export async function markChatMessagesRead(input: {
 
   if (!target) {
     if (input.messageId) throw new AuthError("Message not found", 404);
-    return { roomId: input.roomId, messageId: null, updated: false };
+    return {
+      roomId: input.roomId,
+      messageId: null,
+      readThrough: null,
+      updated: false,
+    };
   }
 
   const update = await db
@@ -2260,10 +2270,33 @@ export async function markChatMessagesRead(input: {
     )
     .run();
 
+  const updated = Number(update.meta.changes ?? 0) === 1;
+  const currentBoundary = updated
+    ? null
+    : await db
+        .prepare(
+          `SELECT last_read_at, last_read_message_id
+           FROM chat_room_members
+           WHERE room_id = ? AND user_id = ?`
+        )
+        .bind(input.roomId, input.userId)
+        .first<{
+          last_read_at: string | null;
+          last_read_message_id: string | null;
+        }>();
+  const readThrough =
+    currentBoundary?.last_read_at && currentBoundary.last_read_message_id
+      ? {
+          messageId: currentBoundary.last_read_message_id,
+          createdAt: currentBoundary.last_read_at,
+        }
+      : { messageId: target.id, createdAt: target.created_at };
+
   return {
     roomId: input.roomId,
     messageId: target.id,
-    updated: Number(update.meta.changes ?? 0) === 1,
+    readThrough,
+    updated,
   };
 }
 

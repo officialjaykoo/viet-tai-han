@@ -1,6 +1,8 @@
 import { getDb } from "@/lib/db";
 import { invalidateBannedWordsCache } from "@/lib/moderation";
 import { AuthError } from "@/lib/session";
+import { revokeChatRoomsForUser } from "@/lib/chat-realtime";
+import { runBackgroundTask } from "@/lib/background-task";
 
 export async function setUserStatus(input: {
   actorId: string;
@@ -47,6 +49,11 @@ export async function setUserStatus(input: {
       input.reason ?? null
     )
     .run();
+  if (input.action === "ban") {
+    runBackgroundTask("banned_user_chat_revoke", () =>
+      revokeChatRoomsForUser(input.targetUserId)
+    );
+  }
 }
 
 export async function warnUser(input: {
@@ -186,6 +193,9 @@ export async function deleteAccount(input: {
       ),
   ];
   await db.batch(statements);
+  runBackgroundTask("deleted_user_chat_revoke", () =>
+    revokeChatRoomsForUser(input.targetUserId)
+  );
 }
 
 export async function deleteSubreddit(input: {

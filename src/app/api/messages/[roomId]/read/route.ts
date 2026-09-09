@@ -12,9 +12,17 @@ export async function POST(
   try {
     const session = await requireSession();
     const { roomId } = await context.params;
-    const body = (await readApiJson(request)) as {
-      messageId?: string | null;
-    };
+    const payload = await readApiJson(request);
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      Array.isArray(payload) ||
+      typeof (payload as { messageId?: unknown }).messageId !== "string" ||
+      (payload as { messageId: string }).messageId.trim().length === 0
+    ) {
+      return await jsonLocalizedError("messageId is required", 400);
+    }
+    const body = payload as { messageId: string };
     const result = await markChatMessagesRead({
       roomId,
       userId: session.user.id,

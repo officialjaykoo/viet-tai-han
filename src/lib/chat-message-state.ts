@@ -58,9 +58,14 @@ export function updateLocalDeliveryState(
   clientMessageId: string,
   localDeliveryState: LocalDeliveryState
 ): LocalChatMessage[] {
-  return messages.map((message) =>
-    message.isMine && message.clientMessageId === clientMessageId
-      ? { ...message, localDeliveryState }
-      : message
-  );
+  return messages.map((message) => {
+    if (
+      !message.isMine ||
+      message.clientMessageId !== clientMessageId ||
+      (localDeliveryState === "failed" && !message.id.startsWith("local:"))
+    ) {
+      return message;
+    }
+    return { ...message, localDeliveryState };
+  });
 }

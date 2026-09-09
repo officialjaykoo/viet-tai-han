@@ -17,6 +17,8 @@ import {
   applyIncomingRoomMessage,
   reconcileChatRoomRead,
   reconcileRoomLatestMessage,
+  rememberCanonicalMessageIds,
+  type ChatReadBoundary,
 } from "@/lib/chat-room-state";
 import {
   mergeMessages,
@@ -79,6 +81,11 @@ type RealtimeMessageEvent =
       roomId: string;
     }
   | {
+      type: "revoked";
+      roomId: string;
+      reason: "membership_revoked" | "account_banned";
+    }
+  | {
       type: "message";
       roomId: string;
       message: ChatMessage;
@@ -89,11 +96,22 @@ function parseRealtimeMessage(value: unknown): RealtimeMessageEvent | null {
   const event = value as {
     type?: unknown;
     roomId?: unknown;
+    reason?: unknown;
     message?: unknown;
   };
   if (typeof event.roomId !== "string") return null;
   if (event.type === "ready") {
     return { type: "ready", roomId: event.roomId };
+  }
+  if (
+    event.type === "revoked" &&
+    (event.reason === "membership_revoked" || event.reason === "account_banned")
+  ) {
+    return {
+      type: "revoked",
+      roomId: event.roomId,
+      reason: event.reason,
+    };
   }
   if (
     event.type !== "message" ||
@@ -185,6 +203,7 @@ export function MessagesClient() {
   const preservingPrependRef = useRef(false);
   const catchUpInFlightRef = useRef(false);
   const socketReadyRoomRef = useRef<string | null>(null);
+  const seenRoomMessageIdsRef = useRef(new Map<string, Set<string>>());
   const activeRoomRef = useRef<string | null>(selectedRoom);
   const readTimerRef = useRef<number | null>(null);
   const sendingClientMessageIdsRef = useRef(new Set<string>());
@@ -226,6 +245,16 @@ export function MessagesClient() {
     },
     []
   );
+  const rememberCanonicalRoomMessages = useCallback(
+    (roomId: string, messageIds: readonly string[]) => {
+      const current = seenRoomMessageIdsRef.current.get(roomId) ?? new Set<string>();
+      seenRoomMessageIdsRef.current.set(
+        roomId,
+        rememberCanonicalMessageIds(current, messageIds)
+      );
+    },
+    []
+  );
 
   const reconcileRoomLatest = useCallback(
     (roomId: string, message: ChatMessage) => {
@@ -258,6 +287,11 @@ export function MessagesClient() {
         requests: RequestItem[];
         outgoingRequests?: OutgoingRequestItem[];
       };
+      for (const room of data.rooms) {
+        if (room.lastMessageId) {
+          rememberCanonicalRoomMessages(room.id, [room.lastMessageId]);
+        }
+      }
       let nextRooms = data.rooms;
       for (const [roomId, message] of latestRoomMessagesRef.current) {
         nextRooms = reconcileRoomLatestMessage(nextRooms, roomId, message);
@@ -268,17 +302,21 @@ export function MessagesClient() {
       setOutgoingRequests(data.outgoingRequests ?? []);
       setLoaded(true);
     });
-  }, [localizeError, router]);
+  }, [localizeError, rememberCanonicalRoomMessages, router]);
 
   const applyRoomMessage = useCallback(
     (roomId: string, message: ChatMessage) => {
       rememberRoomLatestMessage(roomId, message);
+      const seenMessageIds =
+        seenRoomMessageIdsRef.current.get(roomId) ?? new Set<string>();
       const result = applyIncomingRoomMessage(
         roomsRef.current,
         roomId,
         message,
-        isNearBottomRef.current
+        roomId === activeRoomRef.current && isNearBottomRef.current,
+        seenMessageIds
       );
+      seenRoomMessageIdsRef.current.set(roomId, result.seenMessageIds);
       if (result.rooms === roomsRef.current && result.unreadDelta === 0) {
         return;
       }
@@ -346,6 +384,10 @@ export function MessagesClient() {
       }
       const page = (await res.json()) as ChatHistoryPage;
       if (activeRoomRef.current !== roomId) return;
+      rememberCanonicalRoomMessages(
+        roomId,
+        page.messages.map((message) => message.id)
+      );
       beforeCursorRef.current = page.nextBeforeCursor;
       setHasMoreBefore(page.hasMoreBefore);
       preservingPrependRef.current = true;
@@ -363,7 +405,7 @@ export function MessagesClient() {
     } finally {
       loadingOlderRef.current = false;
     }
-  }, [localizeError]);
+  }, [localizeError, rememberCanonicalRoomMessages]);
 
   const loadRoom = useCallback(
     async (roomId: string) => {
@@ -375,6 +417,10 @@ export function MessagesClient() {
         }
         const page = (await res.json()) as ChatHistoryPage;
         if (activeRoomRef.current !== roomId) return;
+        rememberCanonicalRoomMessages(
+          roomId,
+          page.messages.map((message) => message.id)
+        );
         beforeCursorRef.current = page.nextBeforeCursor;
         afterCursorRef.current = page.nextAfterCursor;
         setHasMoreBefore(page.hasMoreBefore);
@@ -392,7 +438,7 @@ export function MessagesClient() {
         }
       }
     },
-    [catchUpRoom, localizeError, reconcileRoomLatest]
+    [catchUpRoom, localizeError, reconcileRoomLatest, rememberCanonicalRoomMessages]
   );
 
 
@@ -448,29 +494,26 @@ export function MessagesClient() {
         if (!res.ok) return;
         const result = (await res.json()) as {
           messageId?: string | null;
+          readThrough?: ChatReadBoundary | null;
           updated?: boolean;
         };
-        // `updated` only describes a server-side boundary mutation. A
-        // successful response still authoritatively acknowledges messageId.
-        if (result.messageId !== messageId) return;
+        if (!result.readThrough) return;
         const reconciliation = reconcileChatRoomRead(
           roomsRef.current,
           roomId,
-          result.messageId
+          result.readThrough
         );
-        if (!reconciliation.acknowledged) return;
-        roomsRef.current = reconciliation.rooms;
-        setRooms(reconciliation.rooms);
-        if (reconciliation.clearedUnread > 0) {
-          announceUnreadChanged({
-            messageDelta: -reconciliation.clearedUnread,
-          });
+        if (reconciliation.acknowledged) {
+          roomsRef.current = reconciliation.rooms;
+          setRooms(reconciliation.rooms);
         }
+        void loadInbox();
+        announceUnreadChanged({ reconcile: true });
       } catch {
         // The next explicit read or inbox refresh reconciles the boundary.
       }
     },
-    []
+    [loadInbox]
   );
 
   const scheduleChatRead = useCallback(
@@ -530,11 +573,13 @@ export function MessagesClient() {
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
+    let revoked = false;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const endpoint = `${protocol}//${window.location.host}/api/messages/realtime?room=${encodeURIComponent(selectedRoom)}`;
 
     const canConnect = () =>
       active &&
+      !revoked &&
       document.visibilityState === "visible" &&
       navigator.onLine !== false;
 
@@ -571,7 +616,7 @@ export function MessagesClient() {
         // Reset only after the DO sends ready; an open-but-stalled socket must back off.
       };
       socket.onmessage = (event) => {
-        if (!active || typeof event.data !== "string") return;
+        if (!active || revoked || typeof event.data !== "string") return;
         let payload: unknown;
         try {
           payload = JSON.parse(event.data);
@@ -580,6 +625,15 @@ export function MessagesClient() {
         }
         const live = parseRealtimeMessage(payload);
         if (!live || live.roomId !== selectedRoom) return;
+        if (live.type === "revoked") {
+          revoked = true;
+          socketReadyRoomRef.current = null;
+          void loadInbox();
+          announceUnreadChanged({ reconcile: true });
+          router.push("/messages");
+          socket?.close(4003, live.reason);
+          return;
+        }
         if (live.type === "ready") {
           socketReadyRoomRef.current = selectedRoom;
           reconnectAttempt = 0;
@@ -598,7 +652,7 @@ export function MessagesClient() {
         if (socketReadyRoomRef.current === selectedRoom) {
           socketReadyRoomRef.current = null;
         }
-        scheduleReconnect();
+        if (!revoked) scheduleReconnect();
       };
     };
 
@@ -633,6 +687,7 @@ export function MessagesClient() {
     connect();
     return () => {
       active = false;
+      revoked = true;
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       document.removeEventListener("visibilitychange", handleVisibility);
@@ -641,8 +696,7 @@ export function MessagesClient() {
       }
       socket?.close(1000, "room changed");
     };
-  }, [selectedRoom, catchUpRoom, applyRoomMessage]);
-
+  }, [selectedRoom, catchUpRoom, applyRoomMessage, loadInbox, router]);
   function startConversation(e: React.FormEvent) {
     e.preventDefault();
     const toUsername = composeUser.trim();

@@ -9,6 +9,9 @@ export type DmRelationship = {
   allowDms: AllowDms;
   directAllowed: boolean;
   requestAllowed: boolean;
+  activeEstablishedRoom: boolean;
+  canMessage: boolean;
+  messageMode: "existing" | "direct" | "request" | "none";
 };
 
 function pairKey(firstUserId: string, secondUserId: string): string {
@@ -50,6 +53,22 @@ export async function getDmRelationship(input: {
            SELECT 1 FROM user_follows
            WHERE follower_id = ? AND following_id = ?
          ) AS recipient_follows_sender,
+         EXISTS (
+           SELECT 1 FROM chat_rooms r
+           WHERE r.pair_key = ?
+             AND EXISTS (
+               SELECT 1 FROM chat_room_members member
+               WHERE member.room_id = r.id
+                 AND member.user_id = ?
+                 AND member.membership_status = 'active'
+             )
+             AND EXISTS (
+               SELECT 1 FROM chat_room_members member
+               WHERE member.room_id = r.id
+                 AND member.user_id = ?
+                 AND member.membership_status = 'active'
+             )
+         ) AS active_established_room,
          COALESCE(
            (SELECT allowDms FROM "user" WHERE id = ?),
            'anyone'
@@ -65,6 +84,9 @@ export async function getDmRelationship(input: {
       input.recipientId,
       input.recipientId,
       input.senderId,
+      pairKey(input.senderId, input.recipientId),
+      input.senderId,
+      input.recipientId,
       input.recipientId
     )
     .first<{
@@ -72,6 +94,7 @@ export async function getDmRelationship(input: {
       friends: number;
       sender_follows_recipient: number;
       recipient_follows_sender: number;
+      active_established_room: number;
       allow_dms: string | null;
     }>();
 
@@ -79,6 +102,7 @@ export async function getDmRelationship(input: {
   const friends = Boolean(row?.friends);
   const senderFollowsRecipient = Boolean(row?.sender_follows_recipient);
   const recipientFollowsSender = Boolean(row?.recipient_follows_sender);
+  const activeEstablishedRoom = Boolean(row?.active_established_room);
   const allowDms = normalizeAllowDms(row?.allow_dms);
   const directAllowed =
     !blocked && (friends || recipientFollowsSender);
@@ -87,6 +111,15 @@ export async function getDmRelationship(input: {
     !directAllowed &&
     (allowDms === "anyone" ||
       (allowDms === "followers" && senderFollowsRecipient));
+  const canMessage =
+    !blocked && (activeEstablishedRoom || directAllowed || requestAllowed);
+  const messageMode = activeEstablishedRoom
+    ? "existing"
+    : directAllowed
+      ? "direct"
+      : requestAllowed
+        ? "request"
+        : "none";
 
   return {
     blocked,
@@ -96,5 +129,8 @@ export async function getDmRelationship(input: {
     allowDms,
     directAllowed,
     requestAllowed,
+    activeEstablishedRoom,
+    canMessage,
+    messageMode,
   };
 }

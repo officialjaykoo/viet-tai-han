@@ -19,8 +19,9 @@ type ChatMessageBroadcast = {
 };
 
 type ChatRoomEvent = {
-  type: "ready" | "message";
+  type: "ready" | "message" | "revoked";
   roomId: string;
+  reason?: "membership_revoked" | "account_banned";
   message?: {
     id: string;
     clientMessageId: string | null;
@@ -80,12 +81,19 @@ export class ChatRoom extends DurableObject<ChatRoomEnv> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === "GET" && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
+    if (
+      request.method === "GET" &&
+      request.headers.get("Upgrade")?.toLowerCase() === "websocket"
+    ) {
       return this.#connect(request, url.searchParams.get("room"));
     }
 
     if (request.method === "POST" && url.pathname === "/broadcast") {
       return this.#broadcast(request, url.searchParams.get("room"));
+    }
+
+    if (request.method === "POST" && url.pathname === "/revoke") {
+      return this.#revoke(request, url.searchParams.get("room"));
     }
 
     return json({ error: "Not found" }, 404);
@@ -141,26 +149,36 @@ export class ChatRoom extends DurableObject<ChatRoomEnv> {
       return json({ error: "Invalid message" }, 400);
     }
 
-    const eventFor = (socket: WebSocket): ChatRoomEvent => {
-      const userId = userIdForSocket(this.ctx, socket);
-      return {
-        type: "message",
-        roomId: input.roomId,
-        message: {
-          id: input.id,
-          clientMessageId: input.clientMessageId ?? null,
-          body: input.body,
-          createdAt: input.createdAt,
-          isMine: userId === input.senderId,
-          senderUsername: input.senderUsername,
-        },
-      };
-    };
+    let authorizedUserIds: Set<string>;
+    try {
+      authorizedUserIds = await this.#authorizedUserIds(input.roomId);
+    } catch {
+      // Fail closed: a D1 authorization failure must not leak a payload.
+      return json({ error: "Realtime authorization unavailable" }, 503);
+    }
+
+    const eventFor = (userId: string): ChatRoomEvent => ({
+      type: "message",
+      roomId: input.roomId,
+      message: {
+        id: input.id,
+        clientMessageId: input.clientMessageId ?? null,
+        body: input.body,
+        createdAt: input.createdAt,
+        isMine: userId === input.senderId,
+        senderUsername: input.senderUsername,
+      },
+    });
 
     let delivered = 0;
     for (const socket of this.ctx.getWebSockets(`room:${input.roomId}`)) {
+      const userId = userIdForSocket(this.ctx, socket);
+      if (!userId || !authorizedUserIds.has(userId)) {
+        this.#sendRevoked(socket, input.roomId, "membership_revoked");
+        continue;
+      }
       try {
-        socket.send(JSON.stringify(eventFor(socket)));
+        socket.send(JSON.stringify(eventFor(userId)));
         delivered += 1;
       } catch {
         try {
@@ -175,36 +193,100 @@ export class ChatRoom extends DurableObject<ChatRoomEnv> {
   }
 
   async #canConnect(roomId: string, userId: string): Promise<boolean> {
+    const authorizedUserIds = await this.#authorizedUserIds(roomId);
+    return authorizedUserIds.has(userId);
+  }
+
+  async #authorizedUserIds(roomId: string): Promise<Set<string>> {
     const { results } = await this.env.DB.prepare(
-      `SELECT user_id, membership_status
-       FROM chat_room_members
-       WHERE room_id = ?`
+      `WITH active_members AS (
+         SELECT member.user_id
+         FROM chat_room_members member
+         INNER JOIN "user" account ON account.id = member.user_id
+         WHERE member.room_id = ?
+           AND member.membership_status = 'active'
+           AND account.status != 'banned'
+       )
+       SELECT user_id
+       FROM active_members
+       WHERE (SELECT COUNT(*) FROM active_members) = 2
+         AND NOT EXISTS (
+           SELECT 1
+           FROM user_blocks block
+           WHERE block.blocker_id IN (SELECT user_id FROM active_members)
+             AND block.blocked_id IN (SELECT user_id FROM active_members)
+         )`
     )
       .bind(roomId)
-      .all<{ user_id: string; membership_status: string }>();
+      .all<{ user_id: string }>();
+    return new Set((results ?? []).map((row) => row.user_id));
+  }
 
-    const members = results ?? [];
-    const self = members.find((member) => member.user_id === userId);
-    const peer = members.find((member) => member.user_id !== userId);
-    if (
-      !self ||
-      self.membership_status !== "active" ||
-      !peer ||
-      peer.membership_status !== "active"
-    ) {
-      return false;
+  async #revoke(
+    request: Request,
+    roomIdParam: string | null
+  ): Promise<Response> {
+    if (request.headers.get(INTERNAL_TOKEN_HEADER) !== this.env.BETTER_AUTH_SECRET) {
+      return json({ error: "Unauthorized" }, 401);
     }
+    const roomId = roomIdParam?.trim();
+    if (!roomId) return json({ error: "Room is required" }, 400);
+    const reason =
+      new URL(request.url).searchParams.get("reason") === "account_banned"
+        ? "account_banned"
+        : "membership_revoked";
+    const revoked = this.#revokeSockets(roomId, reason);
+    return json({ revoked });
+  }
 
-    const blocked = await this.env.DB.prepare(
-      `SELECT 1 AS ok
-       FROM user_blocks
-       WHERE (blocker_id = ? AND blocked_id = ?)
-          OR (blocker_id = ? AND blocked_id = ?)`
-    )
-      .bind(userId, peer.user_id, peer.user_id, userId)
-      .first();
+  #sendRevoked(
+    socket: WebSocket,
+    roomId: string,
+    reason: "membership_revoked" | "account_banned"
+  ): void {
+    try {
+      socket.send(
+        JSON.stringify({
+          type: "revoked",
+          roomId,
+          reason,
+        } satisfies ChatRoomEvent)
+      );
+    } catch {
+      // The runtime may have already closed this socket.
+    }
+    try {
+      socket.close(4003, reason);
+    } catch {
+      // The runtime may have already completed the close handshake.
+    }
+  }
 
-    return !blocked;
+  #revokeSockets(
+    roomId: string,
+    reason: "membership_revoked" | "account_banned"
+  ): number {
+    let revoked = 0;
+    for (const socket of this.ctx.getWebSockets(`room:${roomId}`)) {
+      revoked += 1;
+      try {
+        socket.send(
+          JSON.stringify({
+            type: "revoked",
+            roomId,
+            reason,
+          } satisfies ChatRoomEvent)
+        );
+      } catch {
+        // The runtime may have already closed this socket.
+      }
+      try {
+        socket.close(4003, reason);
+      } catch {
+        // The runtime may have already completed the close handshake.
+      }
+    }
+    return revoked;
   }
 
   webSocketClose(

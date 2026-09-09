@@ -82,6 +82,7 @@ export async function listOnlineUsers(
       viewerUserId!,
       viewerUserId!,
       viewerUserId!,
+      viewerUserId!,
       viewerUserId!
     );
   }
@@ -106,6 +107,16 @@ export async function listOnlineUsers(
            OR reverse_follow.follower_id IS NOT NULL
            OR u.allowDms = 'anyone'
            OR (u.allowDms = 'followers' AND follow.follower_id IS NOT NULL)
+           OR EXISTS (
+             SELECT 1
+             FROM chat_room_members existing_me
+             INNER JOIN chat_room_members existing_peer
+               ON existing_peer.room_id = existing_me.room_id
+              AND existing_peer.user_id = u.id
+              AND existing_peer.membership_status = 'active'
+             WHERE existing_me.user_id = ?
+               AND existing_me.membership_status = 'active'
+           )
          THEN 1 ELSE 0
        END AS can_message`
     : "0 AS can_message";

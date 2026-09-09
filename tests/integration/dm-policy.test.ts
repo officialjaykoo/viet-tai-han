@@ -5,6 +5,7 @@ import { createComment, createPost, createSubreddit } from "@/lib/actions";
 import { getDmRelationship } from "@/lib/dm-relationships";
 import {
   cancelChatRequest,
+  getChatMessages,
   listChatRooms,
   listIncomingRequests,
   respondToChatRequest,
@@ -15,6 +16,8 @@ import { setSiteSetting } from "@/lib/settings";
 import {
   blockUser,
   followUser,
+  getProfileRelation,
+  unblockUser,
   unfollowUser,
 } from "@/lib/user-actions";
 import {
@@ -482,6 +485,11 @@ describe("DM relationship policy (D1)", () => {
       .prepare(`UPDATE "user" SET allowDms = 'nobody' WHERE id = ?`)
       .bind(pair.recipientId)
       .run();
+    await expect(
+      getProfileRelation(pair.senderId, pair.recipientId)
+    ).resolves.toMatchObject({
+      canMessage: true,
+    });
 
     const afterUnfollow = await start(
       pair.senderId,
@@ -524,6 +532,48 @@ describe("DM relationship policy (D1)", () => {
       .first<{ active_count: number; left_count: number }>();
     expect(Number(roomMemberships?.active_count)).toBe(0);
     expect(Number(roomMemberships?.left_count)).toBe(2);
+  });
+  it("blocks history while revoked and preserves delivered history after unblock", async () => {
+    const pair = ids("history-policy", 0);
+    await Promise.all([
+      insertUser(pair.senderId, pair.senderUsername),
+      insertUser(pair.recipientId, pair.recipientUsername),
+    ]);
+    await followUser(pair.recipientId, pair.senderId);
+
+    const first = await start(
+      pair.senderId,
+      pair.recipientUsername,
+      "History before block"
+    );
+    expect(first.conversationType).toBe("direct");
+    await expect(
+      getChatMessages({ roomId: first.roomId, userId: pair.recipientId })
+    ).resolves.toMatchObject({
+      messages: [expect.objectContaining({ body: "History before block" })],
+    });
+
+    await blockUser(pair.recipientId, pair.senderId);
+    await expect(
+      getChatMessages({ roomId: first.roomId, userId: pair.recipientId })
+    ).rejects.toMatchObject({ status: 404 });
+
+    await unblockUser(pair.recipientId, pair.senderId);
+    await followUser(pair.recipientId, pair.senderId);
+    const reopened = await start(
+      pair.senderId,
+      pair.recipientUsername,
+      "History after unblock"
+    );
+    expect(reopened.roomId).toBe(first.roomId);
+    const history = await getChatMessages({
+      roomId: first.roomId,
+      userId: pair.recipientId,
+    });
+    expect(history.messages.map((message) => message.body)).toEqual([
+      "History before block",
+      "History after unblock",
+    ]);
   });
 
   it("uses the automatic message for friendship promotion", async () => {

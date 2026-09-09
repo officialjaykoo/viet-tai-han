@@ -91,4 +91,18 @@ describe("chat message client state", () => {
     expect(merged.map((item) => item.id)).toContain("local:client-1");
     expect(merged.map((item) => item.id)).toContain("server-2");
   });
+  it("never downgrades a canonical sent row after a late transport error", () => {
+    const canonical = message({
+      id: "server-1",
+      localDeliveryState: "sent",
+    });
+
+    const next = updateLocalDeliveryState(
+      [canonical],
+      "client-1",
+      "failed"
+    );
+
+    expect(next[0]?.localDeliveryState).toBe("sent");
+  });
 });

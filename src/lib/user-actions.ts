@@ -4,6 +4,7 @@ import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
 import { syncAchievementsForEvent } from "@/lib/achievements";
 import { runBackgroundTask } from "@/lib/background-task";
 import { scheduleChatPromotion } from "@/lib/chat-promotion";
+import { revokeChatRoom } from "@/lib/chat-realtime";
 import { getDb } from "@/lib/db";
 import { getFriendRelation, type FriendState } from "@/lib/friends";
 import { getDmRelationship } from "@/lib/dm-relationships";
@@ -207,6 +208,16 @@ export async function blockUser(blockerId: string, blockedId: string) {
       )
       .bind(blockerId, blockedId, blockedId, blockerId),
   ]);
+
+  const room = await db
+    .prepare(`SELECT id FROM chat_rooms WHERE pair_key = ?`)
+    .bind(pair)
+    .first<{ id: string }>();
+  if (room) {
+    runBackgroundTask("chat_realtime_revoke", () =>
+      revokeChatRoom(room.id, "membership_revoked")
+    );
+  }
 
   runBackgroundTask("blocked_unread_reconcile", async () => {
     await Promise.allSettled([
@@ -461,8 +472,7 @@ export async function getProfileRelation(
         : "none",
     canViewProfile: true,
     canInteract: !blockedEitherDirection,
-    canMessage:
-      !blockedEitherDirection && (dm.directAllowed || dm.requestAllowed),
+    canMessage: !blockedEitherDirection && dm.canMessage,
     isSelf: false,
   };
 }

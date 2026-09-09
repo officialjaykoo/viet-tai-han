@@ -52,18 +52,29 @@ describe("chat room state", () => {
   });
 
   it("clears the room badge and returns its global unread delta", () => {
-    const result = reconcileChatRoomRead([room()], "room-1", "message-3");
+    const result = reconcileChatRoomRead(
+      [room()],
+      "room-1",
+      { messageId: "message-3", createdAt: "2026-08-14 12:00:00.000" }
+    );
 
     expect(result).toMatchObject({ acknowledged: true, clearedUnread: 3 });
     expect(result.rooms[0]?.unreadCount).toBe(0);
   });
 
   it("clears a stale badge even when the server reports updated false", () => {
-    const serverResult = { messageId: "message-3", updated: false };
+    const serverResult = {
+      messageId: "message-3",
+      readThrough: {
+        messageId: "message-3",
+        createdAt: "2026-08-14 12:00:00.000",
+      },
+      updated: false,
+    };
     const result = reconcileChatRoomRead(
       [room()],
       "room-1",
-      serverResult.messageId
+      serverResult.readThrough
     );
 
     expect(serverResult.updated).toBe(false);
@@ -71,20 +82,23 @@ describe("chat room state", () => {
     expect(result.rooms[0]?.unreadCount).toBe(0);
   });
 
-  it("does not clear an older read target after a newer live message arrives", () => {
+  it("keeps an older read target from clearing a newer live message", () => {
     const live = applyIncomingRoomMessage(
       [room()],
       "room-1",
       incoming(),
       false
     );
-    const read = reconcileChatRoomRead(live.rooms, "room-1", "message-3");
+    const read = reconcileChatRoomRead(live.rooms, "room-1", {
+      messageId: "message-3",
+      createdAt: "2026-08-14 12:00:00.000",
+    });
 
     expect(live.rooms[0]).toMatchObject({
       lastMessageId: "message-4",
       unreadCount: 4,
     });
-    expect(read.acknowledged).toBe(false);
+    expect(read.acknowledged).toBe(true);
     expect(read.rooms[0]?.unreadCount).toBe(4);
   });
 
@@ -98,5 +112,52 @@ describe("chat room state", () => {
 
     expect(result.unreadDelta).toBe(1);
     expect(result.rooms[0]?.unreadCount).toBe(1);
+  });
+  it("counts reversed unique live arrivals without changing preview order", () => {
+    const base = [
+      room({
+        lastMessageAt: "2026-08-14 11:59:00.000",
+        lastMessageId: "message-0",
+        unreadCount: 0,
+      }),
+    ];
+    const second = applyIncomingRoomMessage(
+      base,
+      "room-1",
+      incoming({
+        id: "message-2",
+        createdAt: "2026-08-14 12:02:00.000",
+      }),
+      false
+    );
+    const first = applyIncomingRoomMessage(
+      second.rooms,
+      "room-1",
+      incoming({
+        id: "message-1",
+        createdAt: "2026-08-14 12:01:00.000",
+      }),
+      false,
+      second.seenMessageIds
+    );
+    const duplicate = applyIncomingRoomMessage(
+      first.rooms,
+      "room-1",
+      incoming({
+        id: "message-2",
+        createdAt: "2026-08-14 12:02:00.000",
+      }),
+      false,
+      first.seenMessageIds
+    );
+
+    expect(second.unreadDelta).toBe(1);
+    expect(first.unreadDelta).toBe(1);
+    expect(first.rooms[0]).toMatchObject({
+      lastMessageId: "message-2",
+      unreadCount: 2,
+    });
+    expect(duplicate.unreadDelta).toBe(0);
+    expect(duplicate.rooms[0]?.unreadCount).toBe(2);
   });
 });
