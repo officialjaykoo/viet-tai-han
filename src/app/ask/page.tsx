@@ -26,7 +26,7 @@ export default async function AskQuestionPage() {
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="compact" className="space-y-6">
         <div className="space-y-5">
           <Link
             href="/questions"

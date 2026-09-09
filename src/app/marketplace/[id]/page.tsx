@@ -65,7 +65,7 @@ export default async function MarketplaceListingPage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="standard" className="space-y-6">
           <Link
             href="/marketplace"
             className="text-sm font-medium text-[var(--brand)] hover:underline"

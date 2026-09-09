@@ -65,7 +65,7 @@ export default async function SubmitInSubredditPage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="compact" className="space-y-6">
           <PageHero
             eyebrow={tLocale(locale, "post.submitTitle")}
             title={name}

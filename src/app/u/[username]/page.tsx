@@ -191,7 +191,7 @@ export default async function ProfilePage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="wide" className="py-4 sm:py-6">
+        <PageShell width="standard" className="py-4 sm:py-6">
           <ProfileHeader
             profile={profile}
             targetUserId={profileRecord.id}

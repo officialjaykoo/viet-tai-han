@@ -7,7 +7,7 @@ describe("PageShell widths", () => {
     expect(PAGE_SHELL_WIDTH_CLASSES).toEqual({
       wide: "max-w-[1240px]",
       standard: "max-w-[1024px]",
-      narrow: "max-w-[768px]",
+      compact: "max-w-[768px]",
     });
   });
 });

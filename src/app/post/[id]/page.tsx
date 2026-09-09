@@ -42,7 +42,7 @@ export default async function PostPage({
       <PostViewBeacon postId={post.id} discoverySource={discoverySource} />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="standard" className="space-y-6">
 
           <PostCard
             post={post}

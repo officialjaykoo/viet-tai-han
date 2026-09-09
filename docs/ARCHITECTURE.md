@@ -118,3 +118,15 @@ The current architecture does not include:
 - general-purpose Durable Objects for application state
 - a separate recommendation service or recommendation infrastructure
 - federation
+
+## UI layout and content density
+
+Consumer pages use one `PageShell` width system:
+
+- `wide`: `max-width: 1240px` for home and popular feeds.
+- `standard`: `max-width: 1024px` for communities, Q&A, marketplace, recommended, messages, profiles, and related detail pages.
+- `compact`: `max-width: 768px` for settings, post creation, notifications, and form-focused pages.
+
+`PageShell` always applies the same safe-area-aware horizontal padding. At mobile widths the three desktop tiers converge to the same responsive shell and `16px` horizontal padding; no separate mobile width tier exists.
+
+`PostCard` owns the shared post action footer. Like, comment, and share controls use a single compact visual row with `16px` icons and tight text line-height, desktop `36px` visual controls, and mobile `44px` touch targets. Like/comment/share mutations and permissions remain unchanged.

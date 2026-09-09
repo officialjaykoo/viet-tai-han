@@ -12,7 +12,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
   return (
     <main className="relative isolate flex-1 overflow-hidden">
-      <PageShell width="narrow" className="flex min-h-full items-center py-8 sm:py-14">
+      <PageShell width="compact" className="flex min-h-full items-center py-8 sm:py-14">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-16 -z-10 size-72 -translate-x-1/2 rounded-full bg-[var(--flag-gold)] opacity-15 blur-3xl"

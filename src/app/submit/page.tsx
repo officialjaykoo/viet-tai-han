@@ -30,7 +30,7 @@ export default async function SubmitPage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="compact" className="space-y-6">
           <PageHero
             eyebrow={tLocale(locale, "pages.compose")}
             title={tLocale(locale, "post.submitTitle")}

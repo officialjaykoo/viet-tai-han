@@ -34,7 +34,7 @@ export default async function EditBusinessPage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="compact" className="space-y-6">
           <Link
             href={`/businesses/${business.slug}`}
             className="text-sm font-medium text-[var(--brand)] hover:underline"

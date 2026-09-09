@@ -24,7 +24,7 @@ export default async function NewBusinessPage() {
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="compact" className="space-y-6">
           <Link href="/businesses" className="text-sm font-medium text-[var(--brand)] hover:underline">
             ← {tLocale(locale, "business.titlePage")}
           </Link>

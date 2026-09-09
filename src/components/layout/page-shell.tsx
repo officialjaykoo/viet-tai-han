@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export const PAGE_SHELL_WIDTH_CLASSES = {
   wide: "max-w-[1240px]",
   standard: "max-w-[1024px]",
-  narrow: "max-w-[768px]",
+  compact: "max-w-[768px]",
 } as const;
 
 export function PageShell({
@@ -19,6 +19,7 @@ export function PageShell({
 }) {
   return (
     <div
+      data-page-width={width}
       className={cn(
         "relative mx-auto w-full safe-px safe-pb py-6 sm:py-8",
         PAGE_SHELL_WIDTH_CLASSES[width],

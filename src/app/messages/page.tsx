@@ -21,7 +21,7 @@ export default async function MessagesPage() {
       <SiteHeader />
       <main data-testid="messages-page" className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="wide" className="py-3 sm:py-4">
+        <PageShell width="standard" className="py-3 sm:py-4">
           <Suspense
             fallback={
               <p className="text-sm text-muted-foreground">

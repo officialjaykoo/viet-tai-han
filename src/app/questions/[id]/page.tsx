@@ -34,7 +34,7 @@ export default async function QuestionPage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="narrow" className="space-y-8">
+        <PageShell width="standard" className="space-y-8">
           <Link
             href="/questions"
             className="text-sm font-medium text-[var(--brand)] hover:underline"

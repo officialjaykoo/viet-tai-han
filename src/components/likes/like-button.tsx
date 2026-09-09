@@ -45,14 +45,14 @@ export function LikeButton({
         className={cn(
           vertical
             ? "touch-target text-muted-foreground hover:text-[var(--brand)]"
-            : "min-h-10 min-w-0 flex-1 rounded-lg px-2 text-muted-foreground hover:bg-muted hover:text-[var(--brand)]",
+            : "min-h-11 sm:min-h-9 min-w-0 flex-1 rounded-lg px-2 text-muted-foreground hover:bg-muted hover:text-[var(--brand)]",
           liked &&
             "bg-[color-mix(in_oklch,var(--flag-gold)_32%,transparent)] text-[var(--brand)]"
         )}
       >
-        <HeartIcon className={cn("size-5", liked && "fill-current")} aria-hidden />
+        <HeartIcon className={cn("size-4", liked && "fill-current")} aria-hidden />
         {!vertical ? (
-          <span className="truncate text-xs font-semibold">
+          <span className="truncate text-xs font-semibold leading-tight">
             {t("like.action")} {likeCount}
           </span>
         ) : (

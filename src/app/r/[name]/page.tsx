@@ -60,7 +60,7 @@ export default async function SubredditPage({
       <main className="relative flex-1">
         <PageBackdrop />
         <PageShell width="standard">
-          <div className="max-w-[760px] space-y-6">
+          <div className="space-y-6">
           <PageHero
             eyebrow={tLocale(locale, "communities.title")}
             title={sub.name}

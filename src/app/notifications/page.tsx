@@ -25,7 +25,7 @@ export default async function NotificationsPage() {
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="standard" className="space-y-6">
+        <PageShell width="compact" className="space-y-6">
           <PageHero
             eyebrow={tLocale(locale, "notifications.activity")}
             title={tLocale(locale, "notifications.title")}

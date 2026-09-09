@@ -36,7 +36,7 @@ export default async function FriendsPage() {
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop />
-        <PageShell width="wide" className="space-y-6 py-4 sm:py-6">
+        <PageShell width="standard" className="space-y-6 py-4 sm:py-6">
           <PageHero
             eyebrow={tLocale(locale, "friends.title")}
             title={tLocale(locale, "friends.list")}

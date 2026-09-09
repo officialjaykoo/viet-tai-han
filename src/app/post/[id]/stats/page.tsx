@@ -44,7 +44,7 @@ export default async function PostStatsPage({
       <SiteHeader />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
-        <PageShell width="narrow" className="space-y-6">
+        <PageShell width="standard" className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">
               <Link href={`/post/${id}`} className="hover:underline">

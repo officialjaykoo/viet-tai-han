@@ -268,7 +268,10 @@ export function PostCard({
             </CardContent>
           ) : null}
 
-          <CardFooter className="mt-3 flex flex-wrap gap-1 border-t border-border/70 px-3 py-1.5">
+          <CardFooter
+            data-post-actions
+            className="mt-2 flex flex-wrap gap-1 border-t border-border/70 px-2 py-1 !pt-1"
+          >
             <div data-no-nav className="min-w-0 flex-1">
               <LikeButton
                 likeCount={likeCount}
@@ -281,7 +284,7 @@ export function PostCard({
             <Link
               href={postHref}
               data-no-nav
-              className="inline-flex min-h-10 min-w-[7rem] flex-1 items-center justify-center gap-2 rounded-lg px-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex min-h-11 sm:min-h-9 min-w-[7rem] flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold leading-tight text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <MessageCircleIcon className="size-4 shrink-0" aria-hidden />
               <span>
@@ -294,7 +297,7 @@ export function PostCard({
             <button
               type="button"
               data-no-nav
-              className="inline-flex min-h-10 min-w-[7rem] flex-1 items-center justify-center gap-2 rounded-lg px-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex min-h-11 sm:min-h-9 min-w-[7rem] flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold leading-tight text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label={t("post.share")}
               onClick={sharePost}
             >
@@ -305,7 +308,7 @@ export function PostCard({
               <button
                 type="button"
                 data-no-nav
-                className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-semibold text-[var(--brand)] transition-colors hover:bg-[color-mix(in_oklch,var(--flag-gold)_18%,transparent)]"
+                className="inline-flex min-h-11 sm:min-h-9 items-center rounded-lg px-2 text-xs font-semibold leading-tight text-[var(--brand)] transition-colors hover:bg-[color-mix(in_oklch,var(--flag-gold)_18%,transparent)]"
                 aria-pressed={showTranslation}
                 onClick={(e) => {
                   e.preventDefault();
