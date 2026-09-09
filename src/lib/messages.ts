@@ -865,18 +865,6 @@ function acceptedChatRepairStatements(
   ];
 }
 
-async function repairAcceptedChatRequest(
-  db: D1Database,
-  request: {
-    id: string;
-    room_id: string;
-    from_user_id: string;
-    to_user_id: string;
-    request_id: string | null;
-  }
-) {
-  await db.batch(acceptedChatRepairStatements(db, request));
-}
 
 async function promotePendingRequest(
   db: D1Database,

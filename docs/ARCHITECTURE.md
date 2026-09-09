@@ -160,7 +160,15 @@ Bug11 does not modify the frozen Bug10 messaging paths. Messaging schema objects
 
 ## 15. Database audit and cleanup policy
 
-`docs/VTH_DATABASE.md` is the canonical schema audit. It inventories all applied migrations, identifies Better Auth `user.id` as the identity key, lists canonical relations and counter invariants, and records why legacy `users`, `votes`, and score columns/indexes remain. No applied migration is rewritten or dropped. Cleanup candidates require a separate forward migration backed by production row-count, foreign-key, and rollback evidence.
+`docs/VTH_DATABASE.md` is the canonical schema audit. It inventories every application table, column, check, unique constraint, foreign key, and explicit index through `scripts/audit-db-integrity.mjs --schema`. The default read-only audit reports foreign-key violations, all five canonical counter drifts, relation orphans, and legacy row counts. No applied migration is rewritten or dropped.
+
+Bug12 removes only five dead pre-canonical feed/tree indexes in forward migration `0043_remove_legacy_feed_indexes.sql`. Production contained one legacy `votes` row and non-zero historical post score/hot-score data, so those rows and physical columns remain `RETAINED-DATA`. The production audit runs before any destructive DDL; remote destructive commands are not embedded in the audit script.
+
+## 16. Browser critical-path policy
+
+Chromium is the required browser gate. Existing authenticated, browse, and smoke suites remain the baseline. Critical journeys use allowlisted local test users only, with separate Alice/Bob browser contexts for bilateral policy and Q&A/DM interactions. `/api/auth/e2e-session` is compiled only under the explicit E2E bypass and rejects non-allowlisted usernames; production has no test-session path.
+
+DM assertions use the rendered conversation and the browser WebSocket connection rather than polling. D1 remains authoritative after realtime delivery; the Durable Object only transports committed events. The feed keeps the fixed Popular rank `like_count + comment_count * 3`; Bug12 adds no ranking redesign.
 
 ## UI layout and content density
 

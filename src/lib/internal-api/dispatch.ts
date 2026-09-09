@@ -209,6 +209,26 @@ const ROUTES: RouteEntry[] = [
   },
   {
     methods: ["GET", "POST"],
+    pattern: "/api/questions",
+    load: () => import("@/app/api/questions/route"),
+  },
+  {
+    methods: ["GET"],
+    pattern: "/api/questions/:id",
+    load: () => import("@/app/api/questions/[id]/route"),
+  },
+  {
+    methods: ["POST"],
+    pattern: "/api/questions/:id/answers",
+    load: () => import("@/app/api/questions/[id]/answers/route"),
+  },
+  {
+    methods: ["POST"],
+    pattern: "/api/questions/:id/accept",
+    load: () => import("@/app/api/questions/[id]/accept/route"),
+  },
+  {
+    methods: ["GET", "POST"],
     pattern: "/api/messages",
     load: () => import("@/app/api/messages/route"),
   },

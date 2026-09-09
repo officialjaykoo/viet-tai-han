@@ -172,11 +172,28 @@ function e2eSessionPlugin() {
         "/e2e-session",
         { method: "POST" },
         async (ctx) => {
-          const user = (
-            await ctx.context.internalAdapter.findUserByEmail(
-              "alice@example.local"
-            )
-          )?.user;
+          const requestedUsername =
+            typeof ctx.body === "object" &&
+            ctx.body !== null &&
+            "username" in ctx.body &&
+            typeof ctx.body.username === "string"
+              ? ctx.body.username
+              : null;
+          const email =
+            requestedUsername === null || requestedUsername === "alice"
+              ? "alice@example.local"
+              : requestedUsername === "bob"
+                ? "bob@example.local"
+                : null;
+          if (!email) {
+            throw APIError.from("BAD_REQUEST", {
+              code: "E2E_USER_NOT_ALLOWED",
+              message: "E2E user is not allowlisted",
+            });
+          }
+
+          const user = (await ctx.context.internalAdapter.findUserByEmail(email))
+            ?.user;
           if (!user) {
             throw APIError.from("NOT_FOUND", {
               code: "E2E_USER_NOT_FOUND",

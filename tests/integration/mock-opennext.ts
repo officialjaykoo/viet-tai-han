@@ -4,7 +4,8 @@
  */
 import { env } from "cloudflare:test";
 
-export async function getCloudflareContext(_opts?: { async?: boolean }) {
+export async function getCloudflareContext(options?: { async?: boolean }) {
+  void options;
   return {
     env,
     cf: {},

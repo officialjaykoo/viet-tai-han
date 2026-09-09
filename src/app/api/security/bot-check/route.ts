@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clientIpFromHeaders } from "@/lib/security/challenge";
 import {
   evaluateAttestation,
+  isE2eBotBypass,
   type BotAttestation,
 } from "@/lib/security/bot-signals";
 import { checkSubjectRateLimit } from "@/lib/rate-limit";
@@ -21,14 +22,16 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const ip = clientIpFromHeaders(request.headers);
-    const limited = await checkSubjectRateLimit({
-      subject: `ip:${ip}`,
-      action: "bot-check",
-      limit: 15,
-      windowSeconds: 60,
-    });
-    if (!limited.allowed) {
-      return await jsonLocalizedError("Too many requests", 429);
+    if (!isE2eBotBypass()) {
+      const limited = await checkSubjectRateLimit({
+        subject: `ip:${ip}`,
+        action: "bot-check",
+        limit: 15,
+        windowSeconds: 60,
+      });
+      if (!limited.allowed) {
+        return await jsonLocalizedError("Too many requests", 429);
+      }
     }
 
     const body = (await request.json()) as {

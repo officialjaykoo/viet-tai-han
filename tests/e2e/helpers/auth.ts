@@ -1,13 +1,24 @@
 import { expect, type Page } from "@playwright/test";
 
+import { CONSENT_STORAGE_KEY, ESSENTIAL_CONSENT } from "../../../src/lib/consent";
+
 import { LANG_COOKIE } from "../../../src/lib/i18n/config";
 import { MIN_DWELL_MS } from "../../../src/lib/security/bot-signals";
 
-export const SEED_USER = {
-  username: "alice",
-  providerId: "facebook",
-  accountId: "e2e_alice",
+export const SEED_USERS = {
+  alice: {
+    username: "alice",
+    providerId: "facebook",
+    accountId: "e2e_alice",
+  },
+  bob: {
+    username: "bob",
+    providerId: "facebook",
+    accountId: "e2e_bob",
+  },
 } as const;
+
+export const SEED_USER = SEED_USERS.alice;
 
 /** Prefer Vietnamese and skip the locale chooser dialog. */
 export async function seedLocaleCookie(page: Page) {
@@ -37,7 +48,7 @@ export async function disguiseAutomation(page: Page) {
 export async function dismissLanguagePrompt(page: Page) {
   const preferVi = page.getByRole("button", { name: /chọn tiếng việt/i });
   await preferVi
-    .waitFor({ state: "visible", timeout: 3_000 })
+    .waitFor({ state: "visible", timeout: 1_000 })
     .catch(() => undefined);
   if (await preferVi.isVisible().catch(() => false)) {
     await preferVi.click();
@@ -48,7 +59,7 @@ export async function dismissLanguagePrompt(page: Page) {
     name: /chỉ thiết yếu/i,
   });
   await essentialConsent
-    .waitFor({ state: "visible", timeout: 3_000 })
+    .waitFor({ state: "visible", timeout: 5_000 })
     .catch(() => undefined);
   if (await essentialConsent.isVisible().catch(() => false)) {
     await expect(essentialConsent).toBeEnabled({ timeout: 20_000 });
@@ -75,31 +86,45 @@ export async function waitForHydration(page: Page) {
   });
 }
 
-/** Establish a test-only session for the seeded social account. */
-export async function loginAsAlice(page: Page, next = "/") {
+/** Establish a test-only session for an allowlisted seeded social account. */
+export async function loginAsSeedUser(
+  page: Page,
+  user: keyof typeof SEED_USERS = "alice",
+  next = "/"
+) {
   await seedLocaleCookie(page);
   await disguiseAutomation(page);
+  await page.addInitScript(
+    ({ key, choice }) => {
+      window.localStorage.setItem(key, JSON.stringify(choice));
+    },
+    { key: CONSENT_STORAGE_KEY, choice: ESSENTIAL_CONSENT }
+  );
 
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
   await page.goto(`${baseURL}/login`, { waitUntil: "domcontentloaded" });
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (username) => {
     const response = await fetch("/api/auth/e2e-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify({ username }),
     });
     return {
       ok: response.ok,
       status: response.status,
       body: await response.text(),
     };
-  });
+  }, SEED_USERS[user].username);
   expect(result.ok, result.body || `HTTP ${result.status}`).toBeTruthy();
 
   await page.goto(next, { waitUntil: "domcontentloaded" });
   // Ensure the client session atom starts after the test session cookie exists.
   await page.reload({ waitUntil: "domcontentloaded" });
   await dismissLanguagePrompt(page);
+}
+
+export async function loginAsAlice(page: Page, next = "/") {
+  await loginAsSeedUser(page, "alice", next);
 }
 
 export async function expectSignedIn(page: Page) {

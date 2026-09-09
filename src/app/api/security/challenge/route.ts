@@ -13,6 +13,7 @@ import {
   GATE_VALUE_COOKIE,
 } from "@/lib/security/shared";
 import { checkSubjectRateLimit } from "@/lib/rate-limit";
+import { isE2eBotBypass } from "@/lib/security/bot-signals";
 import { jsonLocalizedError } from "@/lib/public-error";
 
 export const dynamic = "force-dynamic";
@@ -21,14 +22,16 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const ip = clientIpFromHeaders(request.headers);
-    const limited = await checkSubjectRateLimit({
-      subject: `ip:${ip}`,
-      action: "challenge",
-      limit: 20,
-      windowSeconds: 60,
-    });
-    if (!limited.allowed) {
-      return await jsonLocalizedError("Too many challenge requests", 429);
+    if (!isE2eBotBypass()) {
+      const limited = await checkSubjectRateLimit({
+        subject: `ip:${ip}`,
+        action: "challenge",
+        limit: 20,
+        windowSeconds: 60,
+      });
+      if (!limited.allowed) {
+        return await jsonLocalizedError("Too many challenge requests", 429);
+      }
     }
 
     const challenge = await mintChallenge(ip);

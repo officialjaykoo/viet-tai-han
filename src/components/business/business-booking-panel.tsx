@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { usePathname } from "next/navigation";
+import { useRef, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
@@ -40,19 +40,16 @@ export function BusinessBookingPanel({
 }) {
   const { t } = useI18n();
   const pathname = usePathname() ?? "/businesses";
+  const router = useRouter();
   const localizeError = useLocalizedError();
   const [pending, startTransition] = useTransition();
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [startAt, setStartAt] = useState("");
   const [note, setNote] = useState("");
-  const [minStartAt, setMinStartAt] = useState("");
+  const [minStartAt] = useState(() => localDateTimeValue(Date.now() + 15 * 60_000));
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    setMinStartAt(localDateTimeValue(Date.now() + 15 * 60_000));
-  }, []);
 
   function requestBooking(event: React.FormEvent) {
     event.preventDefault();
@@ -74,7 +71,7 @@ export function BusinessBookingPanel({
         }),
       });
       if (res.status === 401) {
-        window.location.href = `/login?next=${encodeURIComponent(pathname)}`;
+        router.push(`/login?next=${encodeURIComponent(pathname)}`);
         return;
       }
       if (!res.ok) {

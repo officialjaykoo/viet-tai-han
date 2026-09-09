@@ -912,7 +912,7 @@ export async function createBusinessBooking(input: {
   }
 
   let durationMinutes = Number(input.durationMinutes ?? 60);
-  let serviceId: string | null = input.serviceId ?? null;
+  const serviceId: string | null = input.serviceId ?? null;
   if (serviceId) {
     const service = await db
       .prepare(
@@ -1020,7 +1020,7 @@ function mapBooking(row: {
   owner_note: string | null;
   created_at: string;
   is_owner: number;
-}, viewerUserId: string): BusinessBooking {
+}): BusinessBooking {
   return {
     id: row.id,
     businessId: row.business_id,
@@ -1082,7 +1082,7 @@ export async function listBusinessBookings(input: {
       created_at: string;
       is_owner: number;
     }>();
-  return (results ?? []).map((row) => mapBooking(row, input.viewerUserId));
+  return (results ?? []).map((row) => mapBooking(row));
 }
 
 export async function updateBusinessBooking(input: {

@@ -19,8 +19,8 @@ import { redirectIfIncompleteOnboarding } from "@/lib/onboarding-access";
 
 export const dynamic = "force-dynamic";
 
-function parseSort(_value: string | undefined): FeedSort {
-  return "new";
+function parseSort(value: string | undefined): FeedSort {
+  return value === "popular" ? "popular" : "new";
 }
 
 export default async function SubredditPage({

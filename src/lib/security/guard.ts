@@ -33,14 +33,6 @@ function readCookie(header: string | null, name: string): string | null {
   return match ? decodeURIComponent(match[1]!) : null;
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  if (hex.length % 2 !== 0) throw new Error("bad hex");
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
-}
 
 async function verifyChallengeAndSignature(input: {
   request: NextRequest;

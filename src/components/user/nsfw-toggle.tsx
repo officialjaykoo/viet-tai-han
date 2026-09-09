@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button } from "@/components/ui/button";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 export function NsfwToggle({ initiallyNsfw }: { initiallyNsfw: boolean }) {
   const router = useRouter();

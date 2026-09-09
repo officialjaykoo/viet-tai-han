@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { withFeedAds } from "@/lib/ads";
 import { getRecommendations } from "@/lib/content";

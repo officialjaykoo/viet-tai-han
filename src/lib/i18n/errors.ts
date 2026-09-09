@@ -120,6 +120,12 @@ const ERROR_CATALOG: Record<
     ko: "이 사용자에게 메시지를 보낼 수 없습니다",
     ru: "Вы не можете написать этому пользователю",
   },
+  "Interaction blocked": {
+    en: "Interaction blocked",
+    vi: "Tương tác bị chặn",
+    ko: "상호작용이 차단되었습니다",
+    ru: "Взаимодействие заблокировано",
+  },
   "You can't message yourself": {
     en: "You can't message yourself",
     vi: "Bạn không thể nhắn tin cho chính mình",

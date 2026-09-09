@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 
@@ -68,6 +69,7 @@ export function ThemeProvider({
   const [resolved, setResolved] = useState<"light" | "dark">(() =>
     resolveTheme(theme)
   );
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     if (
@@ -75,26 +77,32 @@ export function ThemeProvider({
       sessionTheme === "light" ||
       sessionTheme === "dark"
     ) {
-      setThemeState(sessionTheme);
+      startTransition(() => {
+        setThemeState(sessionTheme);
+      });
       writeCookieTheme(sessionTheme);
     }
-  }, [sessionTheme]);
+  }, [sessionTheme, startTransition]);
 
   useEffect(() => {
     const next = resolveTheme(theme);
-    setResolved(next);
+    startTransition(() => {
+      setResolved(next);
+    });
     applyDomTheme(next);
 
     if (theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       const r = resolveTheme("system");
-      setResolved(r);
+      startTransition(() => {
+        setResolved(r);
+      });
       applyDomTheme(r);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [theme]);
+  }, [theme, startTransition]);
 
   const setTheme = useCallback((next: ThemePreference) => {
     setThemeState(next);

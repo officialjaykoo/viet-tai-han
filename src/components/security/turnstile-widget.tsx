@@ -2,7 +2,7 @@
 
 import type { MutableRefObject } from "react";
 import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import { getTurnstileSiteKey } from "@/lib/security/turnstile-public";
 import { cn } from "@/lib/utils";
@@ -43,15 +43,18 @@ export function TurnstileWidget({
   resetRef,
 }: TurnstileWidgetProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
-  onTokenRef.current = onToken;
 
   const sitekey = getTurnstileSiteKey();
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    onTokenRef.current = onToken;
+  }, [onToken]);
 
   useEffect(() => {
     if (!mounted || !sitekey || !hostRef.current) return;

@@ -838,14 +838,23 @@ INSERT OR IGNORE INTO user_achievements (user_id, achievement_id, level) VALUES
 -- Local fixtures represent completed profile setup.
 UPDATE "user" SET onboardingComplete = 1 WHERE email LIKE '%@example.local';
 
--- Dev social identity for E2E session setup (no credential account).
+-- Dev social identities for allowlisted E2E session setup.
 INSERT OR IGNORE INTO account (
   id, accountId, providerId, userId, createdAt, updatedAt
-) VALUES (
-  'acc_alice_facebook',
-  'e2e_alice',
-  'facebook',
-  '7Kp3nZ8QaM2wX5Rc',
-  datetime('now'),
-  datetime('now')
-);
+) VALUES
+  (
+    'acc_alice_facebook',
+    'e2e_alice',
+    'facebook',
+    '7Kp3nZ8QaM2wX5Rc',
+    datetime('now'),
+    datetime('now')
+  ),
+  (
+    'acc_bob_facebook',
+    'e2e_bob',
+    'facebook',
+    '2Vt9Lm4Qx7Nc1RsA',
+    datetime('now'),
+    datetime('now')
+  );

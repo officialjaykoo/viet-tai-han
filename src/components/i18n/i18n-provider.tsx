@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 
@@ -65,60 +66,63 @@ export function I18nProvider({
     initialCookieLocale
   );
   const syncedCookieRef = useRef(false);
+  const [, startTransition] = useTransition();
 
   const sessionPref = (session?.user as { preferredLanguage?: string } | undefined)
     ?.preferredLanguage;
   const signedIn = Boolean(session?.user);
 
   useEffect(() => {
-    const fromCookie = readCookieLocale() ?? cookieLocale;
+    startTransition(() => {
+      const fromCookie = readCookieLocale() ?? cookieLocale;
 
-    // An explicit cookie wins so SSR and client navigation keep the selected language.
-    if (isLocale(fromCookie)) {
-      setCookieLocale(fromCookie);
-      setLocale(fromCookie);
+      // An explicit cookie wins so SSR and client navigation keep the selected language.
+      if (isLocale(fromCookie)) {
+        setCookieLocale(fromCookie);
+        setLocale(fromCookie);
+        if (isLocale(sessionPref)) {
+          setPreferredLanguage(sessionPref);
+          if (sessionPref !== fromCookie && !syncedCookieRef.current) {
+            syncedCookieRef.current = true;
+            void apiFetch("/api/me/language", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ preferredLanguage: fromCookie }),
+            }).then(() => {
+              setPreferredLanguage(fromCookie);
+            });
+          }
+        } else if (signedIn && sessionPref === "unknown") {
+          setPreferredLanguage("unknown");
+          if (!syncedCookieRef.current) {
+            syncedCookieRef.current = true;
+            void apiFetch("/api/me/language", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ preferredLanguage: fromCookie }),
+            }).then(() => {
+              setPreferredLanguage(fromCookie);
+            });
+          }
+        } else if (!signedIn) {
+          setPreferredLanguage("unknown");
+        }
+        return;
+      }
+
       if (isLocale(sessionPref)) {
         setPreferredLanguage(sessionPref);
-        if (sessionPref !== fromCookie && !syncedCookieRef.current) {
-          syncedCookieRef.current = true;
-          void apiFetch("/api/me/language", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ preferredLanguage: fromCookie }),
-          }).then(() => {
-            setPreferredLanguage(fromCookie);
-          });
-        }
-      } else if (signedIn && sessionPref === "unknown") {
-        setPreferredLanguage("unknown");
-        if (!syncedCookieRef.current) {
-          syncedCookieRef.current = true;
-          void apiFetch("/api/me/language", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ preferredLanguage: fromCookie }),
-          }).then(() => {
-            setPreferredLanguage(fromCookie);
-          });
-        }
-      } else if (!signedIn) {
-        setPreferredLanguage("unknown");
+        setLocale(sessionPref);
+        writeCookieLocale(sessionPref);
+        setCookieLocale(sessionPref);
+        return;
       }
-      return;
-    }
 
-    if (isLocale(sessionPref)) {
-      setPreferredLanguage(sessionPref);
-      setLocale(sessionPref);
-      writeCookieLocale(sessionPref);
-      setCookieLocale(sessionPref);
-      return;
-    }
-
-    // No explicit choice yet: retain the server-detected browser/IP locale.
-    setLocale(initialLocale);
-    setPreferredLanguage("unknown");
-  }, [sessionPref, signedIn, cookieLocale, initialLocale]);
+      // No explicit choice yet: retain the server-detected browser/IP locale.
+      setLocale(initialLocale);
+      setPreferredLanguage("unknown");
+    });
+  }, [sessionPref, signedIn, cookieLocale, initialLocale, startTransition]);
 
   useEffect(() => {
     document.documentElement.lang = locale;

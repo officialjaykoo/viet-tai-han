@@ -15,7 +15,7 @@ import {
   MAX_POST_TITLE_LENGTH,
   MAX_POST_URL_LENGTH,
 } from "@/lib/post-limits";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 type PostType = "text" | "image" | "link";
 

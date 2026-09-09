@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { Virtuoso } from "react-virtuoso";
 
 import { AdFeedCard } from "@/components/ads/ad-feed-card";
@@ -39,13 +39,16 @@ export function Feed({
   const [hasMore, setHasMore] = useState(initialFeed.hasMore);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const discoverySource = discoveryForMode(mode);
 
   useEffect(() => {
-    setItems(initialFeed.posts);
-    setCursor(initialFeed.nextCursor);
-    setHasMore(initialFeed.hasMore);
-  }, [initialFeed]);
+    startTransition(() => {
+      setItems(initialFeed.posts);
+      setCursor(initialFeed.nextCursor);
+      setHasMore(initialFeed.hasMore);
+    });
+  }, [initialFeed, startTransition]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loading || !cursor) {

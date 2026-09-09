@@ -134,7 +134,7 @@ describe("identity providers", () => {
     const authorizationURL = new URL(
       ((await start.json()) as { url: string }).url
     );
-    const callback = await auth.handler(
+    await auth.handler(
       new Request(
         `http://localhost:3000/api/auth/callback/facebook?code=test&state=${authorizationURL.searchParams.get(
           "state"

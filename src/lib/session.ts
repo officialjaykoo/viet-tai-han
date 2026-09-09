@@ -36,15 +36,14 @@ export async function getSession(): Promise<PublicSession | null> {
   });
   if (!session) return null;
 
-  const {
-    email: _email,
-    onboardingUsernameCandidate: _candidate,
-    usernameChangedAt: _usernameChangedAt,
-    ...user
-  } = session.user as typeof session.user & {
-    onboardingUsernameCandidate?: string | null;
-    usernameChangedAt?: string | null;
-  };
+  const user = Object.fromEntries(
+    Object.entries(session.user).filter(
+      ([key]) =>
+        key !== "email" &&
+        key !== "onboardingUsernameCandidate" &&
+        key !== "usernameChangedAt"
+    )
+  ) as PublicSessionUser;
   return { ...session, user };
 }
 

@@ -9,7 +9,7 @@ import { jsonLocalizedError } from "@/lib/public-error";
 import { readApiJson } from "@/lib/security/guard";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const session = await requireSession();
     return NextResponse.json({ alerts: await listListingAlerts(session.user.id) });

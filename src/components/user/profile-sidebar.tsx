@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Cake } from "lucide-react";
 
@@ -36,7 +37,8 @@ export function ProfileSidebar({
   isOwner: boolean;
 }) {
   const { t, locale } = useI18n();
-  const ageLabel = formatAccountAge(profile.createdAt, Date.now(), locale);
+  const [now] = useState(() => Date.now());
+  const ageLabel = formatAccountAge(profile.createdAt, now, locale);
   const cakeDay = isCakeDay(profile.createdAt);
   const badges = resolveAccountBadges({
     karma: profile.karma,

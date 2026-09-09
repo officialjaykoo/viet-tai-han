@@ -12,11 +12,12 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
-  useEffectEvent,
   useId,
   useRef,
   useState,
+  useSyncExternalStore,
   useTransition,
 } from "react";
 
@@ -149,10 +150,11 @@ export function CreatePostForm({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileReset = useRef<{ reset: () => void } | null>(null);
   const bot = useBotGuard();
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const currentDraftFingerprint = createDraftFingerprint({
     postType,
@@ -162,10 +164,6 @@ export function CreatePostForm({
     url,
     imageFile,
   });
-  currentDraftRef.current = {
-    value: currentDraftFingerprint,
-    imageFile,
-  };
 
   useEffect(() => {
     const previous = draftFingerprintRef.current;
@@ -178,6 +176,10 @@ export function CreatePostForm({
       mediaKeyRef.current = null;
     }
     draftFingerprintRef.current = {
+      value: currentDraftFingerprint,
+      imageFile,
+    };
+    currentDraftRef.current = {
       value: currentDraftFingerprint,
       imageFile,
     };
@@ -196,11 +198,13 @@ export function CreatePostForm({
     if (defaultSubreddit) return;
     if (destination) return;
     if (username) {
-      setDestination({ kind: "profile" });
+      startTransition(() => {
+        setDestination({ kind: "profile" });
+      });
     }
   }, [defaultSubreddit, destination, username]);
 
-  const loadCommunities = useEffectEvent(async (query: string) => {
+  const loadCommunities = useCallback(async (query: string) => {
     setLoadingCommunities(true);
     try {
       const res = await apiFetch(
@@ -219,7 +223,7 @@ export function CreatePostForm({
     } finally {
       setLoadingCommunities(false);
     }
-  });
+  }, []);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -227,7 +231,7 @@ export function CreatePostForm({
       void loadCommunities(communityQuery);
     }, 180);
     return () => window.clearTimeout(handle);
-  }, [communityQuery, pickerOpen]);
+  }, [communityQuery, loadCommunities, pickerOpen]);
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
