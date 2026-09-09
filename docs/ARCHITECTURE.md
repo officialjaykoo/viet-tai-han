@@ -1,175 +1,398 @@
-# VTH architecture
+# VTH Architecture Contract
 
-This document is the current architecture contract. It describes deployed boundaries and invariants, not a historical implementation plan.
+**Status:** Canonical  
+**Scope:** deployed system boundaries, state ownership, security, and engineering invariants  
+**Rule:** implementation history belongs in Git history. This document describes the system VTH intends to operate now.
 
-## 1. Product boundary
+## 1. System boundary
 
-VTH is a community and social platform for Vietnamese people living in Korea. The product includes communities, posts, comments, likes, Q&A, marketplace listings, local businesses, profiles, follow/friend/block relationships, 1:1 messaging, notifications, and Vietnamese/Korean UI.
+VTH is a focused Korea–Vietnam community/social product. The architecture should remain small enough for a small team to understand end-to-end.
 
-The product is relationship-first. Familiar social UX does not imply a large social-network architecture.
-
-## 2. Runtime topology
+Current runtime shape:
 
 ```text
-Next.js UI
-    |
-VTH Worker
-    |
-    +-- D1          canonical persistent state
-    +-- R2          media
-    +-- ChatRoom DO realtime DM delivery only
-    +-- Workers AI  translation only
+Browser / App Web UI
+        |
+Next.js / OpenNext
+        |
+Cloudflare Worker
+        |
+        +-- D1                 canonical persistent state
+        +-- R2                 media bytes
+        +-- ChatRoom DO        realtime DM transport/projection only
+        +-- Workers AI         language/translation assistance only
+        +-- Web Push           optional notification delivery
 ```
 
-- Next.js pages, route handlers, and server actions are built with OpenNext for the Worker runtime.
-- The custom Worker applies edge rate limits and ingress rules before the OpenNext handler.
-- D1 is the source of truth. No stateful edge service is authoritative over D1.
-- ChatRoom Durable Objects coordinate live DM delivery only; they do not persist chat history.
-- Workers AI is used for content language detection/translation only.
+There is no second canonical application database.
 
-## 3. Persistent state
+## 2. Core architectural rules
 
-D1 binding `DB` in database `vth-db` stores Better Auth records and application state, including users, profiles, communities, posts, comments, likes, questions, answers, listings, businesses, relationships, notifications, chat rooms, requests, messages, reports, and read state.
+1. D1 is authoritative for persistent application state.
+2. `user.id` is the immutable internal identity.
+3. Public usernames are mutable handles and never relationship keys.
+4. Canonical writes commit before best-effort realtime, push, analytics, or translation side effects.
+5. Client state is a projection. It may be optimistic but must converge to server truth.
+6. Important permissions are enforced at the server/final D1 write boundary, not only by UI prechecks.
+7. Retries must not duplicate canonical rows or user-visible side effects.
+8. Applied migrations are immutable. Repairs use new forward migrations.
+9. One responsibility should have one canonical implementation path.
+10. New infrastructure is justified by measured need, not by similarity to another project.
 
-All schema changes are forward-only migrations in `migrations/`. Applied migrations are immutable. Derived counts, previews, and unread fanout are recoverable from canonical rows and must not replace them.
+## 3. Identity and authentication
 
-## 4. Identity/auth
+Better Auth owns authentication/session state.
 
-- Better Auth owns social sign-in and sessions.
-- Current social providers are Facebook, Kakao, and Zalo when configured.
-- `user.id` is the immutable internal identity used by relationships, messages, notifications, moderation, and foreign keys.
-- `username` and `display_username` are public profile handles and may change.
-- Provider identities are not merged solely because two providers expose the same email.
-- Block state overrides ordinary social and contact permissions.
+Supported social providers are Facebook, Kakao, and Zalo when configured.
 
-## 5. Content
+VTH is social-first/social-only at the product layer. It does not require a user-facing email/password account flow.
 
-Posts belong to communities and are authored by immutable user IDs. Comments, votes/likes, questions, answers, listings, business records, and moderation records remain relational D1 state. Content discovery and recommendations are D1-backed; there is no separate recommendation service.
+Identity rules:
 
-Translation metadata and translated content are stored with the canonical content record. Translation failure must not invalidate a successful content write.
+```text
+user.id
+= immutable canonical identity
 
-## 6. Social graph
+username
+= mutable public handle
 
-Follow, friendship, block, presence, notification, and unread state are D1 records. Relationship transitions are server-authorized, idempotent where retried, and protected by database uniqueness/conditional writes at the final write boundary.
+provider account identity
+= authentication linkage, not application relationship identity
+```
 
-A block removes or overrides applicable contact relationships and prevents new social or messaging actions. Public usernames are never used as relationship identity.
+Two providers exposing the same email do not automatically imply the same VTH user. Provider-linking must follow explicit account policy.
 
-## 7. Messaging
+Every relationship, message, notification, content ownership row, moderation record, and other user-owned foreign key should use `user.id`.
 
-- D1 stores rooms, two-person membership, message requests, canonical messages, delivery status, and read boundaries.
-- A direct-message room is keyed by the pair of immutable user IDs; there is one room per pair.
-- At most one pending request exists for a room/pair.
-- The request-specific opener is only deliverable under that request's current state and opener identity.
-- Decline/cancel cannot be bypassed by an older opener or a stale retry.
-- Block cancels pending requests, revokes direct membership/delivery, and prevents old unread state from being resurrected.
-- ChatRoom DO receives committed events and fans them out to connected sockets. It is not a message store.
-- History is read from D1 and remains recoverable when a socket is offline.
-- Canonical message ordering and read boundaries use `(created_at, id)`.
-- `clientMessageId` and request identifiers make retries safe without duplicate canonical messages or notification side effects.
+## 4. Request and ingress boundaries
 
+The custom Worker is the first application boundary and can reject abusive traffic before expensive SSR/D1/AI work.
 
-### DM convergence and transport recovery
+Browser application API traffic uses the existing internal signed/tunneled path where configured. Public API routes enforce their documented bearer/session boundary and then perform route/domain authorization.
 
-The DM client keeps the Bug8 authority boundary: D1 is canonical, HTTP performs mutations, ChatRoom delivers committed realtime events, and React state is disposable projection.
+OAuth callbacks and external webhooks are explicit exceptions with their own verification contract.
 
-- The 256-entry message-ID set is only a fast duplicate cache. When the cache cannot prove uniqueness or an event arrives out of order, the client keeps the immediate local projection and schedules a coalesced canonical inbox refresh.
-- Canonical inbox refresh runs after reconnect/catch-up, visibility or network restoration, transport uncertainty, revocation, and remote-tab unread changes. Normal realtime events do not wait for D1 or trigger a per-message inbox read.
-- An uncertain HTTP send retries at most once with the same `clientMessageId`. If both attempts are uncertain, the active room history is selectively refreshed; explicit HTTP errors are not retried.
-- `vth-unread` `BroadcastChannel` synchronizes unread changes between tabs. `localStorage` storage events are the fallback when `BroadcastChannel` is unavailable.
-- Active-room history, conversation-list previews, and global unread counts reconcile independently. A room switch drops late history responses before they can update the selected room.
+Security layers are complementary:
 
-Bug10 classifications:
+- edge/IP rate limiting
+- Turnstile/bot checks where appropriate
+- Better Auth session verification
+- API-key verification for public API contracts
+- domain ownership/relationship/block checks
+- D1 uniqueness/conditional predicates
+- moderation state
 
-- `[HARDENED]` bounded-cache unread misses, coalesced canonical unread reconciliation, uncertain sends, catch-up/live overlap, cross-tab unread refresh, and late catch-up responses.
-- `[ADOPTED FROM CLONAGRAM]` fast local projection followed by selective canonical reconciliation, plus independent conversation-list and active-room refreshes.
-- `[ALREADY SAFE]` D1 idempotency, canonical ordering, monotonic read boundaries, moderation filtering, block/ban socket revocation, and notification/push guards.
-- `[REJECTED FROM CLONAGRAM]` React Query adoption, polling, per-event full invalidation, current-time read models, and a weaker INSERT-only send path.
+No client-provided user ID, role, membership, block state, or ownership claim is authoritative.
 
-## 8. Media
+## 5. Domain write shape
 
-R2 binding `MEDIA_BUCKET` stores uploaded media in bucket `vth-media`. D1 stores media keys and application metadata. Upload authorization, ownership, content constraints, and deletion behavior are enforced by the application; an R2 object is not a substitute for an authorized D1 record.
+Prefer a direct flow:
 
-## 9. Translation
+```text
+Route / server action
+→ strict payload parsing
+→ small domain function
+→ authorization / moderation / rate limit
+→ D1 conditional canonical write
+→ canonical response
+→ best-effort derived side effects
+```
 
-Workers AI binding `AI` is limited to language detection and translation for supported content languages. The application may use deterministic heuristics before AI. AI availability or translation failure must degrade the translation result, not the canonical content operation.
+Avoid unnecessary permanent layers such as generic repository/DAO/provider/manager stacks.
 
-## 10. Security ingress
+A helper or service is justified when it centralizes a real invariant or removes duplication.
 
-- The Worker applies IP rate limits before SSR, D1, or AI work.
-- Browser application API traffic uses `POST /i/api` with the signed Protobuf tunnel, challenge, cookie, and proof-of-work flow.
-- Direct `/api/*` traffic follows the existing public API boundary and requires `Authorization: Bearer <api_key>` at ingress. The route handler then applies its own session, ownership, and policy checks where required.
-- OAuth callbacks and the billing webhook are explicit ingress exceptions handled by their own verification paths.
-- Turnstile, Better Auth sessions, API-key checks, server-side authorization, block checks, and database constraints are separate controls; none is replaced by a client-side check.
+## 6. Public content
 
-## 11. Deployment
+Canonical public-content responsibilities are split deliberately:
 
-- Worker name: `vth`.
-- Public hosts: `vth.kr` and `developers.vth.kr`.
-- D1: `vth-db`; R2: `vth-media`.
-- Durable Object binding: `CHAT_ROOM` → `ChatRoom`.
-- OpenNext assets are served through the Worker `ASSETS` binding.
-- Build the production bundle with `npm run build:worker` before deploy.
-- Deploy with `npm run deploy` after migrations, secrets, smoke checks, and the production runbook are reviewed.
+- `src/lib/post-projection.ts` owns the shared post projection used by major post surfaces.
+- `src/lib/content-visibility.ts` owns the ordinary public-post SQL visibility predicate.
+- `src/lib/content-payload.ts` owns strict runtime payload parsing for public-content mutations.
 
-## 12. Invariants
+Ordinary public post visibility requires:
 
-1. D1 remains authoritative for persistent application state.
-2. Every user-owned relation references immutable `user.id`, never a username.
-3. Applied migrations are not rewritten; repairs use forward migrations.
-4. Canonical writes commit before non-critical derived work or realtime delivery.
-5. Retries cannot create duplicate relationship, message, or notification state.
-6. A block cannot be bypassed by stale requests, memberships, unread state, or sockets.
-7. Realtime loss cannot destroy or hide recoverable D1 history.
-8. Direct API authentication and route authorization are both required where the route contract requires them.
+```sql
+p.is_removed = 0
+AND p.is_shadow_hidden = 0
+AND s.is_removed = 0
+```
 
-## 13. Explicit non-goals
+Block state is not itself a public-visibility predicate. A blocked user's ordinary public post may still be directly readable, while new positive interaction/contact is denied.
 
-The current architecture does not include:
+Detailed feed/content contract: [`VTH_CONTENT_FEED.md`](VTH_CONTENT_FEED.md).
 
-- PostObject as persistent post state
-- Vectorize
+## 7. Feed and discovery
+
+Current feed roles:
+
+```text
+Home
+= subscribed-community recency
+
+Popular
+= public canonical engagement
+
+Community / Profile
+= recency
+
+Recommended
+= D1-backed user activity/follow personalization
+```
+
+Popular ranking currently uses:
+
+```text
+like_count + comment_count * 3
+```
+
+with deterministic:
+
+```text
+created_at DESC, id DESC
+```
+
+tie-breaks.
+
+Pagination cursors are signed and bound to their complete feed context. A cursor must carry the same ordering tuple used by the SQL query.
+
+No ML/vector recommendation infrastructure is required by the current product.
+
+## 8. Social graph and block policy
+
+Canonical social relations are stored in D1.
+
+Core concepts:
+
+- follow
+- friendship/request state
+- block
+- presence
+- notification/unread projection
+
+Relationship APIs should return server-derived state rather than asking clients to reconstruct relationship truth from independent requests.
+
+Block semantics:
+
+- bilateral block prevents new positive interaction/contact
+- block can tear down applicable follow/friend/pending-message-request relationships
+- block does not automatically delete historical public content or ordinary historical interactions
+- cleanup actions such as unlike or clearing an accepted answer may remain allowed
+- reporting remains available where needed
+- notification/push fanout must recheck applicable block state
+
+The final write boundary should enforce block rules when a race between precheck and write is possible.
+
+## 9. Direct messaging
+
+Messaging has a strict authority split:
+
+```text
+HTTP
+→ validate/authorize/moderate
+→ D1 canonical message/request/read state
+→ committed realtime event
+→ ChatRoom Durable Object
+→ WebSocket clients
+```
+
+ChatRoom Durable Objects are transport/projection infrastructure, not a second message database.
+
+Messaging invariants include:
+
+- one DM room per immutable user pair
+- explicit room membership/request state
+- at most one valid pending request per pair/room contract
+- `clientMessageId` idempotency for uncertain sends
+- `(created_at, id)` message ordering and read boundaries
+- signed history/catch-up cursors
+- block/ban connect and broadcast checks
+- terminal revoke of stale sockets
+- bounded local dedupe with selective canonical reconciliation
+- no polling-based canonical message store
+
+Detailed contract: [`VTH_REALTIME_DM.md`](VTH_REALTIME_DM.md).
+
+## 10. Notifications and unread state
+
+Notification rows/read state in D1 are canonical. Push, badges, and in-memory/client unread counts are derived delivery/projection state.
+
+A user-visible notification should be attributable to a canonical source action when idempotency matters.
+
+Queued or delayed notification delivery must not bypass current block/moderation state when the notification itself represents a social interaction.
+
+Cross-tab unread synchronization may use browser transport such as BroadcastChannel, but final convergence remains server-backed.
+
+## 11. Q&A
+
+Questions and answers are canonical D1 records.
+
+Important invariants:
+
+- answers belong to a valid question
+- removed/shadow/locked state is enforced at the final write boundary where races matter
+- accepted answer belongs to the same question
+- request IDs follow same-payload replay / conflicting-payload rejection semantics
+- denormalized answer counts remain derived from canonical answer rows
+
+Q&A UX should remain compatible with durable searchable knowledge rather than chat-like transient behavior.
+
+## 12. Marketplace and businesses
+
+Marketplace and business domains reuse common identity, block, moderation, idempotency, media-ownership, and notification principles, but do not need to share one giant content model with posts/Q&A.
+
+Separate domain tables are acceptable when lifecycle and constraints genuinely differ.
+
+## 13. Media
+
+R2 binding `MEDIA_BUCKET` / bucket `vth-media` stores media bytes.
+
+D1 stores authorized references and ownership metadata. An R2 key alone does not authorize access, ownership, attachment, or deletion.
+
+Media writes must enforce:
+
+- authenticated ownership
+- acceptable type/size constraints
+- valid association with canonical application records
+- deletion/cleanup policy
+
+## 14. Translation
+
+Workers AI is limited to supported language detection/translation assistance.
+
+Translation is derived work:
+
+```text
+canonical content write succeeds
+→ translation may run
+→ translation result updates metadata/projection
+```
+
+Translation failure must not retroactively invalidate a successful content write.
+
+There is no requirement for an AI-centric application architecture.
+
+## 15. Database architecture
+
+D1 database `vth-db` is the persistent source of truth.
+
+Canonical table ownership and legacy-object status are defined in [`VTH_DATABASE.md`](VTH_DATABASE.md).
+
+Key database principles:
+
+- relational truth before denormalized counters
+- explicit unique constraints for idempotent relations where practical
+- conditional SQL for race-sensitive permission/state transitions
+- counters/previews/ranks are recoverable
+- indexes support query plans but never replace visibility/authorization predicates
+- old migrations are historical records, not current architecture documentation
+
+## 16. Client state
+
+Client state should be as disposable as practical.
+
+Use local/optimistic state when it gives immediate UX benefit, but define how uncertainty is reconciled.
+
+Do not generalize DM's selective-reconciliation machinery into every domain. HTTP/D1 request-response domains usually need a simpler canonical response flow.
+
+Avoid introducing a global state manager or client data framework solely to match an external project.
+
+## 17. UI architecture
+
+Consumer pages use shared layout/component primitives rather than page-specific width systems.
+
+Current layout tiers:
+
+- wide: Home and Popular
+- standard: communities, Q&A, marketplace, recommended, messages, profiles and related detail pages
+- compact: settings, create-post, notifications, form-focused pages
+
+Mobile behavior converges onto the same responsive shell rather than a parallel mobile application architecture.
+
+UI component extraction should reduce duplication, not create abstraction for its own sake.
+
+## 18. Testing and CI
+
+Testing responsibility is documented in [`VTH_TESTING.md`](VTH_TESTING.md).
+
+The production-quality baseline includes:
+
+- lint
+- typecheck
+- unit tests
+- Worker tests
+- integration tests
+- critical browser E2E
+- clean local migration/seed checks
+- Worker build
+
+A green test suite does not replace production observation, but a red quality gate must not become the accepted baseline.
+
+## 19. Deployment and operations
+
+Production resources currently include:
+
+- Worker: `vth`
+- public host: `vth.kr`
+- developer host: `developers.vth.kr`
+- D1: `vth-db`
+- R2: `vth-media`
+- Durable Object binding: `CHAT_ROOM` → `ChatRoom`
+
+Operational setup, migration, backup, deploy, smoke and rollback procedures live in [`CLOUDFLARE_VTH_KR_SETUP.md`](CLOUDFLARE_VTH_KR_SETUP.md).
+
+## 20. Architecture convergence policy
+
+VTH originated from RED and may selectively adopt ideas from Clonagram, Discourse, Lemmy, Apache Answer, Bluesky, GoToSocial, and other open-source systems.
+
+Source lineage does not determine the final design.
+
+For each responsibility:
+
+```text
+compare implementations
+→ choose the best fit for VTH
+→ adapt to VTH identity/D1/security/product semantics
+→ designate one canonical implementation
+→ remove displaced duplicate/temporary paths
+```
+
+Do not retain donor-specific compatibility unless the product truly needs it.
+
+## 21. Explicit non-goals
+
+The current architecture does not require:
+
+- Supabase
 - Redis
 - Kafka
-- a generic background queue architecture
 - microservices
 - a graph database
-- general-purpose Durable Objects for application state
-- a separate recommendation service or recommendation infrastructure
+- a generic repository/DAO/ORM layer
+- general-purpose Durable Objects as primary state
+- a separate recommendation service
+- Vectorize/embedding infrastructure for ordinary feed recommendation
 - federation
+- AT Protocol
+- ActivityPub
+- group-call/media-call architecture
 
-## 14. Public content convergence
+These are not permanently forbidden. They require an explicit product need and architecture decision.
 
-Bug11 keeps one canonical public-content path:
+## 22. Architecture review checklist
 
-- `src/lib/post-projection.ts` maps Feed, Community, Popular, Recommended, Profile Posts, and Post Detail to the same `FeedPost` projection.
-- `src/lib/content-visibility.ts` owns the public post predicate: post not removed, post not shadow-hidden, and community not removed.
-- `src/lib/content-payload.ts` owns strict runtime parsing for like, comment, Q&A, accept-answer, and listing writes.
-- `post_likes` and `comment_likes` are the only runtime positive-reaction tables. Their counters are the only engagement inputs to Popular.
-- Public reads do not use `user_blocks` as visibility. Bilateral block checks are applied at final positive-interaction and guarded-notification writes.
+Before merging a structural change, answer:
 
-Home is subscribed-community recency, Community/Profile are recency, Popular is all public canonical engagement, and Recommended is personalized D1 ranking. Popular uses `like_count + comment_count * 3`, followed by `(created_at, id)` descending. Its signed cursor carries the rank and deterministic tie-break fields and is bound to the complete feed context.
+```text
+What existing responsibility changes?
+What becomes canonical after this change?
+What old path is removed?
+Does a permanent adapter remain?
+Does D1 ownership change?
+Does retry/block/moderation behavior change?
+Does this add infrastructure or a runtime dependency?
+How is the change tested?
+Which canonical document must be updated?
+```
 
-Bug11 classifications:
-
-- `[HARDENED]` public visibility parity across discovery/detail/search/out/analytics, bilateral block enforcement at final writes, strict malformed-payload rejection, request-ID payload conflict detection, canonical counter reconciliation, and migration/seed audit.
-- `[ADOPTED FROM CLONAGRAM]` a small shared post projection, centralized visibility/payload helpers, canonical engagement ranking, and deterministic signed pagination.
-- `[ALREADY SAFE]` D1 as source of truth, immutable `user.id` identity, Better Auth, Cloudflare/OpenNext/D1/R2/DO boundaries, forward-only migrations, and Bug10 DM convergence.
-- `[REJECTED FROM CLONAGRAM]` parallel RED/VTH/Clonagram content models, giant Post DTOs, ORM/repository layers, Supabase, ML/vector recommendation infrastructure, and React Query/polling invalidation.
-
-Bug11 does not modify the frozen Bug10 messaging paths. Messaging schema objects remain inventoried in `docs/VTH_DATABASE.md` and are not copied into a second scheduler or transport.
-
-## 15. Database audit and cleanup policy
-
-`docs/VTH_DATABASE.md` is the canonical schema audit. It inventories all applied migrations, identifies Better Auth `user.id` as the identity key, lists canonical relations and counter invariants, and records why legacy `users`, `votes`, and score columns/indexes remain. No applied migration is rewritten or dropped. Cleanup candidates require a separate forward migration backed by production row-count, foreign-key, and rollback evidence.
-
-## UI layout and content density
-
-Consumer pages use one `PageShell` width system:
-
-- `wide`: `max-width: 1240px` for home and popular feeds.
-- `standard`: `max-width: 1024px` for communities, Q&A, marketplace, recommended, messages, profiles, and related detail pages.
-- `compact`: `max-width: 768px` for settings, post creation, notifications, and form-focused pages.
-
-`PageShell` always applies the same safe-area-aware horizontal padding. At mobile widths the three desktop tiers converge to the same responsive shell and `16px` horizontal padding; no separate mobile width tier exists.
-
-`PostCard` owns the shared post action footer. Like, comment, and share controls use a single compact visual row with `16px` icons and tight text line-height, desktop `36px` visual controls, and mobile `44px` touch targets. Like/comment/share mutations and permissions remain unchanged.
+A structural change that only adds a new layer without removing duplication should be treated skeptically.

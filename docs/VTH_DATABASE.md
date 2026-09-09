@@ -1,35 +1,69 @@
-# VTH database contract
+# VTH Database Contract
 
-This document records the D1 schema audit for Bug11. It describes the canonical runtime tables, retained migration objects, counter invariants, and cleanup candidates. Applied migrations remain immutable.
+**Status:** Canonical  
+**Database:** Cloudflare D1 `vth-db` (`DB`)  
+**Baseline reviewed:** repository main at migration `0042_public_content_indexes.sql`  
+**Rule:** this document describes current data ownership and cleanup policy. Historical migrations are evidence of how the schema evolved, not the primary way to understand the current system.
 
-## Identity and storage boundary
+## 1. Source-of-truth rules
 
-- D1 binding `DB` in database `vth-db` is the persistent source of truth.
-- Better Auth table `"user"` owns the immutable internal identity. Every user-owned foreign key uses `user.id`.
-- `username` and `display_username` are mutable public handles. They are never relationship keys.
-- R2 stores media bytes; `posts.media_key`, `businesses.*_key`, and media registry rows store authorized references only.
-- Durable Object `ChatRoom` transports committed DM events. It is not a second message database.
-- There is no Supabase, ORM, generic repository, generic DAO, or query-builder layer.
+1. D1 is the canonical persistent application store.
+2. Better Auth table `"user"` owns the immutable application identity key `user.id`.
+3. `username` is a mutable public handle, never a relationship key.
+4. R2 stores media bytes; D1 stores authorized media references/ownership metadata.
+5. Durable Objects do not replace D1 message history or relationship state.
+6. Denormalized counts, previews, unread values and ranks are derived accelerators and must remain recoverable.
+7. Applied migrations are immutable. Repairs and cleanup use new forward migrations.
 
-## Canonical runtime objects
+## 2. Canonical domain ownership
 
-| Domain | Canonical tables | Relations and purpose |
+| Domain | Canonical tables / records | Authority notes |
 | --- | --- | --- |
-| Identity | `"user"`, `session`, `account`, `verification` | Better Auth identity, sessions, provider accounts, verification. |
-| Community | `subreddits`, `subscriptions`, `subreddit_moderators` | Community ownership, membership, moderation. |
-| Public posts | `posts`, `comments`, `post_likes`, `comment_likes` | One post/comment graph and one positive-like model. `posts.subreddit_id` and `posts.author_id` are foreign keys. Comments reference posts and optional parent comments. |
-| Q&A | `questions`, `answers` | Questions belong to a community and author; answers belong to a question and author. `accepted_answer_id` points to an answer in the same question. |
-| Discovery | `hidden_posts`, `user_activity`, `post_views`, `post_link_clicks` | Viewer-local hides, D1-backed recommendation signals, and post analytics. Analytics are not visibility authorities. |
-| Social policy | `user_follows`, `friendships`, `user_blocks` | Relationship state and bilateral block policy. Blocks gate new positive interactions and notification delivery; they do not change public post visibility. |
-| Notification | `notifications`, `notification_deliveries`, `notification_reads` | Canonical notification row, push delivery state, and read state. Unread fanout is recoverable. |
-| Marketplace | `listings`, `listing_saves`, `listing_reports`, `listing_alerts` | Listing lifecycle and targeted integrity controls. |
-| Businesses | `businesses`, `business_hours`, `business_reports`, `business_bookings` | Business profiles and booking/report state. |
-| Messaging | `chat_rooms`, `chat_room_members`, `chat_requests`, `chat_messages`, `chat_read_state`, `chat_room_reports` | D1 canonical DM history, request state, membership, and read boundaries. Bug10 messaging abstractions remain canonical and are outside Bug11 cleanup. |
-| Moderation and media | `moderation_actions`, `media_ownership`, `reports`, `post_tags`, `comment_tags` | Auditable moderation, authorized media ownership, reports, and content tags. |
+| Identity | `"user"`, `session`, `account`, `verification` | Better Auth identity/session/provider linkage. `user.id` is the application identity. |
+| Community | `subreddits`, `subscriptions`, `subreddit_moderators` | Community ownership/membership/moderation. |
+| Public posts | `posts`, `comments`, `post_likes`, `comment_likes` | One canonical positive-like model; comments form the post comment graph. |
+| Q&A | `questions`, `answers` | Question/answer lifecycle and accepted-answer relation. |
+| Discovery/analytics | `hidden_posts`, `user_activity`, `post_views`, `post_link_clicks` | Viewer-local discovery signals and analytics; not visibility authorities. |
+| Social graph | `user_follows`, `friendships`, `user_blocks` | Canonical relationship and bilateral block state. |
+| Notifications | `notifications`, `notification_deliveries`, `notification_reads` | Notification/read/delivery truth; client badges and push are projections. |
+| Marketplace | `listings`, `listing_saves`, `listing_reports`, `listing_alerts` | Listing lifecycle and viewer relations. |
+| Businesses | `businesses`, `business_hours`, `business_reports`, `business_bookings` | Business/service lifecycle. |
+| Messaging | `chat_rooms`, `chat_room_members`, `chat_requests`, `chat_messages`, `chat_read_state`, `chat_room_reports` | Canonical DM history, membership/request/read state. |
+| Moderation/media | `moderation_actions`, `media_ownership`, `reports`, `post_tags`, `comment_tags` | Moderation audit, authorized media ownership and tags. |
+| Monetization foundations | billing/pro-related tables introduced by migration history | Product-support state only where runtime code actively uses it. |
 
-## Public content contract
+When a table exists historically but is not listed as canonical above, its runtime status must be explicitly checked before new code uses it.
 
-A post is publicly visible only when all of the following are true:
+## 3. Identity contract
+
+Canonical identity:
+
+```text
+"user".id
+```
+
+Required rule:
+
+```text
+all user-owned foreign keys / relationship identities
+→ user.id
+```
+
+Do not use:
+
+```text
+username
+email
+provider account ID
+```
+
+as application relationship identity.
+
+Legacy pre-Better-Auth identity objects may remain in historical schema until a safe forward cleanup proves they are removable.
+
+## 4. Canonical public-content visibility
+
+Ordinary public post queries use the shared public predicate:
 
 ```sql
 p.is_removed = 0
@@ -37,100 +71,343 @@ AND p.is_shadow_hidden = 0
 AND s.is_removed = 0
 ```
 
-`src/lib/content-visibility.ts` is the single SQL predicate used by feed, community, recommended, profile-post, search, post-detail, link-out, view, and analytics paths. Comments additionally require `is_removed = 0`, `is_deleted = 0`, and `is_shadow_hidden = 0` for ordinary public interaction.
+Comments shown as ordinary live content additionally require the current comment not to be removed, deleted, or shadow-hidden.
 
-- Home uses subscribed-community recency.
-- Community and profile feeds use recency.
-- Popular uses the canonical engagement rank `like_count + comment_count * 3`, then `(created_at, id)` descending as the deterministic tie-break.
-- Recommended remains personalized D1 ranking; it reuses the canonical post projection.
-- Popular cursors are signed and bind `rank`, `created_at`, and `id` to the feed context. A popular cursor without rank is invalid.
-- A block is not a visibility predicate. Direct public reads remain possible, while new likes, comments, replies, Q&A answers, accept actions, and guarded notifications are denied bilaterally. Unlike and accepted-answer cleanup remain allowed.
+Block state is deliberately separate from public visibility. Block affects interaction/contact; moderation state affects public visibility.
 
-## Counter invariants
+Detailed behavior: [`VTH_CONTENT_FEED.md`](VTH_CONTENT_FEED.md).
 
-Counters are denormalized read accelerators; canonical rows remain authoritative.
+## 5. Canonical reaction model
 
-| Counter | Invariant | Write/reconciliation path |
-| --- | --- | --- |
-| `posts.like_count` | Equals `COUNT(post_likes WHERE post_id = posts.id)`. | Like/unlike batch updates from the canonical like table. Migration `0034` backfills it. |
-| `comments.like_count` | Equals `COUNT(comment_likes WHERE comment_id = comments.id)`. | Comment like/unlike batch updates from the canonical like table. Migration `0034` backfills it. |
-| `posts.comment_count` | Counts comments with `is_deleted = 0`, `is_removed = 0`, `is_shadow_hidden = 0`. | Comment create/delete/moderation writes and migration `0037` reconciliation. |
-| `questions.answer_count` | Counts non-removed, non-shadow answers for the question. | Answer creation updates only after the answer insert commits. |
-| `subreddits.subscriber_count` | Equals `COUNT(subscriptions WHERE subreddit_id = subreddits.id)`. | Subscribe/unsubscribe use one D1 batch for relation mutation plus scalar recount; `recountSubscribers` remains an operator repair path. |
+### Post likes
 
-A future maintenance job may recalculate all counters and compare drift, but no derived counter is allowed to become the sole source of truth.
+Truth:
 
-## Migration inventory and disposition
+```text
+post_likes(post_id, user_id)
+```
 
-| Migration | Area | Disposition |
-| --- | --- | --- |
-| `0001_init` | Initial users, communities, posts, comments, votes, subscriptions | Migration-compatible historical base. `users`, `votes`, legacy reaction columns, and legacy score indexes are retained for forward migration history. |
-| `0002_better_auth` | Better Auth tables and FK migration | Canonical identity cutover to `"user"`; immutable history. |
-| `0003_auth_camelcase` | Auth/profile compatibility columns | Canonical profile compatibility migration. |
-| `0004_moderation` | Removal/shadow flags and moderation actions | Canonical moderation state. |
-| `0005_user_actions` | Hides, follows, blocks, reports | Canonical social policy and moderation relations. |
-| `0006_tags_achievements` | Tags and achievements | Canonical profile/content metadata. |
-| `0007_weighted_score` | Vote weighting and score indexes | Legacy/migration-compatible. Runtime public ranking does not read `score` or `hot_score`; Bug11 uses canonical like/comment counters. |
-| `0008_messaging_karma` | Messaging and karma fields | Canonical/used; messaging remains frozen under Bug10. |
-| `0009_ads_analytics_scoring` | Ads, activity, analytics, scoring support | Mixed: analytics/activity are used; legacy post scoring objects are retained compatibility state. |
-| `0010_rich_post_analytics` | Post view/link analytics | Canonical analytics rows and fields. |
-| `0011_notifications` | Notification tables | Canonical notification state. |
-| `0012_preferred_language` | User language preference | Canonical profile preference. |
-| `0013_user_settings` | User settings | Canonical settings. |
-| `0014_achievements_levels_badges` | Achievement levels/badges | Canonical achievement metadata. |
-| `0015_content_translation` | Translation fields and queue state | Canonical content translation metadata. |
-| `0016_security_hardening` | Security constraints/indexes | Canonical hardening. |
-| `0017_laefye_achievement` | Achievement seed/compatibility | Retained product achievement data. |
-| `0018_api_keys` | API key access | Canonical API authentication state. |
-| `0019_migrate_legacy_languages` | Language migration | Migration-compatible data conversion. |
-| `0020_questions_answers` | Q&A schema | Canonical Q&A tables. |
-| `0021_marketplace` | Marketplace schema | Canonical marketplace tables. |
-| `0022_business_profiles` | Business schema | Canonical business tables. |
-| `0023_identity_providers` | Provider identity support | Canonical Better Auth provider relations. |
-| `0024_messaging_delivery` | DM delivery/read state | Canonical messaging reliability state; frozen after Bug10. |
-| `0025_multilingual_content` | Additional translation fields | Canonical translation compatibility. |
-| `0026_monetization_foundations` | Billing/pro subscriptions | Canonical monetization state. |
-| `0027_friendships` | Friend relations | Canonical social graph state. |
-| `0028_user_presence` | Presence | Canonical ephemeral-presence persistence. |
-| `0029_social_first_identity` | Identity/profile transition | Canonical identity hardening. |
-| `0030_username_lifecycle` | Username lifecycle | Canonical mutable public-handle state. |
-| `0031_remove_display_username` | Handle cleanup | Forward-compatible handle migration; applied history retained. |
-| `0032_allow_zero_karma_dm` | DM eligibility repair | Canonical messaging policy repair. |
-| `0033_chat_room_reports` | DM reports | Canonical moderation relation. |
-| `0034_simple_likes` | `post_likes`, `comment_likes`, like counters | Canonical reaction cutover; positive legacy votes were backfilled, negative votes intentionally have no Like equivalent. |
-| `0035_write_idempotency` | Request IDs and unique indexes | Canonical retry boundary for public writes and messaging/business writes. |
-| `0036_chat_reliability` | Chat reliability fields/indexes | Canonical messaging reliability; frozen after Bug10. |
-| `0037_comment_tree_integrity` | Comment tombstone/count repair | Canonical comment-tree invariant repair. |
-| `0038_chat_request_integrity` | Chat request constraints | Canonical messaging integrity; frozen after Bug10. |
-| `0039_cancel_orphan_pending_chat_requests` | Orphan request cleanup | Canonical messaging repair; frozen after Bug10. |
-| `0040_notification_request_identity` | Notification request identity | Canonical notification idempotency. |
-| `0041_media_ownership_registry` | Media ownership registry | Canonical R2 authorization metadata. |
-| `0042_public_content_indexes` | Public engagement/created/comment indexes | Bug11 canonical query support; indexes use public flags and canonical counters, never legacy score fields. |
+Display accelerator:
 
-## Legacy retained objects and cleanup gate
+```text
+posts.like_count
+```
 
-The following are retained because applied migration history is immutable and production verification has not established a safe destructive cutover:
+Invariant:
 
-- `users`: pre-Better-Auth identity table retained for migration continuity. Runtime identity is `"user"`.
-- `votes`: pre-`post_likes`/`comment_likes` reaction table retained for migration compatibility. Runtime writes and reads use canonical like tables; seed fixtures now write canonical likes directly.
-- `posts.upvotes`, `posts.downvotes`, `posts.score`, `comments.upvotes`, `comments.downvotes`, `comments.score`: legacy reaction/score columns. They are not used for Bug11 ranking or counters.
-- `hot_score` and legacy score indexes, where present in historical schema: migration-compatible ranking remnants; not runtime ranking authorities.
-- `user_activity.score`: not a legacy post score. It remains a canonical recommendation/activity signal and is intentionally retained.
+```sql
+posts.like_count = COUNT(post_likes WHERE post_id = posts.id)
+```
 
-Safe cleanup candidates require a separate forward migration after production row-count, foreign-key, and rollback evidence. No Bug11 code path introduces a compatibility adapter or a second content model.
+### Comment likes
 
-## Seed and test-helper audit
+Truth:
 
-- `seed.sql` now inserts positive reactions directly into `post_likes` and `comment_likes`, then reconciles canonical counters. Legacy `votes` fixtures are no longer created.
-- Integration helpers create canonical Better Auth `"user"`, community, post, comment, Q&A, and relation rows.
-- Bug11 tests cover popular engagement/ties/cursors, public visibility, bilateral interaction blocks, notification guards, payload shape rejection, idempotency conflicts, and subscriber counter reconciliation.
+```text
+comment_likes(comment_id, user_id)
+```
 
-## Query-plan evidence
+Display accelerator:
 
-Migration `0042_public_content_indexes.sql` provides:
+```text
+comments.like_count
+```
 
-- `idx_posts_public_engagement_rank` for canonical engagement rank and deterministic recency/id tie-break.
-- `idx_posts_public_created` for public community/recency scans.
-- `idx_comments_public_post` for public comment-tree reads.
+Invariant:
 
-The release checklist must run `EXPLAIN QUERY PLAN` against local D1 after reset and record any planner choice that does not use an applicable public-content index. Indexes are performance support only; SQL visibility predicates remain mandatory.
+```sql
+comments.like_count = COUNT(comment_likes WHERE comment_id = comments.id)
+```
+
+Legacy `votes`/upvote/downvote/score fields are not a second runtime reaction model.
+
+## 6. Other counter invariants
+
+| Counter | Canonical invariant |
+| --- | --- |
+| `posts.comment_count` | number of live, non-removed, non-shadow-hidden comments belonging to the post |
+| `questions.answer_count` | number of live, non-removed, non-shadow answers belonging to the question |
+| `subreddits.subscriber_count` | `COUNT(subscriptions WHERE subreddit_id = subreddits.id)` |
+| message unread projections | recoverable from canonical room/message/read-boundary state |
+
+Counters are read accelerators. If a counter and canonical relation disagree, repair the counter; do not redefine the relation to match the counter.
+
+## 7. Popular ranking truth
+
+Current Popular ranking uses current canonical engagement fields:
+
+```text
+engagement_rank = posts.like_count + posts.comment_count * 3
+```
+
+Ordering:
+
+```text
+engagement_rank DESC,
+created_at DESC,
+id DESC
+```
+
+Legacy `score` and `hot_score` are not runtime Popular authorities.
+
+Current supporting indexes include:
+
+- `idx_posts_public_engagement_rank`
+- `idx_posts_public_created`
+- `idx_comments_public_post`
+
+Indexes support performance only. SQL still carries explicit visibility and authorization predicates.
+
+## 8. Messaging data contract
+
+D1 remains authoritative for:
+
+- rooms
+- pair membership
+- message requests
+- canonical messages
+- message delivery state
+- read boundaries
+- reports
+
+Key invariants:
+
+```text
+one canonical DM room per immutable user pair
+message ordering = (created_at, id)
+retry identity = clientMessageId / request-specific identifiers
+read state = canonical D1 boundary
+```
+
+Durable Object/WebSocket state is not a second database.
+
+Detailed contract: [`VTH_REALTIME_DM.md`](VTH_REALTIME_DM.md).
+
+## 9. Idempotency contract
+
+Where create/write APIs accept request IDs, the intended contract is:
+
+```text
+same actor + same requestId + same normalized payload
+→ return existing canonical result
+
+same actor + same requestId + conflicting normalized payload
+→ conflict (HTTP 409 at API boundary)
+```
+
+Current public-content areas covered by this model include posts, comments, questions, answers and listings where the corresponding write path supports request IDs.
+
+Unique indexes/constraints and conditional SQL should support the application contract rather than relying only on pre-read checks.
+
+## 10. Migration policy
+
+All persistent schema changes live in `migrations/`.
+
+Rules:
+
+1. Never edit or delete a migration that may have been applied to production.
+2. Never repair production by manually changing schema without a recorded forward migration.
+3. Backfill/cleanup SQL belongs in a new migration when it changes persistent production meaning.
+4. A clean database must be able to apply all repository migrations in order.
+5. An existing production-shaped database must be able to apply only the new forward migrations safely.
+6. Destructive cleanup requires evidence, not aesthetic preference.
+
+A long migration history is acceptable if current schema ownership is clear and bootstrap remains reliable.
+
+## 11. Migration eras
+
+The schema evolved through several major eras:
+
+| Range | Main purpose |
+| --- | --- |
+| `0001` | original RED-derived users/community/posts/comments/votes/subscriptions base |
+| `0002–0018` | Better Auth, moderation, social actions, achievements, scoring/analytics, notifications, settings, translation, security and API foundations |
+| `0019–0028` | language migration, Q&A, marketplace, businesses, provider identity, messaging delivery, monetization, friendships, presence |
+| `0029–0033` | social-first identity/username lifecycle and DM policy/report hardening |
+| `0034–0042` | canonical simple likes, write idempotency, DM reliability, comment-tree integrity, request integrity, notification identity, media ownership, public-content indexes |
+
+For exact historical DDL, read the migration file itself. New code should use this document and current source to determine canonical ownership.
+
+## 12. Legacy retained objects
+
+The following objects are explicitly treated as legacy/migration-compatible unless a current runtime search proves otherwise.
+
+### `users`
+
+Pre-Better-Auth identity table from the original schema.
+
+Canonical runtime identity is `"user"`.
+
+Do not add new runtime dependencies on `users`.
+
+### `votes`
+
+Original positive/negative vote relation.
+
+Canonical runtime positive reactions are `post_likes` and `comment_likes`.
+
+Do not add new runtime writes/reads to `votes` without an explicit product/architecture decision.
+
+### `posts.upvotes`, `posts.downvotes`, `posts.score`
+
+Legacy reaction/ranking fields.
+
+Not canonical like state and not current Popular ranking inputs.
+
+### `comments.upvotes`, `comments.downvotes`, `comments.score`
+
+Legacy comment vote/ranking fields.
+
+Not canonical comment-like state.
+
+### `hot_score` and legacy score indexes
+
+Historical ranking artifacts.
+
+Not current Popular ranking authority.
+
+### `user_activity.score`
+
+This is **not** the legacy post score. It remains a distinct recommendation/activity signal where current recommendation code uses it.
+
+Do not remove it merely because its column name is `score`.
+
+## 13. Legacy classification gate
+
+Every legacy candidate must be classified using actual repository and production evidence:
+
+```text
+CANONICAL
+LEGACY-DATA-BUT-NO-RUNTIME
+LEGACY-RUNTIME
+MIGRATION-COMPAT
+SAFE-REMOVE
+UNSAFE-REMOVE
+```
+
+Required evidence before physical removal:
+
+- `src/**` runtime references
+- tests/helpers references
+- scripts references
+- seed references
+- FK/constraint dependencies
+- index dependencies
+- production row counts
+- data-preservation requirement
+- rollback/recovery plan
+
+Migration-file references alone do not count as runtime use.
+
+## 14. Database consolidation strategy
+
+Database cleanup happens in two different senses.
+
+### Logical consolidation
+
+Goal:
+
+- one canonical model per concept
+- no new runtime references to obsolete objects
+- current code/tests/seed use canonical tables
+- documentation clearly distinguishes legacy from current truth
+
+This should happen continuously.
+
+### Physical consolidation
+
+Goal:
+
+- remove safe dead indexes
+- remove obsolete columns/tables only after evidence
+- strengthen useful constraints
+- keep query plans efficient
+- verify clean and upgrade migration paths
+
+Physical consolidation is intentionally scheduled after the cross-project architecture pass so that the database is cleaned around the design VTH actually keeps.
+
+The target is not “few migrations.” The target is “one understandable current schema.”
+
+## 15. Query-plan discipline
+
+Use `EXPLAIN QUERY PLAN` before adding/removing indexes on important D1 paths.
+
+Priority queries:
+
+- Home feed
+- Popular
+- Community/Profile recency
+- Recommended
+- post detail
+- comment tree
+- Q&A list/detail
+- marketplace/business list/detail where traffic justifies it
+- DM inbox/history where schema changes touch messaging
+
+An index should have a concrete query purpose. Duplicate/prefix-redundant indexes should be removed only after query-plan evidence.
+
+## 16. Integrity audit
+
+A reusable local/CI integrity audit should converge on checking:
+
+```text
+PRAGMA foreign_key_check
+post like counter drift
+comment like counter drift
+post comment counter drift
+question answer counter drift
+subscriber counter drift
+comment parent/orphan integrity
+messaging relation integrity where practical
+legacy row counts
+```
+
+A background reconciliation service is not required solely because counters are denormalized. Operator/CI repair tooling is sufficient until real operation shows a need for periodic background repair.
+
+## 17. Seed and test data
+
+`seed.sql` is development/test data, not a production migration.
+
+Rules:
+
+- production must never run the development seed
+- seed should create canonical current relations, not legacy reactions
+- tests should not force production to retain obsolete schema objects
+- deterministic seed users/data may support browser E2E but test-only authentication must fail closed in production
+
+## 18. Backup and destructive operations
+
+Before production-destructive DB work:
+
+1. verify the target Cloudflare account/database
+2. export/backup D1
+3. record relevant row counts/integrity status
+4. rehearse the forward migration locally
+5. verify clean-install and upgrade paths
+6. apply the recorded forward migration
+7. run post-migration integrity checks and production smoke
+
+Operational commands and rollback procedure live in [`CLOUDFLARE_VTH_KR_SETUP.md`](CLOUDFLARE_VTH_KR_SETUP.md).
+
+The dangerous user-ID rekey procedure, if ever needed again, is isolated in [`USER_ID_REKEY_RUNBOOK.md`](USER_ID_REKEY_RUNBOOK.md).
+
+## 19. Future schema snapshot
+
+After the planned physical consolidation, this document should include or link to a generated current-schema snapshot under `docs/` so a developer can understand current D1 structure without replaying migration history mentally.
+
+The snapshot is descriptive, not a replacement for forward migrations.
+
+## 20. Definition of a clean VTH database
+
+The database is considered clean when:
+
+```text
+canonical ownership is unambiguous
++ runtime legacy dependency is zero or explicitly justified
++ counters reconcile to canonical relations
++ foreign-key/integrity checks are clean
++ important query plans use intentional indexes
++ clean-install migrations succeed
++ upgrade migrations succeed
++ production-destructive changes are evidence-backed
+```
