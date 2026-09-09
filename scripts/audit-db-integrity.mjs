@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { join } from "node:path";
 
 function parseArgs() {
   const args = new Set(process.argv.slice(2));
@@ -31,9 +32,9 @@ function parseWranglerJson(output) {
 }
 
 function query(options, sql) {
-  const executable = process.platform === "win32" ? "npx.cmd" : "npx";
+  const executable = process.execPath;
   const args = [
-    "wrangler",
+    join(process.cwd(), "node_modules", "wrangler", "bin", "wrangler.js"),
     "d1",
     "execute",
     "DB",
@@ -42,13 +43,10 @@ function query(options, sql) {
     sql.replace(/\s+/g, " ").trim(),
     "--json",
   ];
-  const commandIndex = args.indexOf("--command");
-  args[commandIndex + 1] = `"${args[commandIndex + 1].replaceAll('"', '\\"')}"`;
   const output = execFileSync(executable, args, {
     cwd: process.cwd(),
     encoding: "utf8",
     maxBuffer: 8 * 1024 * 1024,
-    shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
   return parseWranglerJson(output).flatMap((batch) => batch.results ?? []);
