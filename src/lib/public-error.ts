@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
 import { localizeErrorMessage } from "@/lib/i18n/errors";
@@ -44,9 +43,9 @@ export function jsonPublicError(
 export async function jsonLocalizedError(
   message: string,
   status: number
-): Promise<NextResponse> {
+): Promise<Response> {
   const { locale } = await getRequestLocale();
-  return NextResponse.json(
+  return Response.json(
     { error: localizeErrorMessage(message, locale) },
     { status }
   );
