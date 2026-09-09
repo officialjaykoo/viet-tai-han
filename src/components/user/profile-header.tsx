@@ -17,6 +17,7 @@ import type { PublicProfile } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getUsernameProfileHref } from "@/lib/profile-url";
+import type { RelationshipProjection } from "@/lib/user-actions";
 
 function formatKarma(n: number, locale: string): string {
   if (Math.abs(n) >= 10_000) {
@@ -27,19 +28,14 @@ function formatKarma(n: number, locale: string): string {
 
 export async function ProfileHeader({
   profile,
+  targetUserId,
   isOwner,
   relation,
 }: {
   profile: PublicProfile;
+  targetUserId: string;
   isOwner: boolean;
-  relation: {
-    following: boolean;
-    blockedByMe: boolean;
-    blockedByThem: boolean;
-    blockedEitherDirection: boolean;
-    friendStatus: "none" | "outgoing" | "incoming" | "friends";
-    friendRequestId: string | null;
-  };
+  relation: RelationshipProjection;
 }) {
   const { locale } = await getRequestLocale();
   const username = profile.username ?? "unknown";
@@ -94,16 +90,13 @@ export async function ProfileHeader({
               </Link>
             ) : (
               <ProfileActions
+                targetUserId={targetUserId}
                 username={username}
-                initiallyBlockedByMe={relation.blockedByMe}
-                initiallyBlockedByThem={relation.blockedByThem}
-                initiallyFollowing={relation.following}
-                initiallyFriendStatus={relation.friendStatus}
-                initiallyFriendRequestId={relation.friendRequestId}
+                relationship={relation}
               />
             )}
           </div>
-        </div>
+      </div>
 
         <div className="mt-3 space-y-1">
 

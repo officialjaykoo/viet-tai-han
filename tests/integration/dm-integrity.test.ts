@@ -285,8 +285,9 @@ describe("DM integrity invariants (D1)", () => {
     expect(replacement.requestId).not.toBe(request.requestId);
     expect(await listOutgoingRequests(pair.senderId)).toHaveLength(1);
 
-    const relation = await getProfileRelation(pair.senderId, pair.recipientId);
-    expect(relation.blockedEitherDirection).toBe(false);
+    expect((await getProfileRelation(pair.senderId, pair.recipientId)).blockState).toBe(
+      "none"
+    );
   });
   it("closes a direct room when creation races with a block", async () => {
     const pair = await seedPair(crypto.randomUUID().slice(0, 8));

@@ -95,13 +95,9 @@ export function PostOverflowMenu({
   function blockAuthor() {
     setError(null);
     startTransition(async () => {
-      const res = await apiFetch(
-        `/api/users/${encodeURIComponent(authorUsername)}`,
-        {
-          method: "POST",
-          body: JSON.stringify({ action: "block" }),
-        }
-      );
+      const res = await apiFetch(`/api/posts/${postId}/block-author`, {
+        method: "POST",
+      });
       if (requireAuth(res.status)) return;
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as {

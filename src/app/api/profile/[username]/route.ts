@@ -7,6 +7,7 @@ import {
 import { getFeedPosts } from "@/lib/db";
 import { jsonLocalizedError } from "@/lib/public-error";
 import { InvalidFeedCursorError } from "@/lib/security/feed-cursor";
+import { getProfileRelation } from "@/lib/user-actions";
 import { getSession } from "@/lib/session";
 import { serializeFeed } from "@/lib/serializers";
 
@@ -39,6 +40,13 @@ export async function GET(
     }
 
     const session = await getSession();
+    const relation = await getProfileRelation(
+      session?.user?.id,
+      lookup.profile.id
+    );
+    if (!relation.canViewProfile) {
+      return await jsonLocalizedError("User not found", 404);
+    }
     if (tab === "comments") {
       return NextResponse.json(
         await listUserCommentsPage(lookup.profile.id, { cursor, limit })

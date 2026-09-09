@@ -7,10 +7,9 @@ import {
   sendFriendRequest,
 } from "@/lib/friends";
 import {
-  blockUser,
   followUser,
+  getProfileRelation,
   reportTarget,
-  unblockUser,
   unfollowUser,
 } from "@/lib/user-actions";
 import { AuthError, jsonAuthError, requireSession } from "@/lib/session";
@@ -24,6 +23,21 @@ async function resolveUserId(username: string) {
     .prepare(`SELECT id FROM "user" WHERE username = ? COLLATE NOCASE`)
     .bind(username)
     .first<{ id: string }>();
+}
+
+async function relationResponse<T extends object>(
+  result: T,
+  viewerId: string,
+  targetUserId: string,
+  status = 200
+) {
+  return NextResponse.json(
+    {
+      ...result,
+      relationship: await getProfileRelation(viewerId, targetUserId),
+    },
+    { status }
+  );
 }
 
 export async function POST(
@@ -42,28 +56,36 @@ export async function POST(
 
     switch (body.action) {
       case "follow":
-        return NextResponse.json(await followUser(session.user.id, user.id));
+        return relationResponse(
+          await followUser(session.user.id, user.id),
+          session.user.id,
+          user.id
+        );
       case "unfollow":
-        return NextResponse.json(
-          await unfollowUser(session.user.id, user.id)
+        return relationResponse(
+          await unfollowUser(session.user.id, user.id),
+          session.user.id,
+          user.id
         );
       case "friend_request":
-        return NextResponse.json(
+        return relationResponse(
           await sendFriendRequest(session.user.id, user.id),
-          { status: 201 }
+          session.user.id,
+          user.id,
+          201
         );
       case "friend_remove":
-        return NextResponse.json(
-          await removeFriend(session.user.id, user.id)
+        return relationResponse(
+          await removeFriend(session.user.id, user.id),
+          session.user.id,
+          user.id
         );
       case "friend_cancel":
-        return NextResponse.json(
-          await cancelFriendRequestByUsers(session.user.id, user.id)
+        return relationResponse(
+          await cancelFriendRequestByUsers(session.user.id, user.id),
+          session.user.id,
+          user.id
         );
-      case "block":
-        return NextResponse.json(await blockUser(session.user.id, user.id));
-      case "unblock":
-        return NextResponse.json(await unblockUser(session.user.id, user.id));
       case "report": {
         if (!body.reason) {
           return await jsonLocalizedError("reason is required", 400);

@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-import { resolvePublicProfile } from "@/lib/content";
+import { resolvePublicProfile, toPublicProfile } from "@/lib/content";
 import { friendPairKey } from "@/lib/friends";
 import { completeOnboarding } from "@/lib/onboarding";
 import {
@@ -234,6 +234,11 @@ describe("username lifecycle", () => {
       redirectUsername: newUsername,
       profile: { id: userId, username: newUsername },
     });
+    const publicProfile = toPublicProfile(oldLookup!.profile);
+    expect(publicProfile).not.toHaveProperty("id");
+    expect(publicProfile).not.toHaveProperty("status");
+    expect(publicProfile).not.toHaveProperty("role");
+    expect(publicProfile).not.toHaveProperty("isNsfw");
     expect(await resolvePublicProfile(newUsername)).toMatchObject({
       redirectUsername: null,
       profile: { id: userId, username: newUsername },

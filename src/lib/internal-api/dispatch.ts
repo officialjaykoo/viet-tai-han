@@ -93,6 +93,11 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/posts/[id]/report/route"),
   },
   {
+    methods: ["POST"],
+    pattern: "/api/posts/:id/block-author",
+    load: () => import("@/app/api/posts/[id]/block-author/route"),
+  },
+  {
     methods: ["GET"],
     pattern: "/api/posts/:id/stats",
     load: () => import("@/app/api/posts/[id]/stats/route"),
@@ -121,6 +126,16 @@ const ROUTES: RouteEntry[] = [
     methods: ["POST", "DELETE"],
     pattern: "/api/subreddits/:name/subscribe",
     load: () => import("@/app/api/subreddits/[name]/subscribe/route"),
+  },
+  {
+    methods: ["GET"],
+    pattern: "/api/profile/:username",
+    load: () => import("@/app/api/profile/[username]/route"),
+  },
+  {
+    methods: ["POST", "DELETE"],
+    pattern: "/api/me/blocks/:userId",
+    load: () => import("@/app/api/me/blocks/[userId]/route"),
   },
   {
     methods: ["POST"],

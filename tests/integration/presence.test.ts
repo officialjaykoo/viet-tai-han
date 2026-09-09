@@ -116,29 +116,39 @@ describe("online people relationships (D1)", () => {
     const byId = new Map(online.map((user) => [user.id, user]));
 
     expect(byId.get(followingId)).toMatchObject({
-      following: true,
-      friendStatus: "none",
-      friendRequestId: null,
+      relationship: {
+        followState: "following",
+        friendState: "none",
+        friendRequestId: null,
+      },
     });
     expect(byId.get(outgoingId)).toMatchObject({
-      following: false,
-      friendStatus: "outgoing",
-      friendRequestId: outgoingRequestId,
+      relationship: {
+        followState: "none",
+        friendState: "outgoing_pending",
+        friendRequestId: outgoingRequestId,
+      },
     });
     expect(byId.get(incomingId)).toMatchObject({
-      following: false,
-      friendStatus: "incoming",
-      friendRequestId: incomingRequestId,
+      relationship: {
+        followState: "none",
+        friendState: "incoming_pending",
+        friendRequestId: incomingRequestId,
+      },
     });
     expect(byId.get(friendsId)).toMatchObject({
-      following: false,
-      friendStatus: "friends",
-      friendRequestId: null,
+      relationship: {
+        followState: "none",
+        friendState: "friends",
+        friendRequestId: null,
+      },
     });
     expect(byId.get(unrelatedId)).toMatchObject({
-      following: false,
-      friendStatus: "none",
-      friendRequestId: null,
+      relationship: {
+        followState: "none",
+        friendState: "none",
+        friendRequestId: null,
+      },
     });
   });
 });

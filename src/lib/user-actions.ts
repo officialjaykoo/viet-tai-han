@@ -5,11 +5,25 @@ import { syncAchievementsForEvent } from "@/lib/achievements";
 import { runBackgroundTask } from "@/lib/background-task";
 import { scheduleChatPromotion } from "@/lib/chat-promotion";
 import { getDb } from "@/lib/db";
-import { getFriendRelation } from "@/lib/friends";
+import { getFriendRelation, type FriendState } from "@/lib/friends";
+import { getDmRelationship } from "@/lib/dm-relationships";
 import { createPublicId } from "@/lib/id";
 import { refreshUnreadCounts } from "@/lib/unread";
 import { AuthError } from "@/lib/session";
 
+export type FollowState = "none" | "following";
+export type BlockState = "none" | "blocked_by_me" | "blocked_by_peer";
+
+export type RelationshipProjection = {
+  followState: FollowState;
+  friendState: FriendState;
+  friendRequestId: string | null;
+  blockState: BlockState;
+  canViewProfile: boolean;
+  canInteract: boolean;
+  canMessage: boolean;
+  isSelf: boolean;
+};
 export type ReportReason =
   | "spam"
   | "harassment"
@@ -206,7 +220,15 @@ export async function blockUser(blockerId: string, blockedId: string) {
 
 
 export async function unblockUser(blockerId: string, blockedId: string) {
+  if (blockerId === blockedId) {
+    throw new AuthError("You can't unblock yourself", 400);
+  }
   const db = await getDb();
+  const user = await db
+    .prepare(`SELECT id FROM "user" WHERE id = ?`)
+    .bind(blockedId)
+    .first<{ id: string }>();
+  if (!user) throw new AuthError("User not found", 404);
   await db
     .prepare(
       `DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?`
@@ -275,7 +297,7 @@ export async function followUser(followerId: string, followingId: string) {
       secondUserId: followingId,
       reason: "recipient_followed_sender",
     });
-    return { following: true as const };
+    return { followState: "following" as const };
   }
 
   scheduleChatPromotion({
@@ -298,7 +320,7 @@ export async function followUser(followerId: string, followingId: string) {
     href: getUsernameProfileHref(actor?.username),
   });
 
-  return { following: true as const };
+  return { followState: "following" as const };
 }
 
 export async function unfollowUser(followerId: string, followingId: string) {
@@ -309,7 +331,7 @@ export async function unfollowUser(followerId: string, followingId: string) {
     )
     .bind(followerId, followingId)
     .run();
-  return { following: false as const };
+  return { followState: "none" as const };
 }
 
 export async function reportTarget(input: {
@@ -382,20 +404,25 @@ export async function reportTarget(input: {
 export async function getProfileRelation(
   viewerId: string | null | undefined,
   profileUserId: string
-) {
-  if (!viewerId || viewerId === profileUserId) {
+): Promise<RelationshipProjection> {
+  const isSelf = viewerId === profileUserId;
+  if (!viewerId || isSelf) {
     return {
-      following: false,
-      blockedByMe: false,
-      blockedByThem: false,
-      blockedEitherDirection: false,
-      friendStatus: "none" as const,
+      followState: "none",
+      friendState: "none",
       friendRequestId: null,
-      isSelf: viewerId === profileUserId,
+      blockState: "none",
+      // VTH has public profiles; block currently removes contact permission,
+      // not read access. Keep this policy explicit at the service boundary.
+      canViewProfile: true,
+      canInteract: false,
+      canMessage: false,
+      isSelf,
     };
   }
+
   const db = await getDb();
-  const [follow, blocks, friend] = await Promise.all([
+  const [follow, blocks, friend, dm] = await Promise.all([
     db
       .prepare(
         `SELECT 1 AS ok FROM user_follows
@@ -418,16 +445,24 @@ export async function getProfileRelation(
       .bind(viewerId, profileUserId, profileUserId, viewerId)
       .first<{ blocked_by_me: number; blocked_by_them: number }>(),
     getFriendRelation(viewerId, profileUserId),
+    getDmRelationship({ senderId: viewerId, recipientId: profileUserId }),
   ]);
   const blockedByMe = Boolean(blocks?.blocked_by_me);
   const blockedByThem = Boolean(blocks?.blocked_by_them);
+  const blockedEitherDirection = blockedByMe || blockedByThem;
   return {
-    following: Boolean(follow),
-    blockedByMe,
-    blockedByThem,
-    blockedEitherDirection: blockedByMe || blockedByThem,
-    friendStatus: friend.status,
+    followState: follow ? "following" : "none",
+    friendState: friend.friendState,
     friendRequestId: friend.requestId,
+    blockState: blockedByMe
+      ? "blocked_by_me"
+      : blockedByThem
+        ? "blocked_by_peer"
+        : "none",
+    canViewProfile: true,
+    canInteract: !blockedEitherDirection,
+    canMessage:
+      !blockedEitherDirection && (dm.directAllowed || dm.requestAllowed),
     isSelf: false,
   };
 }

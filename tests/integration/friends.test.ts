@@ -16,6 +16,7 @@ import {
   followUser,
   getProfileRelation,
   unblockUser,
+  unfollowUser,
 } from "@/lib/user-actions";
 import { getUnreadCounts } from "@/lib/unread";
 import { createNotification, listNotifications } from "@/lib/notifications";
@@ -46,10 +47,10 @@ describe("friend relationships (D1)", () => {
     const { firstId, secondId } = await seedFriendUsers();
 
     const sent = await sendFriendRequest(firstId, secondId);
-    expect(sent.friendStatus).toBe("outgoing");
+    expect(sent.friendState).toBe("outgoing_pending");
     expect(sent.requestId).toBeTruthy();
     expect(await getFriendRelation(secondId, firstId)).toMatchObject({
-      status: "incoming",
+      friendState: "incoming_pending",
       requestId: sent.requestId,
     });
 
@@ -57,9 +58,9 @@ describe("friend relationships (D1)", () => {
     expect(incoming.map((request) => request.id)).toContain(sent.requestId);
 
     const accepted = await acceptFriendRequest(secondId, sent.requestId!);
-    expect(accepted.friendStatus).toBe("friends");
+    expect(accepted.friendState).toBe("friends");
     expect(await getFriendRelation(firstId, secondId)).toMatchObject({
-      status: "friends",
+      friendState: "friends",
       requestId: null,
     });
     expect((await listFriends(firstId)).some((friend) => friend.id === secondId)).toBe(
@@ -79,7 +80,7 @@ describe("friend relationships (D1)", () => {
 
     await blockUser(firstId, secondId);
     expect(await getFriendRelation(firstId, secondId)).toMatchObject({
-      status: "none",
+      friendState: "none",
       requestId: null,
     });
     expect((await listFriends(firstId)).some((friend) => friend.id === secondId)).toBe(
@@ -96,14 +97,14 @@ describe("friend relationships (D1)", () => {
 
     await blockUser(secondId, firstId);
     expect(await getProfileRelation(firstId, secondId)).toMatchObject({
-      blockedByMe: false,
-      blockedByThem: true,
-      blockedEitherDirection: true,
+      blockState: "blocked_by_peer",
+      canInteract: false,
+      canMessage: false,
     });
     expect(await getProfileRelation(secondId, firstId)).toMatchObject({
-      blockedByMe: true,
-      blockedByThem: false,
-      blockedEitherDirection: true,
+      blockState: "blocked_by_me",
+      canInteract: false,
+      canMessage: false,
     });
     await expect(followUser(firstId, secondId)).rejects.toMatchObject({
       status: 403,
@@ -111,8 +112,10 @@ describe("friend relationships (D1)", () => {
     await expect(sendFriendRequest(firstId, secondId)).rejects.toMatchObject({
       status: 403,
     });
-    await blockUser(firstId, secondId);
-    await blockUser(secondId, firstId);
+    await Promise.all([
+      blockUser(firstId, secondId),
+      blockUser(secondId, firstId),
+    ]);
     const mutualBlocks = await env.DB
       .prepare(
         `SELECT blocker_id, blocked_id FROM user_blocks
@@ -135,12 +138,14 @@ describe("friend relationships (D1)", () => {
     await unblockUser(secondId, firstId);
     await unblockUser(firstId, secondId);
     expect(await getFriendRelation(firstId, secondId)).toMatchObject({
-      status: "none",
+      friendState: "none",
     });
     expect(await getProfileRelation(firstId, secondId)).toMatchObject({
-      blockedEitherDirection: false,
-      following: false,
-      friendStatus: "none",
+      blockState: "none",
+      followState: "none",
+      friendState: "none",
+      canInteract: true,
+      canMessage: true,
     });
   });
 
@@ -151,7 +156,7 @@ describe("friend relationships (D1)", () => {
       followUser(firstId, secondId),
       followUser(firstId, secondId),
     ]);
-    expect(outcomes.every((result) => result.following)).toBe(true);
+    expect(outcomes.every((result) => result.followState === "following")).toBe(true);
     const edge = await env.DB
       .prepare(
         `SELECT COUNT(*) AS count FROM user_follows
@@ -168,6 +173,96 @@ describe("friend relationships (D1)", () => {
     ).toHaveLength(1);
   });
 
+  it("leaves no follow edge when follow races with a block", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    await Promise.allSettled([
+      followUser(firstId, secondId),
+      blockUser(secondId, firstId),
+    ]);
+
+    const edges = await env.DB
+      .prepare(
+        `SELECT 1 FROM user_follows
+         WHERE (follower_id = ? AND following_id = ?)
+            OR (follower_id = ? AND following_id = ?)`
+      )
+      .bind(firstId, secondId, secondId, firstId)
+      .all();
+    expect(edges.results).toHaveLength(0);
+  });
+
+  it("never leaves a follow edge while unblock races with follow", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    await blockUser(firstId, secondId);
+    await Promise.allSettled([
+      unblockUser(firstId, secondId),
+      followUser(firstId, secondId),
+    ]);
+
+    const relation = await getProfileRelation(firstId, secondId);
+    expect(relation.blockState).toBe("none");
+    const edge = await env.DB
+      .prepare(
+        `SELECT 1 FROM user_follows
+         WHERE follower_id = ? AND following_id = ?`
+      )
+      .bind(firstId, secondId)
+      .first();
+    expect(Boolean(edge)).toBe(
+      relation.followState === "following"
+    );
+  });
+
+  it("leaves one canonical direction when opposite friend requests race", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    const results = await Promise.allSettled([
+      sendFriendRequest(firstId, secondId),
+      sendFriendRequest(secondId, firstId),
+    ]);
+
+    const row = await env.DB
+      .prepare(
+        `SELECT requester_id, addressee_id, status
+         FROM user_friendships
+         WHERE pair_key = ?`
+      )
+      .bind([firstId, secondId].sort().join(":"))
+      .first<{
+        requester_id: string;
+        addressee_id: string;
+        status: string;
+      }>();
+    expect(row).toMatchObject({ status: "pending" });
+    expect([firstId, secondId]).toContain(row?.requester_id);
+    expect([firstId, secondId]).toContain(row?.addressee_id);
+    expect(row?.requester_id).not.toBe(row?.addressee_id);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(2);
+  });
+
+  it("tears down a pending friend request when block races with creation", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    await Promise.allSettled([
+      sendFriendRequest(firstId, secondId),
+      blockUser(secondId, firstId),
+    ]);
+
+    const relation = await getProfileRelation(firstId, secondId);
+    expect(relation).toMatchObject({
+      friendState: "none",
+      blockState: "blocked_by_peer",
+      canInteract: false,
+      canMessage: false,
+    });
+    const pending = await env.DB
+      .prepare(
+        `SELECT 1 FROM user_friendships
+         WHERE pair_key = ? AND status = 'pending'`
+      )
+      .bind([firstId, secondId].sort().join(":"))
+      .first();
+    expect(pending).toBeNull();
+  });
+
   it("makes repeated and concurrent friend accepts idempotent", async () => {
     const { firstId, secondId } = await seedFriendUsers();
     const sent = await sendFriendRequest(firstId, secondId);
@@ -176,7 +271,7 @@ describe("friend relationships (D1)", () => {
       acceptFriendRequest(secondId, sent.requestId!),
       acceptFriendRequest(secondId, sent.requestId!),
     ]);
-    expect(outcomes.every((result) => result.friendStatus === "friends")).toBe(
+    expect(outcomes.every((result) => result.friendState === "friends")).toBe(
       true
     );
     await flushBackgroundWork();
@@ -234,7 +329,7 @@ describe("friend relationships (D1)", () => {
       acceptFriendRequest(secondId, first.requestId!)
     ).rejects.toMatchObject({ status: 404 });
     expect(await getFriendRelation(secondId, firstId)).toMatchObject({
-      status: "incoming",
+      friendState: "incoming_pending",
       requestId: second.requestId,
     });
   });
@@ -347,18 +442,115 @@ describe("friend relationships (D1)", () => {
       .first();
     expect(friendship).toBeNull();
   });
-  it("resolves concurrent accept and decline without a pending row", async () => {
-    const { firstId, secondId } = await seedFriendUsers();
-    const sent = await sendFriendRequest(firstId, secondId);
-    await Promise.allSettled([
-      acceptFriendRequest(secondId, sent.requestId!),
-      declineFriendRequest(secondId, sent.requestId!),
-    ]);
 
-    const row = await env.DB
-      .prepare(`SELECT status FROM user_friendships WHERE id = ?`)
-      .bind(sent.requestId)
-      .first<{ status: string }>();
-    expect(["accepted", "declined"]).toContain(row?.status);
+  it("projects each relationship state from a deterministic transition sequence", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+
+    await expect(getProfileRelation(firstId, secondId)).resolves.toMatchObject({
+      followState: "none",
+      friendState: "none",
+      blockState: "none",
+      canViewProfile: true,
+      canInteract: true,
+      canMessage: true,
+    });
+
+    await followUser(firstId, secondId);
+    await expect(getProfileRelation(firstId, secondId)).resolves.toMatchObject({
+      followState: "following",
+      friendState: "none",
+      blockState: "none",
+    });
+    await unfollowUser(firstId, secondId);
+
+    const request = await sendFriendRequest(firstId, secondId);
+    await expect(getProfileRelation(firstId, secondId)).resolves.toMatchObject({
+      friendState: "outgoing_pending",
+      friendRequestId: request.requestId,
+    });
+    await expect(getProfileRelation(secondId, firstId)).resolves.toMatchObject({
+      friendState: "incoming_pending",
+      friendRequestId: request.requestId,
+    });
+
+    await acceptFriendRequest(secondId, request.requestId!);
+    await expect(getProfileRelation(firstId, secondId)).resolves.toMatchObject({
+      friendState: "friends",
+      friendRequestId: null,
+    });
+
+    await blockUser(firstId, secondId);
+    await expect(getProfileRelation(firstId, secondId)).resolves.toMatchObject({
+      followState: "none",
+      friendState: "none",
+      friendRequestId: null,
+      blockState: "blocked_by_me",
+      canViewProfile: true,
+      canInteract: false,
+      canMessage: false,
+    });
+    await unblockUser(firstId, secondId);
+    await expect(getProfileRelation(firstId, secondId)).resolves.toMatchObject({
+      followState: "none",
+      friendState: "none",
+      blockState: "none",
+      canInteract: true,
+      canMessage: true,
+    });
+  });
+
+  it("enforces relationship uniqueness and user-id foreign keys in D1", async () => {
+    const { firstId, secondId } = await seedFriendUsers();
+    const pairKey = [firstId, secondId].sort().join(":");
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_follows (follower_id, following_id) VALUES (?, ?)`
+      ).bind(firstId, firstId).run()
+    ).rejects.toThrow();
+
+    await followUser(firstId, secondId);
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_follows (follower_id, following_id) VALUES (?, ?)`
+      ).bind(firstId, secondId).run()
+    ).rejects.toThrow();
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_friendships
+          (id, pair_key, requester_id, addressee_id, status)
+         VALUES (?, ?, ?, ?, 'pending')`
+      ).bind("friend-pending", pairKey, firstId, secondId).run()
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_friendships
+          (id, pair_key, requester_id, addressee_id, status)
+         VALUES (?, ?, ?, ?, 'pending')`
+      ).bind("duplicate-friend", pairKey, secondId, firstId).run()
+    ).rejects.toThrow();
+
+    await blockUser(firstId, secondId);
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)`
+      ).bind(firstId, secondId).run()
+    ).rejects.toThrow();
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO user_follows (follower_id, following_id) VALUES (?, ?)`
+      ).bind("missing-user", secondId).run()
+    ).rejects.toThrow();
+  });
+
+  it("rejects self-targeted and unknown block transitions", async () => {
+    const { firstId } = await seedFriendUsers();
+    await expect(blockUser(firstId, firstId)).rejects.toMatchObject({ status: 400 });
+    await expect(unblockUser(firstId, firstId)).rejects.toMatchObject({ status: 400 });
+    await expect(unblockUser(firstId, "missing-user")).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

@@ -9,7 +9,17 @@ import {
 import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
 import { AuthError } from "@/lib/session";
 
-export type FriendStatus = "none" | "outgoing" | "incoming" | "friends";
+export type FriendState =
+  | "none"
+  | "outgoing_pending"
+  | "incoming_pending"
+  | "friends";
+
+export type FriendRelation = {
+  friendState: FriendState;
+  requestId: string | null;
+  isSelf: boolean;
+};
 
 export type FriendListItem = {
   id: string;
@@ -55,25 +65,24 @@ function relationFromRow(
   row: FriendshipRow | null,
   viewerId: string,
   isSelf = false
-): {
-  status: FriendStatus;
-  requestId: string | null;
-  isSelf: boolean;
-} {
+): FriendRelation {
   if (isSelf || !row) {
-    return { status: "none", requestId: null, isSelf };
+    return { friendState: "none", requestId: null, isSelf };
   }
   if (row.status === "accepted") {
-    return { status: "friends", requestId: null, isSelf: false };
+    return { friendState: "friends", requestId: null, isSelf: false };
   }
   if (row.status === "pending") {
     return {
-      status: row.requester_id === viewerId ? "outgoing" : "incoming",
+      friendState:
+        row.requester_id === viewerId
+          ? "outgoing_pending"
+          : "incoming_pending",
       requestId: row.id,
       isSelf: false,
     };
   }
-  return { status: "none", requestId: null, isSelf: false };
+  return { friendState: "none", requestId: null, isSelf: false };
 }
 
 async function getFriendshipByPair(
@@ -153,15 +162,15 @@ export async function sendFriendRequest(
       reason: "friendship",
     });
     return {
-      friendStatus: "friends" as const,
+      friendState: "friends" as const,
       requestId: null,
     };
   }
   if (current?.status === "pending") {
     return {
-      friendStatus: (current.requester_id === requesterId
-        ? "outgoing"
-        : "incoming") as FriendStatus,
+      friendState: (current.requester_id === requesterId
+        ? "outgoing_pending"
+        : "incoming_pending") as FriendState,
       requestId: current.id,
     };
   }
@@ -232,13 +241,13 @@ export async function sendFriendRequest(
     if (blocked) throw new AuthError("Can't connect with this user", 403);
     const latest = await getFriendshipByPair(db, pairKey);
     if (latest?.status === "accepted") {
-      return { friendStatus: "friends" as const, requestId: null };
+      return { friendState: "friends" as const, requestId: null };
     }
     if (latest?.status === "pending") {
       return {
-        friendStatus: (latest.requester_id === requesterId
-          ? "outgoing"
-          : "incoming") as FriendStatus,
+        friendState: (latest.requester_id === requesterId
+          ? "outgoing_pending"
+          : "incoming_pending") as FriendState,
         requestId: latest.id,
       };
     }
@@ -257,9 +266,8 @@ export async function sendFriendRequest(
     title: `${formatUserHandle(requester?.username)} sent you a friend request`,
     href: getUsernameProfileHref(requester?.username) ?? "/friends",
   });
-
   return {
-    friendStatus: "outgoing" as const,
+    friendState: "outgoing_pending" as const,
     requestId,
   };
 }
@@ -303,7 +311,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
       request.requester_id,
       request.updated_at
     );
-    return { friendStatus: "friends" as const, requestId: null, friend };
+    return { friendState: "friends" as const, requestId: null, friend };
   }
 
   const [result] = await db.batch([
@@ -360,7 +368,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
         request.requester_id,
         latest.updated_at
       );
-      return { friendStatus: "friends" as const, requestId: null, friend };
+      return { friendState: "friends" as const, requestId: null, friend };
     }
     throw new AuthError("Friend request is no longer available", 409);
   }
@@ -393,7 +401,7 @@ export async function acceptFriendRequest(userId: string, requestId: string) {
     accepted?.updated_at ?? request.updated_at
   );
   return {
-    friendStatus: "friends" as const,
+    friendState: "friends" as const,
     requestId: null,
     friend,
   };
@@ -431,7 +439,7 @@ export async function declineFriendRequest(userId: string, requestId: string) {
   if (!Number(result?.meta.changes ?? 0)) {
     throw new AuthError("Friend request not found", 404);
   }
-  return { friendStatus: "none" as const, requestId: null };
+  return { friendState: "none" as const, requestId: null };
 }
 
 export async function cancelFriendRequest(userId: string, requestId: string) {
@@ -465,7 +473,7 @@ export async function cancelFriendRequest(userId: string, requestId: string) {
   if (!Number(result?.meta.changes ?? 0)) {
     throw new AuthError("Friend request not found", 404);
   }
-  return { friendStatus: "none" as const, requestId: null };
+  return { friendState: "none" as const, requestId: null };
 }
 
 export async function cancelFriendRequestByUsers(
@@ -499,7 +507,7 @@ export async function removeFriend(userId: string, otherUserId: string) {
     )
     .bind(friendPairKey(userId, otherUserId))
     .run();
-  return { friendStatus: "none" as const, requestId: null };
+  return { friendState: "none" as const, requestId: null };
 }
 
 async function getFriendListItem(

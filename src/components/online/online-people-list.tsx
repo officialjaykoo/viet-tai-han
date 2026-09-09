@@ -96,12 +96,9 @@ export function OnlinePeopleList({
                 </span>
               </Link>
               <ProfileActions
+                targetUserId={user.id}
                 username={user.username}
-                initiallyFollowing={user.following}
-                initiallyBlockedByMe={false}
-                initiallyBlockedByThem={false}
-                initiallyFriendStatus={user.friendStatus}
-                initiallyFriendRequestId={user.friendRequestId}
+                relationship={user.relationship}
                 compact
                 showBlock={false}
               />

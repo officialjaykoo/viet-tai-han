@@ -50,7 +50,6 @@ export interface SubredditDetail {
 }
 
 export interface PublicProfile {
-  id: string;
   username: string | null;
   name: string;
   image: string | null;
@@ -60,11 +59,16 @@ export interface PublicProfile {
   postKarma: number;
   commentKarma: number;
   createdAt: string;
+  tags: AccountTag[];
+  badges: AccountBadge[];
+}
+
+/** Server-only profile record; moderation and identity fields never cross the DTO boundary. */
+export interface ProfileRecord extends PublicProfile {
+  id: string;
   status: string;
   role: string;
   isNsfw: boolean;
-  tags: AccountTag[];
-  badges: AccountBadge[];
 }
 
 function mapTranslation(row: {
@@ -487,7 +491,7 @@ const PUBLIC_PROFILE_SELECT = `
          ) AS is_community_mod
 `;
 
-function mapPublicProfile(row: PublicProfileRow): PublicProfile {
+function mapProfileRecord(row: PublicProfileRow): ProfileRecord {
   return {
     id: row.id,
     username: row.username,
@@ -517,8 +521,24 @@ function mapPublicProfile(row: PublicProfileRow): PublicProfile {
   };
 }
 
+export function toPublicProfile(profile: ProfileRecord): PublicProfile {
+  return {
+    username: profile.username,
+    name: profile.name,
+    image: profile.image,
+    bio: profile.bio,
+    bannerKey: profile.bannerKey,
+    karma: profile.karma,
+    postKarma: profile.postKarma,
+    commentKarma: profile.commentKarma,
+    createdAt: profile.createdAt,
+    tags: profile.tags,
+    badges: profile.badges,
+  };
+}
+
 export type PublicProfileLookup = {
-  profile: PublicProfile;
+  profile: ProfileRecord;
   redirectUsername: string | null;
 };
 
@@ -535,7 +555,7 @@ export async function resolvePublicProfile(
     .bind(username)
     .first<PublicProfileRow>();
   if (current) {
-    return { profile: mapPublicProfile(current), redirectUsername: null };
+    return { profile: mapProfileRecord(current), redirectUsername: null };
   }
 
   const historical = await db
@@ -553,7 +573,7 @@ export async function resolvePublicProfile(
   if (!historical) return null;
 
   return {
-    profile: mapPublicProfile(historical),
+    profile: mapProfileRecord(historical),
     redirectUsername: historical.username,
   };
 }
@@ -561,7 +581,8 @@ export async function resolvePublicProfile(
 export async function getPublicProfile(
   identifier: string
 ): Promise<PublicProfile | null> {
-  return (await resolvePublicProfile(identifier))?.profile ?? null;
+  const lookup = await resolvePublicProfile(identifier);
+  return lookup ? toPublicProfile(lookup.profile) : null;
 }
 
 export async function getRecommendations(userId: string, limit = 10) {

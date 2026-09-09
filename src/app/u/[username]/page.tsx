@@ -21,6 +21,7 @@ import { listUserAchievements } from "@/lib/achievements";
 import {
   listUserCommentsPage,
   resolvePublicProfile,
+  toPublicProfile,
   type ProfileComment,
 } from "@/lib/content";
 import { listFriends } from "@/lib/friends";
@@ -120,13 +121,15 @@ export default async function ProfilePage({
     const query = tabParam ? `?tab=${encodeURIComponent(tabParam)}` : "";
     redirect(`/u/${encodeURIComponent(lookup.redirectUsername)}${query}`);
   }
-  const profile = lookup.profile;
+  const profileRecord = lookup.profile;
+  const profile = toPublicProfile(profileRecord);
 
   const session = await getSession();
   await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
-  const isOwner = session?.user?.id === profile.id;
-  const relation = await getProfileRelation(session?.user?.id, profile.id);
+  const isOwner = session?.user?.id === profileRecord.id;
+  const relation = await getProfileRelation(session?.user?.id, profileRecord.id);
+  if (!relation.canViewProfile) notFound();
 
   const viewerUserId = session?.user?.id ?? null;
   let achievements: Awaited<ReturnType<typeof listUserAchievements>>;
@@ -144,21 +147,21 @@ export default async function ProfilePage({
 
   if (tab === "overview") {
     [achievements, postsFeed, commentsPage] = await Promise.all([
-      listUserAchievements(profile.id),
+      listUserAchievements(profileRecord.id),
       getFeedPosts({
-        authorId: profile.id,
+        authorId: profileRecord.id,
         limit: 30,
         sort: "new",
         mode: "popular",
         viewerUserId,
       }),
-      listUserCommentsPage(profile.id, { limit: 30 }),
+      listUserCommentsPage(profileRecord.id, { limit: 30 }),
     ]);
   } else if (tab === "posts") {
     [achievements, postsFeed] = await Promise.all([
-      listUserAchievements(profile.id),
+      listUserAchievements(profileRecord.id),
       getFeedPosts({
-        authorId: profile.id,
+        authorId: profileRecord.id,
         limit: 30,
         sort: "new",
         mode: "popular",
@@ -167,17 +170,16 @@ export default async function ProfilePage({
     ]);
   } else if (tab === "comments") {
     [achievements, commentsPage] = await Promise.all([
-      listUserAchievements(profile.id),
-      listUserCommentsPage(profile.id, { limit: 30 }),
+      listUserAchievements(profileRecord.id),
+      listUserCommentsPage(profileRecord.id, { limit: 30 }),
     ]);
   } else {
     [achievements, friends] = await Promise.all([
-      listUserAchievements(profile.id),
-      listFriends(profile.id),
+      listUserAchievements(profileRecord.id),
+      listFriends(profileRecord.id),
     ]);
   }
   logProfileStage("profile_data_done");
-  const user = profile;
   const posts = postsFeed.posts;
   const comments = commentsPage.comments;
   const initialProfilePosts =
@@ -191,7 +193,8 @@ export default async function ProfilePage({
         <PageBackdrop variant="subtle" />
         <PageShell width="wide" className="py-4 sm:py-6">
           <ProfileHeader
-            profile={user}
+            profile={profile}
+            targetUserId={profileRecord.id}
             isOwner={isOwner}
             relation={relation}
           />
@@ -225,8 +228,8 @@ export default async function ProfilePage({
 
               {tab === "posts" && initialProfilePosts ? (
                 <ProfileActivity
-                  key={`${user.id}-posts`}
-                  username={user.username ?? identifier}
+                  key={`${profileRecord.id}-posts`}
+                  username={profile.username ?? identifier}
                   tab="posts"
                   locale={locale}
                   initialPosts={initialProfilePosts}
@@ -236,8 +239,8 @@ export default async function ProfilePage({
 
               {tab === "comments" ? (
                 <ProfileActivity
-                  key={`${user.id}-comments`}
-                  username={user.username ?? identifier}
+                  key={`${profileRecord.id}-comments`}
+                  username={profile.username ?? identifier}
                   tab="comments"
                   locale={locale}
                   initialComments={commentsPage}
@@ -256,7 +259,7 @@ export default async function ProfilePage({
             <div className="hidden lg:block">
               <div className="sticky top-20">
                 <ProfileSidebar
-                  profile={user}
+                  profile={profile}
                   achievements={achievements}
                   isOwner={isOwner}
                 />
@@ -266,7 +269,7 @@ export default async function ProfilePage({
 
           <div className="mt-6 lg:hidden">
             <ProfileSidebar
-              profile={user}
+              profile={profile}
               achievements={achievements}
               isOwner={isOwner}
             />

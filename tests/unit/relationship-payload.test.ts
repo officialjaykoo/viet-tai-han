@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   AuthError,
+  mockBlockUser,
+  mockFollowUser,
   mockGetDb,
+  mockGetProfileRelation,
   mockReadApiJson,
   mockRequireSession,
+  mockUnblockUser,
 } = vi.hoisted(() => {
   class TestAuthError extends Error {
     status: number;
@@ -19,9 +23,13 @@ const {
 
   return {
     AuthError: TestAuthError,
+    mockBlockUser: vi.fn(),
+    mockFollowUser: vi.fn(),
     mockGetDb: vi.fn(),
+    mockGetProfileRelation: vi.fn(),
     mockReadApiJson: vi.fn(),
     mockRequireSession: vi.fn(),
+    mockUnblockUser: vi.fn(),
   };
 });
 
@@ -57,15 +65,21 @@ vi.mock("@/lib/session", () => ({
   requireSession: mockRequireSession,
 }));
 vi.mock("@/lib/user-actions", () => ({
-  blockUser: vi.fn(),
-  followUser: vi.fn(),
+  blockUser: mockBlockUser,
+  followUser: mockFollowUser,
+  getProfileRelation: mockGetProfileRelation,
   reportTarget: vi.fn(),
-  unblockUser: vi.fn(),
+  unblockUser: mockUnblockUser,
   unfollowUser: vi.fn(),
 }));
 
 import { POST as friendsPost } from "@/app/api/friends/route";
 import { POST as chatRequestPost } from "@/app/api/messages/requests/[id]/route";
+import {
+  POST as blockPost,
+  DELETE as blockDelete,
+} from "@/app/api/me/blocks/[userId]/route";
+import { POST as blockAuthorPost } from "@/app/api/posts/[id]/block-author/route";
 import { POST as userPost } from "@/app/api/users/[username]/route";
 
 function request(path: string) {
@@ -79,7 +93,7 @@ describe("relationship API payload validation", () => {
     mockGetDb.mockResolvedValue({
       prepare: vi.fn(() => ({
         bind: vi.fn(() => ({
-          first: vi.fn().mockResolvedValue({ id: "target" }),
+          first: vi.fn().mockResolvedValue({ id: "target", author_id: "target" }),
         })),
       })),
     });
@@ -123,5 +137,101 @@ describe("relationship API payload validation", () => {
       context as never
     );
     expect(response.status).toBe(400);
+  });
+
+  it("returns the canonical relationship projection after a user action", async () => {
+    const relationship = {
+      followState: "following",
+      friendState: "none",
+      friendRequestId: null,
+      blockState: "none",
+      canViewProfile: true,
+      canInteract: true,
+      canMessage: true,
+      isSelf: false,
+    };
+    mockReadApiJson.mockResolvedValue({ action: "follow" });
+    mockFollowUser.mockResolvedValue({ followState: "following" });
+    mockGetProfileRelation.mockResolvedValue(relationship);
+
+    const response = await userPost(request("/api/users/target"), {
+      params: Promise.resolve({ username: "target" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      followState: "following",
+      relationship,
+    });
+    expect(mockGetProfileRelation).toHaveBeenCalledWith("viewer", "target");
+  });
+
+  it("uses the ID block endpoint and returns the post-mutation projection", async () => {
+    const relationship = {
+      followState: "none",
+      friendState: "none",
+      friendRequestId: null,
+      blockState: "blocked_by_me",
+      canViewProfile: true,
+      canInteract: false,
+      canMessage: false,
+      isSelf: false,
+    };
+    mockBlockUser.mockResolvedValue({ blocked: true });
+    mockGetProfileRelation.mockResolvedValue(relationship);
+
+    const postResponse = await blockPost(
+      request("/api/me/blocks/target"),
+      { params: Promise.resolve({ userId: "target" }) }
+    );
+    expect(postResponse.status).toBe(200);
+    expect(await postResponse.json()).toMatchObject({ blocked: true, relationship });
+
+    const unblockedRelationship = { ...relationship, blockState: "none", canInteract: true };
+    mockUnblockUser.mockResolvedValue({ blocked: false });
+    mockGetProfileRelation.mockResolvedValue(unblockedRelationship);
+    const deleteResponse = await blockDelete(
+      request("/api/me/blocks/target"),
+      { params: Promise.resolve({ userId: "target" }) }
+    );
+    expect(deleteResponse.status).toBe(200);
+    expect(await deleteResponse.json()).toMatchObject({
+      blocked: false,
+      relationship: unblockedRelationship,
+    });
+  });
+
+  it("resolves post authors to the canonical ID block endpoint", async () => {
+    mockBlockUser.mockResolvedValue({ blocked: true });
+    mockGetProfileRelation.mockResolvedValue({
+      followState: "none",
+      friendState: "none",
+      friendRequestId: null,
+      blockState: "blocked_by_me",
+      canViewProfile: true,
+      canInteract: false,
+      canMessage: false,
+      isSelf: false,
+    });
+
+    const response = await blockAuthorPost(
+      request("/api/posts/post-1/block-author"),
+      { params: Promise.resolve({ id: "post-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockBlockUser).toHaveBeenCalledWith("viewer", "target");
+    expect(await response.json()).toMatchObject({ blocked: true });
+  });
+
+  it("rejects username-based block mutations", async () => {
+    mockReadApiJson.mockResolvedValue({ action: "block" });
+
+    const response = await userPost(request("/api/users/target"), {
+      params: Promise.resolve({ username: "target" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(mockBlockUser).not.toHaveBeenCalled();
   });
 });
