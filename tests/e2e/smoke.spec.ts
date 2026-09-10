@@ -69,6 +69,43 @@ test.describe("cross-platform smoke", () => {
       page.getByRole("heading", { name: /tiếp tục với/i })
     ).toBeVisible();
   });
+  test("guest opens login with one click", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const login = page.getByRole("banner").getByRole("link", {
+      name: /đăng nhập/i,
+    });
+    await expect(login).toBeVisible({ timeout: 30_000 });
+    await login.click();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(
+      page.getByRole("heading", { name: /tiếp tục với/i })
+    ).toBeVisible();
+  });
+
+  test("guest opens login with one click after a stale API token", async ({
+    page,
+  }) => {
+    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+    const sessionCookieName = baseURL.startsWith("https://")
+      ? "__Secure-better-auth.session_token"
+      : "better-auth.session_token";
+    await page.context().addCookies([
+      { name: sessionCookieName, value: "stale", url: baseURL, httpOnly: true },
+      { name: "red_atk", value: "stale", url: baseURL },
+      { name: "red_qn", value: "stale", url: baseURL },
+      { name: "red_qv", value: "stale", url: baseURL },
+      { name: "red_sec", value: "stale", url: baseURL, httpOnly: true },
+    ]);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.locator('header a[href="/login"]').first().click({
+      timeout: 10_000,
+    });
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(
+      page.getByRole("heading", { name: /tiếp tục với/i })
+    ).toBeVisible();
+  });
+
 
   test("layout does not overflow horizontally", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });

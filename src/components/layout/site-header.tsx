@@ -372,7 +372,7 @@ export function SiteHeader() {
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>
-              ) : authState === "anonymous" ? (
+              ) : authState === "anonymous" || authState === "unknown" ? (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
@@ -383,22 +383,20 @@ export function SiteHeader() {
                       <LogInIcon />
                       {t("nav.logIn")}
                     </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </>
-              ) : authState === "unknown" ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>{t("common.error")}</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      className="min-h-11"
-                      onClick={() => {
-                        void refetch();
-                      }}
-                    >
-                      <CircleUserRoundIcon />
-                      {t("feed.tryAgain")}
-                    </DropdownMenuItem>
+                    {authState === "unknown" ? (
+                      <>
+                        <DropdownMenuLabel>{t("common.error")}</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onClick={() => {
+                            void refetch();
+                          }}
+                        >
+                          <CircleUserRoundIcon />
+                          {t("feed.tryAgain")}
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
                   </DropdownMenuGroup>
                 </>
               ) : null}
@@ -442,7 +440,7 @@ export function SiteHeader() {
               />
             </>
           ) : null}
-          {authState === "anonymous" ? (
+          {authState === "anonymous" || authState === "unknown" ? (
             <div className="mr-0.5 hidden items-center gap-1 sm:flex">
               <Link
                 href="/login"
