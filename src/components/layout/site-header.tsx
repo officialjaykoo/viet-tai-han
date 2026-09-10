@@ -385,7 +385,6 @@ export function SiteHeader() {
                     </DropdownMenuItem>
                     {authState === "unknown" ? (
                       <>
-                        <DropdownMenuLabel>{t("common.error")}</DropdownMenuLabel>
                         <DropdownMenuItem
                           className="min-h-11"
                           onClick={() => {
