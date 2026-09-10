@@ -96,7 +96,11 @@ test.describe("cross-platform smoke", () => {
       { name: "red_qv", value: "stale", url: baseURL },
       { name: "red_sec", value: "stale", url: baseURL, httpOnly: true },
     ]);
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/", { waitUntil: "commit" });
+    await page.locator('header a[href="/login"]').first().waitFor({
+      state: "visible",
+      timeout: 30_000,
+    });
     await page.locator('header a[href="/login"]').first().click({
       timeout: 10_000,
     });
