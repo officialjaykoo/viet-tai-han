@@ -7,14 +7,30 @@ import {
   PROTOBUF_CONTENT_TYPE,
   type InternalApiResponse,
 } from "@/lib/security/protobuf";
-import { ATK_COOKIE } from "@/lib/security/shared";
+import {
+  ATK_COOKIE,
+  GATE_NAME_COOKIE,
+  GATE_VALUE_COOKIE,
+  SEC_COOKIE,
+} from "@/lib/security/shared";
 import { AuthError } from "@/lib/session";
 
 const FORWARD_HEADERS = ["set-cookie", "etag", "x-content-type-options"] as const;
+const API_GUARD_EXPIRY =
+  "Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0";
+const API_GUARD_COOKIES = [
+  { name: ATK_COOKIE, httpOnly: false },
+  { name: SEC_COOKIE, httpOnly: true },
+  { name: GATE_NAME_COOKIE, httpOnly: false },
+  { name: GATE_VALUE_COOKIE, httpOnly: false },
+] as const;
 
 export type WrapOptions = {
   /** ATK used to seal the response payload (hides JSON on the wire). */
   sealAtk?: string | null;
+  /** Expire VTH's ephemeral API guard after a successful logout. */
+  expireApiGuardCookies?: boolean;
+  /** Match the challenge cookie's Secure attribute. */
   secure?: boolean;
 };
 
@@ -73,6 +89,18 @@ export async function wrapAsProtobufResponse(
     }
     const single = inner.headers.get(name);
     if (single) headers.set(name, single);
+  }
+  if (options.expireApiGuardCookies) {
+    const secure = options.secure ?? true;
+    const secureAttribute = secure ? "; Secure" : "";
+    for (const cookie of API_GUARD_COOKIES) {
+      headers.append(
+        "Set-Cookie",
+        `${cookie.name}=; ${API_GUARD_EXPIRY}${secureAttribute}; SameSite=Lax${
+          cookie.httpOnly ? "; HttpOnly" : ""
+        }`
+      );
+    }
   }
 
   return new NextResponse(new Uint8Array(frame), {

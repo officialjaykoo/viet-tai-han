@@ -220,10 +220,19 @@ export async function POST(request: NextRequest) {
         })
     );
 
-    // Seal with request ATK when present. Challenge responses seal with the
-    // newly minted ATK from Set-Cookie (handled inside wrapAsProtobufResponse).
-    // Do NOT rotate the query gate per request — concurrent calls share one gate.
-    return wrapAsProtobufResponse(inner, { sealAtk: atk });
+    const expireApiGuardCookies =
+      method === "POST" &&
+      envelope.path === "/api/auth/sign-out" &&
+      inner.ok;
+    // Preserve Better Auth's Set-Cookie headers while retiring the separate
+    // VTH API security context on a successful logout.
+    return wrapAsProtobufResponse(inner, {
+      sealAtk: atk,
+      expireApiGuardCookies,
+      secure:
+        request.nextUrl.protocol === "https:" ||
+        process.env.NODE_ENV === "production",
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       return await protobufAuthError(error, { sealAtk: readCookie(request.headers.get("cookie"), ATK_COOKIE) });

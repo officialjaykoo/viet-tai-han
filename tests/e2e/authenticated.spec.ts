@@ -343,24 +343,62 @@ test.describe("authenticated flows", () => {
     await expect(page).toHaveURL(/\/messages$/);
   });
 
-  test("logout clears the session and exposes one guest CTA", async ({
-    page,
-  }) => {
+  test("logout clears auth and API security contexts", async ({ page }) => {
     await disguiseAutomation(page);
     await loginAsAlice(page);
     await expectSignedIn(page);
+
+    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+    const guardNames = ["red_atk", "red_sec", "red_qn", "red_qv"];
+    const beforeLogout = await page.context().cookies(baseURL);
+    const beforeGuard = Object.fromEntries(
+      beforeLogout
+        .filter((cookie) => guardNames.includes(cookie.name))
+        .map((cookie) => [cookie.name, cookie.value])
+    );
+    const beforeLocale = beforeLogout.find(
+      (cookie) => cookie.name === "vth_lang"
+    )?.value;
+    const expiredGuardResponse = page.waitForResponse(
+      async (response) => {
+        if (
+          response.request().method() !== "POST" ||
+          !response.url().includes("/i/api")
+        ) {
+          return false;
+        }
+        const setCookie = (await response.allHeaders())["set-cookie"] ?? "";
+        return guardNames.every(
+          (name) =>
+            setCookie.includes(`${name}=;`) &&
+            setCookie.includes("Max-Age=0")
+        );
+      },
+      { timeout: 45_000 }
+    );
 
     const header = page.getByTestId("site-header");
     await header.getByRole("button", { name: /menu tài khoản/i }).click();
     const menu = page.getByRole("menu");
     await expect(menu).toContainText("@alice");
-    await expect(
-      menu.getByRole("menuitem", { name: /đăng nhập/i })
-    ).toHaveCount(0);
-    await expect(
-      menu.getByRole("menuitem", { name: /đăng ký/i })
-    ).toHaveCount(0);
+    await expect(menu.getByRole("menuitem", { name: /đăng xuất/i })).toHaveCount(
+      1
+    );
     await menu.getByRole("menuitem", { name: /đăng xuất/i }).click();
+
+    const logoutResponse = await expiredGuardResponse;
+    const logoutSetCookie = (await logoutResponse.allHeaders())["set-cookie"] ?? "";
+    const logoutSetCookieLines = logoutSetCookie.split(/\r?\n/);
+    expect(
+      logoutSetCookieLines.some(
+        (line) => line.startsWith("red_sec=;") && line.includes("HttpOnly")
+      )
+    ).toBe(true);
+    expect(
+      logoutSetCookieLines.some(
+        (line) => line.includes("session_token=;") && line.includes("Max-Age=0")
+      )
+    ).toBe(true);
 
     await expect(page).toHaveURL(/\/$/, { timeout: 45_000 });
     await expect(
@@ -371,6 +409,21 @@ test.describe("authenticated flows", () => {
     await expect(header.getByRole("link", { name: /thông báo/i })).toHaveCount(0);
     await expect(header.getByAltText("@alice")).toHaveCount(0);
 
+    const afterLogout = await page.context().cookies(baseURL);
+    const afterGuard = Object.fromEntries(
+      afterLogout
+        .filter((cookie) => guardNames.includes(cookie.name))
+        .map((cookie) => [cookie.name, cookie.value])
+    );
+    for (const name of guardNames) {
+      if (beforeGuard[name]) expect(afterGuard[name]).not.toBe(beforeGuard[name]);
+    }
+    expect(
+      afterLogout.find((cookie) => cookie.name === "vth_lang")?.value
+    ).toBe(beforeLocale);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(header.getByRole("link", { name: /đăng nhập/i })).toHaveCount(1);
     const sessionResponse = await page.request.get("/api/auth/get-session");
     expect(sessionResponse.ok()).toBe(true);
     expect(await sessionResponse.json()).toBeNull();
@@ -378,6 +431,24 @@ test.describe("authenticated flows", () => {
     const protectedResponse = await page.request.get("/api/messages");
     expect(protectedResponse.status()).toBe(401);
   });
+  test("logout then login succeeds with one click", async ({ page }) => {
+    await disguiseAutomation(page);
+    await loginAsAlice(page);
+    await expectSignedIn(page);
+
+    const header = page.getByTestId("site-header");
+    await header.getByRole("button", { name: /menu tài khoản/i }).click();
+    await page.getByRole("menuitem", { name: /đăng xuất/i }).click();
+    await expect(page).toHaveURL(/\/$/, { timeout: 45_000 });
+
+    await header.getByRole("link", { name: /đăng nhập/i }).click();
+    await expect(page).toHaveURL(/\/login$/, { timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { name: /tiếp tục với/i })
+    ).toBeVisible();
+    await expect(page.getByText("문제가 발생했습니다")).toHaveCount(0);
+  });
+
 
   test("logout removes private messages UI before returning home", async ({
     page,
