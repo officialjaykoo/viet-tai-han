@@ -8,7 +8,6 @@ import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { buttonVariants } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/site-header";
-import { withFeedAds } from "@/lib/ads";
 import { isSubscribed } from "@/lib/communities";
 import { getSubredditByName } from "@/lib/content";
 import { getFeedPosts, type FeedSort } from "@/lib/db";
@@ -43,16 +42,18 @@ export default async function SubredditPage({
     ? await isSubscribed(session.user.id, sub.id)
     : false;
 
-  const initialFeed = await withFeedAds(
-    await getFeedPosts({
-      subreddit: sub.name,
-      limit: 20,
-      viewerUserId: session?.user?.id ?? null,
-      sort,
-      mode: "community",
-    }),
-    session?.user?.id ?? null
-  );
+  const organicFeed = await getFeedPosts({
+    subreddit: sub.name,
+    limit: 20,
+    viewerUserId: session?.user?.id ?? null,
+    sort,
+    mode: "community",
+  });
+  const initialFeed = {
+    posts: organicFeed.posts.map((post) => ({ ...post, kind: "post" as const })),
+    nextCursor: organicFeed.nextCursor,
+    hasMore: organicFeed.hasMore,
+  };
 
   return (
     <>

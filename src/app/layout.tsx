@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Geist_Mono, Manrope } from "next/font/google";
 
-import { ConsentBanner } from "@/components/consent/consent-banner";
 import { AuthSessionHydrator } from "@/components/auth/auth-session-hydrator";
 
 import { I18nProvider } from "@/components/i18n/i18n-provider";
@@ -172,7 +171,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               {!isAdminPath ? <OnlinePresenceBeacon enabled={signedIn} /> : null}
               {!isAdminPath ? <MobileNav /> : null}
               {!isAdminPath ? <SiteFooter /> : null}
-              {!isAdminPath ? <ConsentBanner signedIn={signedIn} /> : null}
             </I18nProvider>
           </AuthSessionHydrator>
         </ThemeProvider>

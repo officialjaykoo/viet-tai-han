@@ -18,21 +18,21 @@ export async function seedUsersAndSubreddit(
   const subredditId = `s_${suffix}`;
   const subredditName = `c_${suffix}`;
   await env.DB.prepare(
-    `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-     VALUES (?, 'Admin', ?, 1, ?, 50, 'admin', 'active')`
+    `INSERT INTO "user" (id, name, email, emailVerified, username, role, status)
+     VALUES (?, 'Admin', ?, 1, ?, 'admin', 'active')`
   )
     .bind(adminId, `${adminId}@test.local`, `admin_${suffix}`)
     .run();
   await env.DB.prepare(
-    `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-     VALUES (?, 'Author', ?, 1, ?, 50, 'user', 'active')`
+    `INSERT INTO "user" (id, name, email, emailVerified, username, role, status)
+     VALUES (?, 'Author', ?, 1, ?, 'user', 'active')`
   )
     .bind(authorId, `${authorId}@test.local`, `author_${suffix}`)
     .run();
 
   await env.DB.prepare(
-    `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-     VALUES (?, 'Actor', ?, 1, ?, 40, 'user', 'active')`
+    `INSERT INTO "user" (id, name, email, emailVerified, username, role, status)
+     VALUES (?, 'Actor', ?, 1, ?, 'user', 'active')`
   )
     .bind(actorId, `${actorId}@test.local`, `actor_${suffix}`)
     .run();

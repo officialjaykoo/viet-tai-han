@@ -238,7 +238,6 @@ describe("username lifecycle", () => {
     expect(publicProfile).not.toHaveProperty("id");
     expect(publicProfile).not.toHaveProperty("status");
     expect(publicProfile).not.toHaveProperty("role");
-    expect(publicProfile).not.toHaveProperty("isNsfw");
     expect(await resolvePublicProfile(newUsername)).toMatchObject({
       redirectUsername: null,
       profile: { id: userId, username: newUsername },

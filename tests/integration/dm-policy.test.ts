@@ -36,22 +36,20 @@ async function insertUser(
   id: string,
   username: string,
   options: {
-    karma?: number;
     allowDms?: "anyone" | "followers" | "nobody";
     role?: "user" | "admin";
   } = {}
 ) {
   await env.DB
     .prepare(
-      `INSERT INTO "user" (id, name, email, emailVerified, username, karma, allowDms, role, status)
-       VALUES (?, ?, ?, 1, ?, ?, ?, ?, 'active')`
+      `INSERT INTO "user" (id, name, email, emailVerified, username, allowDms, role, status)
+       VALUES (?, ?, ?, 1, ?, ?, ?, 'active')`
     )
     .bind(
       id,
       username,
       `${id}@test.local`,
       username,
-      options.karma ?? 0,
       options.allowDms ?? "anyone",
       options.role ?? "user"
     )
@@ -81,7 +79,7 @@ async function flushBackgroundWork() {
 }
 
 describe("DM relationship policy (D1)", () => {
-  it("allows a karma-zero user to create a request without a karma gate", async () => {
+  it("allows a new user to create a request without a reputation gate", async () => {
     const suffix = crypto.randomUUID().slice(0, 8);
     const senderId = `dm_zero_sender_${suffix}`;
     const recipientId = `dm_zero_recipient_${suffix}`;
@@ -91,7 +89,7 @@ describe("DM relationship policy (D1)", () => {
       insertUser(recipientId, recipientUsername),
     ]);
 
-    const request = await start(senderId, recipientUsername, "Hello from zero karma.");
+    const request = await start(senderId, recipientUsername, "Hello from a new user.");
     expect(request.conversationType).toBe("request");
     expect(request.requestId).toBeTruthy();
 
@@ -645,7 +643,7 @@ describe("DM relationship policy (D1)", () => {
     });
   });
 
-  it("retains request rate limits for karma-zero users", async () => {
+  it("retains request rate limits for new users", async () => {
     const suffix = crypto.randomUUID().slice(0, 8);
     const senderId = `dm_rate_sender_${suffix}`;
     const firstUsername = `dm_rate_first_${suffix}`;
@@ -665,15 +663,15 @@ describe("DM relationship policy (D1)", () => {
     });
   });
 
-  it("allows zero and negative reputation users to use normal content actions", async () => {
+  it("allows new users to use normal content actions", async () => {
     const suffix = crypto.randomUUID().slice(0, 8);
     const adminId = `admin_${suffix}`;
-    const creatorId = `normal_negative_creator_${suffix}`;
-    const actorId = `normal_zero_actor_${suffix}`;
+    const creatorId = `normal_creator_${suffix}`;
+    const actorId = `normal_actor_${suffix}`;
     await Promise.all([
       insertUser(adminId, `admin_${suffix}`, { role: "admin" }),
-      insertUser(creatorId, `normal_negative_creator_${suffix}`, { karma: -25 }),
-      insertUser(actorId, `normal_zero_actor_${suffix}`, { karma: 0 }),
+      insertUser(creatorId, `normal_creator_${suffix}`),
+      insertUser(actorId, `normal_actor_${suffix}`),
     ]);
 
     const community = await createSubreddit({

@@ -135,8 +135,8 @@ describe("messaging delivery (D1)", () => {
     const { authorId, actorId } = await seedUsersAndSubreddit();
     const outsiderId = `u_outsider_${crypto.randomUUID().slice(0, 8)}`;
     await env.DB.prepare(
-      `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-       VALUES (?, 'Outsider', ?, 1, ?, 40, 'user', 'active')`
+      `INSERT INTO "user" (id, name, email, emailVerified, username, role, status)
+       VALUES (?, 'Outsider', ?, 1, ?, 'user', 'active')`
     )
       .bind(
         outsiderId,

@@ -13,7 +13,6 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
 import { getSession } from "@/lib/session";
 import { getUserSettings, listBlockedUsers, listMutedUsers } from "@/lib/user-settings";
-import { getProStatus, getUserConsent } from "@/lib/monetization";
 
 export const dynamic = "force-dynamic";
 
@@ -74,12 +73,10 @@ export default async function SettingsPage({
   if (!settings) {
     redirect("/login?next=/settings");
   }
-  const [blocked, muted, push, consent, pro] = await Promise.all([
+  const [blocked, muted, push] = await Promise.all([
     listBlockedUsers(session.user.id),
     listMutedUsers(session.user.id),
     getPushStatus(session.user.id),
-    getUserConsent(session.user.id),
-    getProStatus(session.user.id),
   ]);
 
   return (
@@ -108,8 +105,6 @@ export default async function SettingsPage({
               activeDeviceCount: push.activeDeviceCount,
               hasAnySubscription: push.hasAnySubscription,
             }}
-            initialConsent={consent}
-            initialPro={pro}
           />
         </PageShell>
       </main>

@@ -15,7 +15,6 @@ export type SearchAccountHit = {
   username: string;
   displayName: string | null;
   image: string | null;
-  karma: number;
   tags: AccountTag[];
 };
 
@@ -152,12 +151,7 @@ async function searchAccounts(
   const { results } = await db
     .prepare(
       `SELECT
-         username, name, image, karma, role, isNsfw, createdAt,
-         EXISTS (
-           SELECT 1 FROM user_achievements ua
-           INNER JOIN achievements a ON a.id = ua.achievement_id
-           WHERE ua.user_id = "user".id AND a.slug = 'veteran'
-         ) AS has_veteran,
+         username, name, image, role,
          EXISTS (
            SELECT 1 FROM subreddit_moderators WHERE user_id = "user".id
          ) AS is_community_mod
@@ -166,7 +160,7 @@ async function searchAccounts(
          AND username IS NOT NULL
          ${mutedClause}
          AND (username LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\')
-       ORDER BY karma DESC, username ASC
+       ORDER BY username ASC
        LIMIT ?`
     )
     .bind(
@@ -178,11 +172,7 @@ async function searchAccounts(
       username: string;
       name: string;
       image: string | null;
-      karma: number;
       role: string;
-      isNsfw: number;
-      createdAt: string;
-      has_veteran: number;
       is_community_mod: number;
     }>();
 
@@ -190,14 +180,9 @@ async function searchAccounts(
     username: row.username,
     displayName: row.name || null,
     image: row.image,
-    karma: Number(row.karma ?? 0),
     tags: resolveAccountTags({
       role: row.role,
-      isNsfw: row.isNsfw,
-      createdAt: row.createdAt,
-      karma: row.karma,
       isCommunityMod: Boolean(row.is_community_mod),
-      hasVeteranAchievement: Boolean(row.has_veteran),
     }),
   }));
 }

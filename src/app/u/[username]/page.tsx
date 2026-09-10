@@ -16,7 +16,6 @@ import {
   ProfileTabs,
   type ProfileTab,
 } from "@/components/user/profile-tabs";
-import { listUserAchievements } from "@/lib/achievements";
 
 import {
   listUserCommentsPage,
@@ -132,7 +131,6 @@ export default async function ProfilePage({
   if (!relation.canViewProfile) notFound();
 
   const viewerUserId = session?.user?.id ?? null;
-  let achievements: Awaited<ReturnType<typeof listUserAchievements>>;
   let postsFeed: OrganicFeedPage = {
     posts: [],
     nextCursor: null,
@@ -146,8 +144,7 @@ export default async function ProfilePage({
   let friends: Awaited<ReturnType<typeof listFriends>> = [];
 
   if (tab === "overview") {
-    [achievements, postsFeed, commentsPage] = await Promise.all([
-      listUserAchievements(profileRecord.id),
+    [postsFeed, commentsPage] = await Promise.all([
       getFeedPosts({
         authorId: profileRecord.id,
         limit: 30,
@@ -158,26 +155,17 @@ export default async function ProfilePage({
       listUserCommentsPage(profileRecord.id, { limit: 30 }),
     ]);
   } else if (tab === "posts") {
-    [achievements, postsFeed] = await Promise.all([
-      listUserAchievements(profileRecord.id),
-      getFeedPosts({
-        authorId: profileRecord.id,
-        limit: 30,
-        sort: "new",
-        mode: "popular",
-        viewerUserId,
-      }),
-    ]);
+    postsFeed = await getFeedPosts({
+      authorId: profileRecord.id,
+      limit: 30,
+      sort: "new",
+      mode: "popular",
+      viewerUserId,
+    });
   } else if (tab === "comments") {
-    [achievements, commentsPage] = await Promise.all([
-      listUserAchievements(profileRecord.id),
-      listUserCommentsPage(profileRecord.id, { limit: 30 }),
-    ]);
+    commentsPage = await listUserCommentsPage(profileRecord.id, { limit: 30 });
   } else {
-    [achievements, friends] = await Promise.all([
-      listUserAchievements(profileRecord.id),
-      listFriends(profileRecord.id),
-    ]);
+    friends = await listFriends(profileRecord.id);
   }
   logProfileStage("profile_data_done");
   const posts = postsFeed.posts;
@@ -260,7 +248,6 @@ export default async function ProfilePage({
               <div className="sticky top-20">
                 <ProfileSidebar
                   profile={profile}
-                  achievements={achievements}
                   isOwner={isOwner}
                 />
               </div>
@@ -270,7 +257,6 @@ export default async function ProfilePage({
           <div className="mt-6 lg:hidden">
             <ProfileSidebar
               profile={profile}
-              achievements={achievements}
               isOwner={isOwner}
             />
           </div>

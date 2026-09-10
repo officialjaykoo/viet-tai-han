@@ -1,6 +1,5 @@
 import { expect, type Page } from "@playwright/test";
 
-import { CONSENT_STORAGE_KEY, ESSENTIAL_CONSENT } from "../../../src/lib/consent";
 
 import { LANG_COOKIE } from "../../../src/lib/i18n/config";
 import { MIN_DWELL_MS } from "../../../src/lib/security/bot-signals";
@@ -44,7 +43,7 @@ export async function disguiseAutomation(page: Page) {
   });
 }
 
-/** Dismiss locale and privacy prompts if they still appear. */
+/** Dismiss the locale prompt if it still appears. */
 export async function dismissLanguagePrompt(page: Page) {
   const preferVi = page.getByRole("button", { name: /chọn tiếng việt/i });
   await preferVi
@@ -55,17 +54,6 @@ export async function dismissLanguagePrompt(page: Page) {
     await expect(preferVi).toBeHidden({ timeout: 5_000 });
   }
 
-  const essentialConsent = page.getByRole("button", {
-    name: /chỉ thiết yếu/i,
-  });
-  await essentialConsent
-    .waitFor({ state: "visible", timeout: 5_000 })
-    .catch(() => undefined);
-  if (await essentialConsent.isVisible().catch(() => false)) {
-    await expect(essentialConsent).toBeEnabled({ timeout: 20_000 });
-    await essentialConsent.click();
-    await expect(essentialConsent).toBeHidden({ timeout: 20_000 });
-  }
 }
 
 /**
@@ -94,12 +82,6 @@ export async function loginAsSeedUser(
 ) {
   await seedLocaleCookie(page);
   await disguiseAutomation(page);
-  await page.addInitScript(
-    ({ key, choice }) => {
-      window.localStorage.setItem(key, JSON.stringify(choice));
-    },
-    { key: CONSENT_STORAGE_KEY, choice: ESSENTIAL_CONSENT }
-  );
 
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
   await page.goto(`${baseURL}/login`, { waitUntil: "domcontentloaded" });

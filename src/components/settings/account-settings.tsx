@@ -11,7 +11,6 @@ import {
   settingsErrorMessage,
   settingsRequest,
 } from "@/components/settings/settings-action";
-import type { ProStatus } from "@/lib/monetization";
 import type { UserSettings } from "@/lib/user-settings";
 import type {
   SettingsChange,
@@ -20,12 +19,10 @@ import type {
 
 export function AccountSettings({
   settings,
-  initialPro,
   onSettingsChange,
   flash,
 }: {
   settings: UserSettings;
-  initialPro: ProStatus;
   onSettingsChange: SettingsChange;
   flash: SettingsFeedback;
 }) {
@@ -40,10 +37,7 @@ export function AccountSettings({
     flash(null, null);
     startTransition(async () => {
       try {
-        const data = await settingsRequest<{
-          contactEmail?: string | null;
-          contactEmailVerified?: boolean;
-        }>(
+        const data = await settingsRequest<{ contactEmail?: string | null }>(
           "/api/me/settings",
           {
             method: "PATCH",
@@ -52,11 +46,7 @@ export function AccountSettings({
           },
           t("settings.contactEmailSaveFailed")
         );
-        const contactEmailVerified = data.contactEmailVerified;
-        if (
-          !("contactEmail" in data) ||
-          typeof contactEmailVerified !== "boolean"
-        ) {
+        if (!("contactEmail" in data)) {
           throw new Error(t("settings.contactEmailSaveFailed"));
         }
         const nextContactEmail = data.contactEmail ?? "";
@@ -64,7 +54,6 @@ export function AccountSettings({
         onSettingsChange((current) => ({
           ...current,
           contactEmail: data.contactEmail ?? null,
-          contactEmailVerified,
         }));
         flash(t("settings.contactEmailUpdated"), null);
       } catch (cause) {
@@ -81,70 +70,31 @@ export function AccountSettings({
   }
 
   return (
-    <>
-      <SettingsCard
-        title={t("settings.pro")}
-        description={t("settings.proDescription")}
+    <SettingsCard
+      title={t("settings.contactEmail")}
+      description={t("settings.contactEmailDesc")}
+    >
+      <Field label={t("settings.contactEmail")}>
+        <Input
+          type="email"
+          value={contactEmail}
+          placeholder={t("settings.contactEmailPlaceholder")}
+          autoComplete="email"
+          onChange={(event) => setContactEmail(event.target.value)}
+        />
+      </Field>
+      <Button
+        type="button"
+        disabled={
+          pending ||
+          contactEmail.trim().toLowerCase() === (settings.contactEmail ?? "")
+        }
+        onClick={saveContactEmail}
       >
-        <div className="rounded-xl border border-border/50 px-3 py-3">
-          <p className="text-sm font-medium">
-            {initialPro.active
-              ? t("settings.proActive")
-              : t("settings.proInactive")}
-          </p>
-          {initialPro.plan ? (
-            <p className="text-xs text-muted-foreground">
-              {t(
-                initialPro.plan === "monthly"
-                  ? "settings.proPlanMonthly"
-                  : initialPro.plan === "annual"
-                    ? "settings.proPlanAnnual"
-                    : "settings.proPlanLifetime"
-              )}
-            </p>
-          ) : null}
-          <p className="mt-2 text-xs text-muted-foreground">
-            {initialPro.active
-              ? t("settings.proAdFree")
-              : t("settings.proBillingUnavailable")}
-          </p>
-          {initialPro.active && initialPro.currentPeriodEnd ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t("settings.proEndsAt", {
-                date: new Date(initialPro.currentPeriodEnd).toLocaleDateString(),
-              })}
-            </p>
-          ) : null}
-        </div>
-      </SettingsCard>
-
-      <SettingsCard
-        title={t("settings.contactEmail")}
-        description={t("settings.contactEmailDesc")}
-      >
-        <Field label={t("settings.contactEmail")}>
-          <Input
-            type="email"
-            value={contactEmail}
-            placeholder={t("settings.contactEmailPlaceholder")}
-            autoComplete="email"
-            onChange={(event) => setContactEmail(event.target.value)}
-          />
-        </Field>
-        <Button
-          type="button"
-          disabled={
-            pending ||
-            contactEmail.trim().toLowerCase() ===
-              (settings.contactEmail ?? "")
-          }
-          onClick={saveContactEmail}
-        >
-          {contactEmail.trim()
-            ? t("settings.updateContactEmail")
-            : t("settings.clearContactEmail")}
-        </Button>
-      </SettingsCard>
-    </>
+        {contactEmail.trim()
+          ? t("settings.updateContactEmail")
+          : t("settings.clearContactEmail")}
+      </Button>
+    </SettingsCard>
   );
 }

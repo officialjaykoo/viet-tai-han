@@ -2,6 +2,9 @@
 -- Post/comment IDs are opaque YouTube-style tokens (not sequential).
 -- Re-run safely on an un-rekeyed local DB; production never runs this seed.
 
+-- Rate-limit events are ephemeral; local resets must not inherit test throttles.
+DELETE FROM security_rate_events;
+
 DELETE FROM comment_likes
 WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@example.local')
    OR comment_id IN (
@@ -43,11 +46,8 @@ WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@example.local');
 DELETE FROM user_follows
 WHERE follower_id IN (SELECT id FROM "user" WHERE email LIKE '%@example.local')
    OR following_id IN (SELECT id FROM "user" WHERE email LIKE '%@example.local');
-DELETE FROM user_achievements
-WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@example.local');
-DELETE FROM ad_impressions WHERE campaign_id LIKE 'adcamp_%';
-DELETE FROM ad_clicks WHERE campaign_id LIKE 'adcamp_%';
-DELETE FROM ad_campaigns WHERE id LIKE 'adcamp_%';
+
+
 DELETE FROM banned_words WHERE id LIKE 'bw_%';
 DELETE FROM business_bookings
 WHERE requester_id IN (SELECT id FROM "user" WHERE email LIKE '%@example.local')
@@ -75,36 +75,36 @@ DELETE FROM "user" WHERE email LIKE '%@example.local';
 
 INSERT OR IGNORE INTO "user" (
   id, name, email, emailVerified, username,
-  karma, postKarma, commentKarma, role, status, bio, isNsfw, preferredLanguage, createdAt
+  role, status, bio, preferredLanguage, createdAt
 ) VALUES
   ('7Kp3nZ8QaM2wX5Rc', 'Alice', 'alice@example.local', 1, 'alice',
-   0, 0, 0, 'admin', 'active', 'Building Việt tại Hàn on Cloudflare.', 0, 'vi', datetime('now', '-400 days')),
+   'admin', 'active', 'Building Việt tại Hàn on Cloudflare.', 'vi', datetime('now', '-400 days')),
   ('2Vt9Lm4Qx7Nc1RsA', 'Bob', 'bob@example.local', 1, 'bob',
-   0, 0, 0, 'user', 'active', 'Virtuoso enjoyer.', 0, 'vi', datetime('now', '-30 days')),
+   'user', 'active', 'Virtuoso enjoyer.', 'vi', datetime('now', '-30 days')),
   ('H6sP0dK3wZ8mB2yQ', 'Carol', 'carol@example.local', 1, 'carol',
-   0, 0, 0, 'moderator', 'active', 'Mods webdev.', 0, 'vi', datetime('now', '-120 days')),
+   'moderator', 'active', 'Mods webdev.', 'vi', datetime('now', '-120 days')),
   ('9Aa4Cc7Ee1Gg3IiK', 'Dave', 'dave@example.local', 1, 'dave',
-   0, 0, 0, 'user', 'active', 'Edge runtime tinkerer.', 1, 'vi', datetime('now', '-14 days')),
+   'user', 'active', 'Edge runtime tinkerer.', 'vi', datetime('now', '-14 days')),
   ('L2nR5tY8uW1qE4oP', 'Erin', 'erin@example.local', 1, 'erin',
-   0, 0, 0, 'user', 'active', 'Writes about DX and tooling.', 0, 'vi', datetime('now', '-220 days')),
+   'user', 'active', 'Writes about DX and tooling.', 'vi', datetime('now', '-220 days')),
   ('B7vD0fH3jL6zX9cM', 'Frank', 'frank@example.local', 1, 'frank',
-   0, 0, 0, 'user', 'active', NULL, 0, 'vi', datetime('now', '-3 days')),
+   'user', 'active', NULL, 'vi', datetime('now', '-3 days')),
   ('Q4sN7kT0mV3xA6pR', 'Grace', 'grace@example.local', 1, 'grace',
-   0, 0, 0, 'user', 'active', 'Comment thread archaeologist.', 0, 'vi', datetime('now', '-90 days')),
+   'user', 'active', 'Comment thread archaeologist.', 'vi', datetime('now', '-90 days')),
   ('E8rU1iO4aS7dF0gH', 'Henry', 'henry@example.local', 1, 'henry',
-   0, 0, 0, 'user', 'active', 'Mostly shares links.', 0, 'vi', datetime('now', '-60 days')),
+   'user', 'active', 'Mostly shares links.', 'vi', datetime('now', '-60 days')),
   ('W3yC6bN9hK2lP5vX', 'Ivy', 'ivy@example.local', 1, 'ivy',
-   0, 0, 0, 'user', 'active', 'Viết bằng tiếng Việt và tiếng Hàn.', 0, 'ko', datetime('now', '-45 days')),
+   'user', 'active', 'Viết bằng tiếng Việt và tiếng Hàn.', 'ko', datetime('now', '-45 days')),
   ('M0qR3tY6uI9oA2sD', 'Jake', 'jake@example.local', 1, 'jake',
-   0, 0, 0, 'user', 'active', 'Gaming + CSS.', 0, 'vi', datetime('now', '-18 days')),
+   'user', 'active', 'Gaming + CSS.', 'vi', datetime('now', '-18 days')),
   ('Z5xV8nB1mK4pH7cQ', 'Kate', 'kate@example.local', 1, 'kate',
-   0, 0, 0, 'user', 'active', NULL, 0, 'vi', datetime('now', '-7 days')),
+   'user', 'active', NULL, 'vi', datetime('now', '-7 days')),
   ('F2gJ5lS8dO1wE4rT', 'Leo', 'leo@example.local', 1, 'leo',
-   0, 0, 0, 'user', 'active', 'Photography hobbyist.', 0, 'vi', datetime('now', '-150 days')),
+   'user', 'active', 'Photography hobbyist.', 'vi', datetime('now', '-150 days')),
   ('A9cD2fG5hJ8kL1zX', 'Mira', 'mira@example.local', 1, 'mira',
-   0, 0, 0, 'user', 'active', 'Ask me anything about Workers.', 0, 'vi', datetime('now', '-80 days')),
+   'user', 'active', 'Ask me anything about Workers.', 'vi', datetime('now', '-80 days')),
   ('P6qW9eR2tY5uI8oA', 'Nate', 'nate@example.local', 1, 'nate',
-   0, 0, 0, 'user', 'active', 'New here — testing the feed.', 0, 'vi', datetime('now', '-1 day'));
+   'user', 'active', 'New here — testing the feed.', 'vi', datetime('now', '-1 day'));
 
 INSERT OR IGNORE INTO subreddits (id, name, title, description, created_by, subscriber_count) VALUES
   ('sub_cloudflare', 'cloudflare', 'Cloudflare', 'Workers, D1, Durable Objects, and the edge.', '7Kp3nZ8QaM2wX5Rc', 0),
@@ -291,7 +291,7 @@ INSERT OR IGNORE INTO posts (
    NULL, 0, 0, 0, 0, datetime('now', '-9 days')),
   ('o7Oo8Pp9Qq0', 'sub_programming', '7Kp3nZ8QaM2wX5Rc',
    'Easter egg: shoutout to laefye',
-   'If you see this, the laefye achievement path is working.',
+   'If you see this, the laefye community easter egg is here.',
    NULL, 0, 0, 0, 0, datetime('now', '-219 hours')),
   ('r1Rr2Ss3Tt4', 'sub_gaming', 'A9cD2fG5hJ8kL1zX',
    'Controller layouts for left-handed players',
@@ -709,42 +709,6 @@ SET comment_count = (
 
 
 
-INSERT OR IGNORE INTO ad_campaigns (
-  id, name, status, placement, body, image_key, target_url, weight, created_by
-) VALUES
-  (
-    'adcamp_workers',
-    'Ship on the edge with Workers',
-    'active',
-    'feed_inline',
-    'Deploy globally in seconds. D1, R2, and Durable Objects included.',
-    NULL,
-    'https://developers.cloudflare.com/workers/',
-    3,
-    '7Kp3nZ8QaM2wX5Rc'
-  ),
-  (
-    'adcamp_pages',
-    'Build your next app on Pages',
-    'active',
-    'feed_inline',
-    'Git-connected previews and Workers integration for full-stack sites.',
-    NULL,
-    'https://developers.cloudflare.com/pages/',
-    2,
-    '7Kp3nZ8QaM2wX5Rc'
-  ),
-  (
-    'adcamp_footer',
-    'Việt tại Hàn · open source on Cloudflare',
-    'active',
-    'post_footer',
-    'A community-first feed running entirely at the edge.',
-    NULL,
-    'https://developers.cloudflare.com/',
-    1,
-    '7Kp3nZ8QaM2wX5Rc'
-  );
 
 INSERT OR IGNORE INTO banned_words (id, word, severity, created_by) VALUES
   ('bw_001', 'spamlink', 'block', '7Kp3nZ8QaM2wX5Rc'),
@@ -766,74 +730,20 @@ INSERT OR IGNORE INTO user_activity (user_id, subreddit_id, score) VALUES
   ('A9cD2fG5hJ8kL1zX', 'sub_askred', 8),
   ('P6qW9eR2tY5uI8oA', 'sub_askred', 2);
 
-UPDATE "user" SET createdAt = datetime('now', '-400 days'), isNsfw = 0, preferredLanguage = 'vi' WHERE id = '7Kp3nZ8QaM2wX5Rc';
-UPDATE "user" SET createdAt = datetime('now', '-30 days'), isNsfw = 0 WHERE id = '2Vt9Lm4Qx7Nc1RsA';
-UPDATE "user" SET createdAt = datetime('now', '-120 days'), isNsfw = 0 WHERE id = 'H6sP0dK3wZ8mB2yQ';
-UPDATE "user" SET createdAt = datetime('now', '-14 days'), isNsfw = 1 WHERE id = '9Aa4Cc7Ee1Gg3IiK';
-UPDATE "user" SET createdAt = datetime('now', '-220 days'), isNsfw = 0 WHERE id = 'L2nR5tY8uW1qE4oP';
-UPDATE "user" SET createdAt = datetime('now', '-3 days'), isNsfw = 0 WHERE id = 'B7vD0fH3jL6zX9cM';
-UPDATE "user" SET createdAt = datetime('now', '-90 days'), isNsfw = 0 WHERE id = 'Q4sN7kT0mV3xA6pR';
-UPDATE "user" SET createdAt = datetime('now', '-60 days'), isNsfw = 0 WHERE id = 'E8rU1iO4aS7dF0gH';
-UPDATE "user" SET createdAt = datetime('now', '-45 days'), isNsfw = 0, preferredLanguage = 'ko' WHERE id = 'W3yC6bN9hK2lP5vX';
-UPDATE "user" SET createdAt = datetime('now', '-18 days'), isNsfw = 0 WHERE id = 'M0qR3tY6uI9oA2sD';
-UPDATE "user" SET createdAt = datetime('now', '-7 days'), isNsfw = 0 WHERE id = 'Z5xV8nB1mK4pH7cQ';
-UPDATE "user" SET createdAt = datetime('now', '-150 days'), isNsfw = 0 WHERE id = 'F2gJ5lS8dO1wE4rT';
-UPDATE "user" SET createdAt = datetime('now', '-80 days'), isNsfw = 0 WHERE id = 'A9cD2fG5hJ8kL1zX';
-UPDATE "user" SET createdAt = datetime('now', '-1 day'), isNsfw = 0 WHERE id = 'P6qW9eR2tY5uI8oA';
-
-INSERT OR IGNORE INTO user_achievements (user_id, achievement_id, level) VALUES
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_admin', 1),
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_veteran', 1),
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_first_post', 1),
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_first_comment', 1),
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_community', 1),
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_laefye', 1),
-  ('7Kp3nZ8QaM2wX5Rc', 'ach_verified_start', 1),
-  ('H6sP0dK3wZ8mB2yQ', 'ach_moderator', 1),
-  ('H6sP0dK3wZ8mB2yQ', 'ach_first_post', 1),
-  ('H6sP0dK3wZ8mB2yQ', 'ach_first_comment', 1),
-  ('H6sP0dK3wZ8mB2yQ', 'ach_verified_start', 1),
-  ('2Vt9Lm4Qx7Nc1RsA', 'ach_first_post', 1),
-  ('2Vt9Lm4Qx7Nc1RsA', 'ach_first_comment', 1),
-  ('2Vt9Lm4Qx7Nc1RsA', 'ach_verified_start', 1),
-  ('9Aa4Cc7Ee1Gg3IiK', 'ach_nsfw', 1),
-  ('9Aa4Cc7Ee1Gg3IiK', 'ach_first_post', 1),
-  ('9Aa4Cc7Ee1Gg3IiK', 'ach_first_comment', 1),
-  ('9Aa4Cc7Ee1Gg3IiK', 'ach_verified_start', 1),
-  ('L2nR5tY8uW1qE4oP', 'ach_first_post', 1),
-  ('L2nR5tY8uW1qE4oP', 'ach_first_comment', 1),
-  ('L2nR5tY8uW1qE4oP', 'ach_verified_start', 1),
-  ('L2nR5tY8uW1qE4oP', 'ach_community', 1),
-  ('B7vD0fH3jL6zX9cM', 'ach_first_post', 1),
-  ('B7vD0fH3jL6zX9cM', 'ach_first_comment', 1),
-  ('B7vD0fH3jL6zX9cM', 'ach_verified_start', 1),
-  ('Q4sN7kT0mV3xA6pR', 'ach_first_post', 1),
-  ('Q4sN7kT0mV3xA6pR', 'ach_first_comment', 1),
-  ('Q4sN7kT0mV3xA6pR', 'ach_verified_start', 1),
-  ('Q4sN7kT0mV3xA6pR', 'ach_laefye', 1),
-  ('E8rU1iO4aS7dF0gH', 'ach_first_post', 1),
-  ('E8rU1iO4aS7dF0gH', 'ach_verified_start', 1),
-  ('W3yC6bN9hK2lP5vX', 'ach_first_post', 1),
-  ('W3yC6bN9hK2lP5vX', 'ach_first_comment', 1),
-  ('W3yC6bN9hK2lP5vX', 'ach_verified_start', 1),
-  ('M0qR3tY6uI9oA2sD', 'ach_first_post', 1),
-  ('M0qR3tY6uI9oA2sD', 'ach_first_comment', 1),
-  ('M0qR3tY6uI9oA2sD', 'ach_verified_start', 1),
-  ('M0qR3tY6uI9oA2sD', 'ach_community', 1),
-  ('Z5xV8nB1mK4pH7cQ', 'ach_first_post', 1),
-  ('Z5xV8nB1mK4pH7cQ', 'ach_first_comment', 1),
-  ('Z5xV8nB1mK4pH7cQ', 'ach_verified_start', 1),
-  ('F2gJ5lS8dO1wE4rT', 'ach_first_post', 1),
-  ('F2gJ5lS8dO1wE4rT', 'ach_first_comment', 1),
-  ('F2gJ5lS8dO1wE4rT', 'ach_verified_start', 1),
-  ('F2gJ5lS8dO1wE4rT', 'ach_community', 1),
-  ('A9cD2fG5hJ8kL1zX', 'ach_first_post', 1),
-  ('A9cD2fG5hJ8kL1zX', 'ach_first_comment', 1),
-  ('A9cD2fG5hJ8kL1zX', 'ach_verified_start', 1),
-  ('A9cD2fG5hJ8kL1zX', 'ach_community', 1),
-  ('P6qW9eR2tY5uI8oA', 'ach_first_post', 1),
-  ('P6qW9eR2tY5uI8oA', 'ach_first_comment', 1),
-  ('P6qW9eR2tY5uI8oA', 'ach_verified_start', 1);
+UPDATE "user" SET createdAt = datetime('now', '-400 days'), preferredLanguage = 'vi' WHERE id = '7Kp3nZ8QaM2wX5Rc';
+UPDATE "user" SET createdAt = datetime('now', '-30 days') WHERE id = '2Vt9Lm4Qx7Nc1RsA';
+UPDATE "user" SET createdAt = datetime('now', '-120 days') WHERE id = 'H6sP0dK3wZ8mB2yQ';
+UPDATE "user" SET createdAt = datetime('now', '-14 days') WHERE id = '9Aa4Cc7Ee1Gg3IiK';
+UPDATE "user" SET createdAt = datetime('now', '-220 days') WHERE id = 'L2nR5tY8uW1qE4oP';
+UPDATE "user" SET createdAt = datetime('now', '-3 days') WHERE id = 'B7vD0fH3jL6zX9cM';
+UPDATE "user" SET createdAt = datetime('now', '-90 days') WHERE id = 'Q4sN7kT0mV3xA6pR';
+UPDATE "user" SET createdAt = datetime('now', '-60 days') WHERE id = 'E8rU1iO4aS7dF0gH';
+UPDATE "user" SET createdAt = datetime('now', '-45 days'), preferredLanguage = 'ko' WHERE id = 'W3yC6bN9hK2lP5vX';
+UPDATE "user" SET createdAt = datetime('now', '-18 days') WHERE id = 'M0qR3tY6uI9oA2sD';
+UPDATE "user" SET createdAt = datetime('now', '-7 days') WHERE id = 'Z5xV8nB1mK4pH7cQ';
+UPDATE "user" SET createdAt = datetime('now', '-150 days') WHERE id = 'F2gJ5lS8dO1wE4rT';
+UPDATE "user" SET createdAt = datetime('now', '-80 days') WHERE id = 'A9cD2fG5hJ8kL1zX';
+UPDATE "user" SET createdAt = datetime('now', '-1 day') WHERE id = 'P6qW9eR2tY5uI8oA';
 
 -- Local fixtures represent completed profile setup.
 UPDATE "user" SET onboardingComplete = 1 WHERE email LIKE '%@example.local';

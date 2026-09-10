@@ -5,7 +5,6 @@ export type SiteSettingGroup =
   | "translation_ai"
   | "social_messaging"
   | "marketplace_businesses"
-  | "ads"
   | "performance_operations"
   | "legacy";
 
@@ -63,28 +62,6 @@ export const SITE_SETTING_DEFINITIONS: SiteSettingDefinition[] = [
     defaultValue: "0",
     ...numberDefaults,
     unit: "hours",
-  },
-  {
-    key: "min_age_hours_to_media",
-    group: "content_moderation",
-    label: "Minimum account age for media",
-    description: "Minimum account age required before a user can upload media to a post.",
-    type: "number",
-    defaultValue: "24",
-    ...numberDefaults,
-    unit: "hours",
-  },
-  {
-    key: "ads_enabled",
-    group: "ads",
-    label: "Advertising",
-    description: "Enables ad selection and delivery for eligible placements and viewers.",
-    type: "boolean",
-    defaultValue: "0",
-    options: [
-      { value: "1", label: "Enabled" },
-      { value: "0", label: "Disabled" },
-    ],
   },
   {
     key: "max_posts_per_hour",
@@ -438,6 +415,5 @@ export const SITE_SETTING_GROUPS: Array<{
   { id: "translation_ai", label: "Translation / AI" },
   { id: "social_messaging", label: "Social / Messaging" },
   { id: "marketplace_businesses", label: "Marketplace / Businesses" },
-  { id: "ads", label: "Ads" },
   { id: "performance_operations", label: "Performance / Operations" },
 ];

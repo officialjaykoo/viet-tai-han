@@ -123,9 +123,6 @@ export async function cleanupUnreferencedMedia(
            SELECT 1 FROM posts p WHERE p.media_key = m.media_key
          )
          AND NOT EXISTS (
-           SELECT 1 FROM ad_campaigns c WHERE c.image_key = m.media_key
-         )
-         AND NOT EXISTS (
            SELECT 1 FROM "user" u
            WHERE u.image = '/api/media/' || m.media_key
               OR u.image = '/i/media/' || m.media_key

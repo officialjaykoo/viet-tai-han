@@ -1,4 +1,4 @@
-export const LOCALES = ["vi", "ko", "en", "ru"] as const;
+export const LOCALES = ["vi", "ko", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const PREFERRED_LANGUAGES = ["unknown", ...LOCALES] as const;
@@ -67,8 +67,6 @@ export function detectLocaleFromCountry(
       return "vi";
     case "KR":
       return "ko";
-    case "RU":
-      return "ru";
     default:
       return null;
   }

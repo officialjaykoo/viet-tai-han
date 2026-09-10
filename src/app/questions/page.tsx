@@ -94,10 +94,7 @@ export default async function QuestionsPage({
               <ul className="space-y-3">
                 {questions.map((question) => (
                   <li key={question.id}>
-                    <Link
-                      href={`/questions/${question.id}`}
-                      className="block rounded-2xl border border-border/60 bg-card/70 p-4 transition-colors hover:bg-muted/50 sm:p-5"
-                    >
+                    <article className="rounded-2xl border border-border/60 bg-card/70 p-4 transition-colors hover:bg-muted/50 sm:p-5">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span className="rounded-full bg-[color-mix(in_oklch,var(--brand)_12%,transparent)] px-2 py-0.5 font-medium text-[var(--brand)]">
                           {question.answerCount === 1
@@ -106,39 +103,82 @@ export default async function QuestionsPage({
                                 count: question.answerCount,
                               })}
                         </span>
-                        {question.acceptedAnswerId ? (
-                          <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                            {tLocale(locale, "questions.solved")}
-                          </span>
-                        ) : null}
+                        <span
+                          className={
+                            question.acceptedAnswerId
+                              ? "font-medium text-emerald-700 dark:text-emerald-400"
+                              : "font-medium text-foreground"
+                          }
+                        >
+                          {tLocale(
+                            locale,
+                            question.acceptedAnswerId
+                              ? "questions.filterSolved"
+                              : question.answerCount > 0
+                                ? "questions.filterAnswered"
+                                : "questions.filterUnanswered"
+                          )}
+                        </span>
                         <span className="truncate">
-                          <span className="font-medium text-foreground">
+                          <Link
+                            href={`/r/${encodeURIComponent(question.community.name)}`}
+                            className="font-medium text-[var(--brand)] hover:underline"
+                          >
                             {question.community.name}
-                          </span>{" "}
-                          · {tLocale(locale, "questions.by")} @
-                          {question.author.username ?? "unknown"}
+                          </Link>{" "}
+                          · {tLocale(locale, "questions.by")}{" "}
+                          {question.author.username ? (
+                            <Link
+                              href={`/u/${encodeURIComponent(question.author.username)}`}
+                              className="font-medium text-foreground hover:underline"
+                            >
+                              @{question.author.username}
+                            </Link>
+                          ) : (
+                            "unknown"
+                          )}
                         </span>
                       </div>
                       <h3 className="mt-2 font-heading text-lg font-semibold leading-snug text-balance">
-                        {question.title}
+                        <Link
+                          href={`/questions/${question.id}`}
+                          className="hover:underline"
+                        >
+                          {question.title}
+                        </Link>
                       </h3>
                       <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                         {question.body}
                       </p>
                       <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                        <UserAvatar
-                          username={question.author.username}
-                          image={question.author.image}
-                          size="xs"
-                          className="ring-0"
-                        />
+                        {question.author.username ? (
+                          <Link
+                            href={`/u/${encodeURIComponent(question.author.username)}`}
+                            aria-label={`@${question.author.username}`}
+                            className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                          >
+                            <UserAvatar
+                              username={question.author.username}
+                              image={question.author.image}
+                              size="xs"
+                              className="ring-0"
+                            />
+                          </Link>
+                        ) : (
+                          <UserAvatar
+                            username={question.author.username}
+                            image={question.author.image}
+                            size="xs"
+                            className="ring-0"
+                          />
+                        )}
                         <span>
                           {new Date(question.createdAt).toLocaleDateString(
                             locale
                           )}
                         </span>
                       </div>
-                    </Link>
+                    </article>
                   </li>
                 ))}
               </ul>

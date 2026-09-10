@@ -1,7 +1,6 @@
 import { notifyQuietly } from "@/lib/notifications";
 
 import { formatUserHandle, getUsernameProfileHref } from "@/lib/profile-url";
-import { syncAchievementsForEvent } from "@/lib/achievements";
 import { runBackgroundTask } from "@/lib/background-task";
 import { scheduleChatPromotion } from "@/lib/chat-promotion";
 import { revokeChatRoom } from "@/lib/chat-realtime";
@@ -355,8 +354,6 @@ export async function followUser(followerId: string, followingId: string) {
     secondUserId: followingId,
     reason: "recipient_followed_sender",
   });
-  syncAchievementsForEvent(followerId, "follow");
-  syncAchievementsForEvent(followingId, "follow");
 
   const actor = await db
     .prepare(`SELECT username FROM "user" WHERE id = ?`)

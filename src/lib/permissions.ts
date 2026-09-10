@@ -7,7 +7,6 @@ export type SessionUser = {
   username?: string | null;
   role?: string | null;
   status?: string | null;
-  karma?: number | null;
 };
 
 export async function requireActiveUser(user: SessionUser) {

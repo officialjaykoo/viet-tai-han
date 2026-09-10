@@ -9,7 +9,6 @@ const LANGUAGE_LABEL_KEYS: Record<Locale, MessageKey> = {
   vi: "language.vietnamese",
   ko: "language.korean",
   en: "language.english",
-  ru: "language.russian",
 };
 
 export function LanguageSwitcher({ className }: { className?: string }) {

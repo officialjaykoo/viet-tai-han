@@ -1,7 +1,6 @@
 import type { CommentNode, PostDetail } from "@/lib/content";
 import type { AccountTag } from "@/lib/tags";
 import type {
-  FeedAdItem,
   FeedItem,
   FeedPost,
   PaginatedFeed,
@@ -20,10 +19,8 @@ export type PublicFeedPost = Omit<FeedPost, "author"> & {
   kind: "post";
   author: PublicAuthor;
 };
+export type PublicFeedItem = PublicFeedPost;
 
-export type PublicFeedAd = FeedAdItem;
-
-export type PublicFeedItem = PublicFeedPost | PublicFeedAd;
 
 export type PublicComment = {
   id: string;
@@ -109,8 +106,7 @@ export function serializeFeedPost(
 export function serializeFeedItem(
   item: FeedItem,
   viewerUserId?: string | null
-): PublicFeedItem {
-  if (item.kind === "ad") return item;
+): PublicFeedPost {
   return serializeFeedPost(item, viewerUserId);
 }
 

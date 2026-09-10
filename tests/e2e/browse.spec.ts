@@ -106,6 +106,32 @@ test.describe("public browsing", () => {
       page.getByRole("heading", { name: /cloudflare/i })
     ).toBeVisible();
   });
+  test("Q&A state and identity links remain usable on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/questions/question_housing_01", {
+      waitUntil: "domcontentloaded",
+    });
+    await dismissLanguagePrompt(page);
+    await expect(page.locator('main a[href="/r/askvth"]')).toBeVisible();
+    await expect(page.locator('main a[href="/u/mira"]').first()).toBeVisible();
+    await expect(page.getByText(/đã giải đáp/i).first()).toBeVisible();
+    const layout = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
+  });
+  test("business detail connects owner profile and contact", async ({ page }) => {
+    await page.goto("/businesses/saigon-kitchen-seoul", {
+      waitUntil: "domcontentloaded",
+    });
+    await dismissLanguagePrompt(page);
+    await expect(
+      page.getByRole("heading", { name: /saigon kitchen seoul/i })
+    ).toBeVisible();
+    await expect(page.locator('a[href="/u/mira"]')).toBeVisible();
+    await expect(page.locator('a[href="/messages?to=mira"]')).toBeVisible();
+  });
 
   test("search page is reachable", async ({ page }) => {
     await page.goto("/search?q=cloudflare", { waitUntil: "domcontentloaded" });
@@ -120,5 +146,16 @@ test.describe("public browsing", () => {
     await dismissLanguagePrompt(page);
     await expect(page).toHaveURL(/\/login/);
     expect(page.url()).toContain("next=");
+  });
+  test("guest messages preserve contact intent through login", async ({
+    page,
+  }) => {
+    await page.goto("/messages?to=bob", { waitUntil: "domcontentloaded" });
+    const loginUrl = new URL(page.url());
+    expect(loginUrl.pathname).toBe("/login");
+    expect(loginUrl.searchParams.get("next")).toBe("/messages?to=bob");
+    await expect(
+      page.getByRole("heading", { name: /tiếp tục với/i })
+    ).toBeVisible();
   });
 });

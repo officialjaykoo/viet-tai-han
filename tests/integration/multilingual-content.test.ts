@@ -16,8 +16,8 @@ describe("multilingual translation persistence", () => {
     const commentId = `translation_comment_${suffix}`;
 
     await env.DB.prepare(
-      `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-       VALUES (?, 'Translator', ?, 1, ?, 10, 'user', 'active')`
+      `INSERT INTO "user" (id, name, email, emailVerified, username, role, status)
+       VALUES (?, 'Translator', ?, 1, ?, 'user', 'active')`
     )
       .bind(userId, `${userId}@test.local`, userId)
       .run();

@@ -5,7 +5,6 @@ import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
-import { withFeedAds } from "@/lib/ads";
 import { getRecommendations } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -24,14 +23,11 @@ export default async function RecommendedPage() {
 
   const { locale } = await getRequestLocale();
   const posts = await getRecommendations(session.user.id, 20);
-  const initialFeed: PaginatedFeed = await withFeedAds(
-    {
-      posts,
-      nextCursor: null,
-      hasMore: false,
-    },
-    session.user.id
-  );
+  const initialFeed: PaginatedFeed = {
+    posts: posts.map((post) => ({ ...post, kind: "post" as const })),
+    nextCursor: null,
+    hasMore: false,
+  };
 
   return (
     <>

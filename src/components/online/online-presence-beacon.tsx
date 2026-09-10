@@ -17,7 +17,7 @@ export function OnlinePresenceBeacon({ enabled }: { enabled: boolean }) {
     }
 
     sendPresence();
-    const interval = window.setInterval(sendPresence, 60_000);
+    const interval = window.setInterval(sendPresence, 240_000);
     return () => window.clearInterval(interval);
   }, [enabled]);
 

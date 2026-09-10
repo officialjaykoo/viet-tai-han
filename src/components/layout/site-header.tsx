@@ -89,7 +89,6 @@ export function SiteHeader() {
     (visibleSession?.user as { username?: string } | undefined)?.username ??
     null;
   const displayName = username ?? visibleSession?.user?.name ?? "user";
-  const karma = (visibleSession?.user as { karma?: number } | undefined)?.karma;
   const isAdmin =
     (visibleSession?.user as { role?: string } | undefined)?.role === "admin";
   const image = visibleSession?.user?.image ?? null;
@@ -237,11 +236,6 @@ export function SiteHeader() {
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="font-normal">
                       @{displayName}
-                      {karma != null ? (
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          {t("nav.karma", { count: karma })}
-                        </span>
-                      ) : null}
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />

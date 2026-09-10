@@ -12,7 +12,6 @@ import {
   editPost,
 } from "@/lib/actions";
 import { uploadPostImage } from "@/lib/media";
-import { ensureProfileCommunity } from "@/lib/profile-community";
 import { getPostDetail } from "@/lib/content";
 import { getFeedPosts } from "@/lib/db";
 import { AuthError } from "@/lib/session";
@@ -565,69 +564,6 @@ describe("communities", () => {
         actor: { id: authorId, role: "user", status: "active" },
         name: `user_${crypto.randomUUID().slice(0, 6)}`,
         title: "Should not be created",
-      })
-    ).rejects.toMatchObject({ status: 403 });
-  });
-  it("bootstraps and repairs profile communities atomically", async () => {
-    const { authorId, actorId } = await seedUsersAndSubreddit();
-    const username = `owner_${crypto.randomUUID().slice(0, 8)}`;
-
-    const [first, second] = await Promise.all([
-      ensureProfileCommunity({ userId: authorId, username }),
-      ensureProfileCommunity({ userId: authorId, username }),
-    ]);
-    expect(first.id).toBe(second.id);
-
-    await env.DB.batch([
-      env.DB
-        .prepare(
-          `DELETE FROM subscriptions
-           WHERE user_id = ? AND subreddit_id = ?`
-        )
-        .bind(authorId, first.id),
-      env.DB
-        .prepare(
-          `DELETE FROM subreddit_moderators
-           WHERE user_id = ? AND subreddit_id = ?`
-        )
-        .bind(authorId, first.id),
-      env.DB
-        .prepare(`UPDATE subreddits SET subscriber_count = 99 WHERE id = ?`)
-        .bind(first.id),
-    ]);
-
-    const repaired = await ensureProfileCommunity({
-      userId: authorId,
-      username,
-    });
-    expect(repaired).toEqual(first);
-    const membership = await env.DB
-      .prepare(
-        `SELECT
-           (SELECT COUNT(*) FROM subscriptions
-            WHERE user_id = ? AND subreddit_id = ?) AS subscriptions,
-           (SELECT COUNT(*) FROM subreddit_moderators
-            WHERE user_id = ? AND subreddit_id = ?) AS moderators,
-           subscriber_count
-         FROM subreddits WHERE id = ?`
-      )
-      .bind(authorId, first.id, authorId, first.id, first.id)
-      .first<{
-        subscriptions: number;
-        moderators: number;
-        subscriber_count: number;
-      }>();
-    expect(membership).toMatchObject({
-      subscriptions: 1,
-      moderators: 1,
-      subscriber_count: 1,
-    });
-
-    await expect(
-      createPost({
-        userId: actorId,
-        subredditId: first.id,
-        title: "Unauthorized profile post",
       })
     ).rejects.toMatchObject({ status: 403 });
   });

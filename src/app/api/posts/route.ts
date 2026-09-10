@@ -3,9 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPost } from "@/lib/actions";
 import { HUMAN_COOKIE, openHumanToken } from "@/lib/security/human-cookie";
 import { parseCreatePostPayload } from "@/lib/post-payload";
-import { isProfileCommunityName } from "@/lib/profile-community";
 import { getTunnelContext } from "@/lib/security/tunnel-context";
-import { withFeedAds } from "@/lib/ads";
 import {
   getDb,
   getFeedPosts,
@@ -71,13 +69,21 @@ export async function GET(request: NextRequest) {
       mode: modeParam as FeedMode,
       window,
     });
-    const withAds = await withFeedAds(feed, viewerUserId);
-
-    return NextResponse.json(serializeFeed(withAds, viewerUserId), {
-      headers: {
-        "Cache-Control": "private, no-store",
-      },
-    });
+    return NextResponse.json(
+      serializeFeed(
+        {
+          posts: feed.posts.map((post) => ({ ...post, kind: "post" as const })),
+          nextCursor: feed.nextCursor,
+          hasMore: feed.hasMore,
+        },
+        viewerUserId
+      ),
+      {
+        headers: {
+          "Cache-Control": "private, no-store",
+        },
+      }
+    );
   } catch (error) {
     if (error instanceof InvalidFeedCursorError) {
       return await jsonLocalizedError("Invalid cursor", 400);
@@ -108,44 +114,20 @@ export async function POST(request: NextRequest) {
 
     await requireActiveUser(user);
 
-    let subredditId: string;
+    const db = await getDb();
+    const sub = await db
+      .prepare(
+        `SELECT id
+         FROM subreddits
+         WHERE name = ? COLLATE NOCASE AND is_removed = 0`
+      )
+      .bind(body.subreddit)
+      .first<{ id: string }>();
 
-    if (body.subreddit === "profile" || body.subreddit === "@me") {
-      const username = user.username ?? user.name;
-      if (!username) {
-        return await jsonLocalizedError("Set a username before posting to your profile", 400);
-      }
-      const { ensureProfileCommunity } = await import(
-        "@/lib/profile-community"
-      );
-      const profile = await ensureProfileCommunity({
-        userId: user.id,
-        username,
-      });
-      subredditId = profile.id;
-    } else {
-      const db = await getDb();
-      const sub = await db
-        .prepare(
-          `SELECT id, name, created_by
-           FROM subreddits
-           WHERE name = ? COLLATE NOCASE AND is_removed = 0`
-        )
-        .bind(body.subreddit)
-        .first<{
-          id: string;
-          name: string;
-          created_by: string | null;
-        }>();
-
-      if (!sub) {
-        return await jsonLocalizedError("Community not found", 404);
-      }
-      if (isProfileCommunityName(sub.name) && sub.created_by !== user.id) {
-        throw new AuthError("Profile community belongs to another user", 403);
-      }
-      subredditId = sub.id;
+    if (!sub) {
+      return await jsonLocalizedError("Community not found", 404);
     }
+    const subredditId = sub.id;
 
     const result = await createPost({
       userId: user.id,

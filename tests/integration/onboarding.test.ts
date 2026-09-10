@@ -129,7 +129,6 @@ describe("social-first onboarding", () => {
       updateUserContactEmail(userId, "Person@Example.com")
     ).resolves.toEqual({
       contactEmail: "person@example.com",
-      contactEmailVerified: false,
     });
     expect((await getUserSettings(userId))?.contactEmail).toBe(
       "person@example.com"
@@ -137,7 +136,6 @@ describe("social-first onboarding", () => {
 
     await expect(updateUserContactEmail(userId, "")).resolves.toEqual({
       contactEmail: null,
-      contactEmailVerified: false,
     });
     expect((await getUserSettings(userId))?.contactEmail).toBeNull();
   });

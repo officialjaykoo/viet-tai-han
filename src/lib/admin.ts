@@ -302,7 +302,6 @@ export type AdminUser = {
   name: string;
   role: string;
   status: string;
-  karma: number;
   createdAt: string;
 };
 
@@ -421,7 +420,7 @@ export async function listAdminUsers(input: {
   const pattern = `%${search}%`;
   const { results } = await db
     .prepare(
-      `SELECT id, username, name, role, status, karma, createdAt
+      `SELECT id, username, name, role, status, createdAt
        FROM "user"
        WHERE (? = '' OR username LIKE ? OR name LIKE ? OR id LIKE ?)
        ORDER BY createdAt DESC

@@ -43,7 +43,6 @@ export function AdminUsers({
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Karma</th>
               <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -75,7 +74,6 @@ export function AdminUsers({
                 </td>
                 <td className="px-4 py-3">{user.role}</td>
                 <td className="px-4 py-3">{user.status}</td>
-                <td className="px-4 py-3 tabular-nums">{user.karma}</td>
                 <td className="px-4 py-3 text-muted-foreground">{user.createdAt}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
@@ -93,7 +91,7 @@ export function AdminUsers({
                 </td>
               </tr>
             ))}
-            {!users.length ? <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No users.</td></tr> : null}
+            {!users.length ? <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users.</td></tr> : null}
           </tbody>
         </table>
       </div>

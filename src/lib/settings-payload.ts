@@ -8,8 +8,6 @@ const PREFERENCE_KEYS = new Set([
   "section",
   "theme",
   "preferredLanguage",
-  "isNsfw",
-  "showNsfw",
   "allowDms",
   "notifyComments",
   "notifyFollows",
@@ -33,8 +31,6 @@ export type SettingsPatch =
       section: "preferences";
       theme?: "system" | "light" | "dark";
       preferredLanguage?: Locale;
-      isNsfw?: boolean;
-      showNsfw?: boolean;
       allowDms?: "anyone" | "followers" | "nobody";
       notifyComments?: boolean;
       notifyFollows?: boolean;
@@ -63,8 +59,6 @@ function isStringOrNull(value: unknown): value is string | null {
 }
 
 const BOOLEAN_FIELDS = [
-  "isNsfw",
-  "showNsfw",
   "notifyComments",
   "notifyFollows",
   "notifyChat",

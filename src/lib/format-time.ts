@@ -55,21 +55,3 @@ export function formatAbsoluteDate(
   }
 }
 
-/** @deprecated Prefer `formatCakeDayDate` from `@/lib/account-age`. */
-export function formatCakeDay(
-  iso: string,
-  locale: Locale = DEFAULT_LOCALE
-): string {
-  const then = parseSqliteDate(iso);
-  if (Number.isNaN(then)) return iso;
-  try {
-    return new Intl.DateTimeFormat(locale, {
-      timeZone: "UTC",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(then);
-  } catch {
-    return new Date(then).toISOString().slice(0, 10);
-  }
-}

@@ -60,16 +60,6 @@ export type ListingFilters = {
   viewerUserId?: string | null;
 };
 
-export type ListingAlert = {
-  id: string;
-  query: string;
-  kind: ListingKind | null;
-  category: string;
-  location: string;
-  isActive: boolean;
-  createdAt: string;
-};
-
 export type ListingReportQueueItem = {
   id: string;
   listingId: string;
@@ -516,107 +506,6 @@ export async function toggleListingSave(input: {
     .bind(input.listingId, input.userId)
     .run();
   return { saved: true as const };
-}
-
-export async function createListingAlert(input: {
-  userId: string;
-  query?: string | null;
-  kind?: string | null;
-  category?: string | null;
-  location?: string | null;
-}) {
-  const query = normalizeText(input.query, 80);
-  const kind = normalizeText(input.kind, 20);
-  const category = normalizeText(input.category, 80);
-  const location = normalizeText(input.location, 100);
-  if (kind && !isListingKind(kind)) {
-    throw new AuthError("Invalid listing type", 400);
-  }
-  if (!query && !kind && !category && !location) {
-    throw new AuthError("Add a search filter before saving an alert", 400);
-  }
-
-  const db = await getDb();
-  await db
-    .prepare(
-      `INSERT INTO listing_alerts (id, user_id, query, kind, category, location)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (user_id, query, kind, category, location)
-       DO UPDATE SET is_active = 1`
-    )
-    .bind(createPublicId(), input.userId, query, kind, category, location)
-    .run();
-  const alert = await db
-    .prepare(
-      `SELECT id, query, kind, category, location, is_active, created_at
-       FROM listing_alerts
-       WHERE user_id = ? AND query = ? AND kind = ? AND category = ? AND location = ?`
-    )
-    .bind(input.userId, query, kind, category, location)
-    .first<{
-      id: string;
-      query: string;
-      kind: string;
-      category: string;
-      location: string;
-      is_active: number;
-      created_at: string;
-    }>();
-  if (!alert) throw new AuthError("Could not save search alert", 500);
-  return mapAlert(alert);
-}
-
-function mapAlert(row: {
-  id: string;
-  query: string;
-  kind: string;
-  category: string;
-  location: string;
-  is_active: number;
-  created_at: string;
-}): ListingAlert {
-  return {
-    id: row.id,
-    query: row.query,
-    kind: row.kind && isListingKind(row.kind) ? row.kind : null,
-    category: row.category,
-    location: row.location,
-    isActive: Boolean(row.is_active),
-    createdAt: row.created_at,
-  };
-}
-
-export async function listListingAlerts(userId: string) {
-  const db = await getDb();
-  const { results } = await db
-    .prepare(
-      `SELECT id, query, kind, category, location, is_active, created_at
-       FROM listing_alerts WHERE user_id = ?
-       ORDER BY created_at DESC LIMIT 50`
-    )
-    .bind(userId)
-    .all<{
-      id: string;
-      query: string;
-      kind: string;
-      category: string;
-      location: string;
-      is_active: number;
-      created_at: string;
-    }>();
-  return (results ?? []).map(mapAlert);
-}
-
-export async function deleteListingAlert(input: {
-  userId: string;
-  alertId: string;
-}) {
-  const db = await getDb();
-  await db
-    .prepare(`DELETE FROM listing_alerts WHERE id = ? AND user_id = ?`)
-    .bind(input.alertId, input.userId)
-    .run();
-  return { deleted: true as const };
 }
 
 export async function reportListing(input: {

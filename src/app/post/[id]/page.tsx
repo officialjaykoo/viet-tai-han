@@ -1,16 +1,13 @@
 import { notFound } from "next/navigation";
 
-import { AdSlot } from "@/components/ads/ad-slot";
 import { CommentComposer } from "@/components/comments/comment-composer";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
 import { PostCard } from "@/components/feed/post-card";
-import { TunneledOutboundLink } from "@/components/media/tunneled-outbound-link";
 import { PostAuthorActions } from "@/components/posts/post-author-actions";
 import { PostBodyPanel } from "@/components/posts/post-body-panel";
-import { PostViewBeacon } from "@/components/posts/post-view-beacon";
 import { getPostDetail } from "@/lib/content";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { tLocale } from "@/lib/i18n/translate";
@@ -39,7 +36,6 @@ export default async function PostPage({
   return (
     <>
       <SiteHeader />
-      <PostViewBeacon postId={post.id} discoverySource={discoverySource} />
       <main className="relative flex-1">
         <PageBackdrop variant="subtle" />
         <PageShell width="standard" className="space-y-6">
@@ -60,16 +56,17 @@ export default async function PostPage({
             commentCount={post.commentCount}
           />
 
-          <AdSlot placement="post_footer" />
 
           {post.url ? (
             <p className="text-sm">
-              <TunneledOutboundLink
-                href={`/api/posts/${post.id}/out`}
+              <a
+                href={post.url}
+                target="_blank"
+                rel="noreferrer"
                 className="text-[var(--brand)] hover:underline"
               >
                 {post.url}
-              </TunneledOutboundLink>
+              </a>
             </p>
           ) : null}
 

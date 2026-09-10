@@ -368,11 +368,6 @@ export function SearchForm({
                         <span className="block truncate text-sm font-medium">
                           @{account.username}
                         </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {t("nav.karma", {
-                            count: account.karma.toLocaleString(),
-                          })}
-                        </span>
                       </span>
                     </SuggestionRow>
                   );
@@ -409,13 +404,7 @@ export function SearchForm({
                         <span className="block truncate text-sm font-medium">
                           {post.title}
                         </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {/^u_/i.test(post.subredditName)
-                            ? `@${post.subredditName.slice(2)}`
-                            : post.subredditName}{" "}
-                          {t("search.likes", { count: post.likeCount })}
                         </span>
-                      </span>
                     </SuggestionRow>
                   );
                 })}

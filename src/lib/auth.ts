@@ -375,13 +375,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
           input: true,
           returned: false,
         },
-        contactEmailVerified: {
-          type: "boolean",
-          defaultValue: false,
-          required: false,
-          input: false,
-          returned: false,
-        },
         onboardingComplete: {
           type: "boolean",
           defaultValue: false,
@@ -393,24 +386,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
           required: false,
           input: true,
           returned: false,
-        },
-        karma: {
-          type: "number",
-          defaultValue: 0,
-          required: false,
-          input: false,
-        },
-        postKarma: {
-          type: "number",
-          defaultValue: 0,
-          required: false,
-          input: false,
-        },
-        commentKarma: {
-          type: "number",
-          defaultValue: 0,
-          required: false,
-          input: false,
         },
         role: {
           type: "string",
@@ -428,12 +403,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
           type: "string",
           required: false,
         },
-        isNsfw: {
-          type: "boolean",
-          defaultValue: false,
-          required: false,
-          input: false,
-        },
         preferredLanguage: {
           type: "string",
           defaultValue: "unknown",
@@ -448,12 +417,6 @@ function createAuthFromDb(db: D1Database, env: AuthEnv) {
         },
         bannerKey: {
           type: "string",
-          required: false,
-          input: false,
-        },
-        showNsfw: {
-          type: "boolean",
-          defaultValue: false,
           required: false,
           input: false,
         },

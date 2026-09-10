@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getSubredditByName } from "@/lib/content";
-import { withFeedAds } from "@/lib/ads";
 import { getFeedPosts } from "@/lib/db";
 import { serializeCommunity, serializeFeed } from "@/lib/serializers";
 import { getSession } from "@/lib/session";
@@ -25,7 +24,11 @@ export async function GET(
       limit: 20,
       viewerUserId,
     });
-    const withAds = await withFeedAds(feed, viewerUserId);
+    const page = {
+      posts: feed.posts.map((post) => ({ ...post, kind: "post" as const })),
+      nextCursor: feed.nextCursor,
+      hasMore: feed.hasMore,
+    };
 
     return NextResponse.json({
       community: serializeCommunity({
@@ -36,7 +39,7 @@ export async function GET(
         subscriber_count: sub.subscriber_count,
         created_at: sub.created_at,
       }),
-      feed: serializeFeed(withAds, viewerUserId),
+      feed: serializeFeed(page, viewerUserId),
     });
   } catch (error) {
     console.error("GET /api/subreddits/[name] failed", error);

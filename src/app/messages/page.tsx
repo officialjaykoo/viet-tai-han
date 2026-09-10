@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
@@ -11,9 +12,18 @@ import { tLocale } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
-export default async function MessagesPage() {
+export default async function MessagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ to?: string }>;
+}) {
   const session = await getSession();
-  await redirectIfIncompleteOnboarding(session?.user?.id);
+  if (!session?.user) {
+    const { to } = await searchParams;
+    const next = to ? `/messages?to=${encodeURIComponent(to)}` : "/messages";
+    redirect(`/login?next=${encodeURIComponent(next)}`);
+  }
+  await redirectIfIncompleteOnboarding(session.user.id);
   const { locale } = await getRequestLocale();
 
   return (

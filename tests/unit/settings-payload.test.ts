@@ -12,18 +12,13 @@ describe("settings payload validation", () => {
         section: "preferences",
         theme: "dark",
         preferredLanguage: "ko",
-        isNsfw: false,
-        showNsfw: true,
         allowDms: "followers",
         notifyComments: true,
       })
     ).toMatchObject({ ok: true });
   });
 
-  it("rejects truthy string booleans and unexpected fields", () => {
-    expect(
-      parseSettingsPatch({ section: "preferences", isNsfw: "false" })
-    ).toMatchObject({ ok: false });
+  it("rejects unexpected fields", () => {
     expect(
       parseSettingsPatch({
         section: "preferences",

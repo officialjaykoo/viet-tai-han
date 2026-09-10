@@ -83,11 +83,6 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/posts/[id]/save/route"),
   },
   {
-    methods: ["POST"],
-    pattern: "/api/posts/:id/view",
-    load: () => import("@/app/api/posts/[id]/view/route"),
-  },
-  {
     methods: ["POST", "DELETE"],
     pattern: "/api/posts/:id/hide",
     load: () => import("@/app/api/posts/[id]/hide/route"),
@@ -101,11 +96,6 @@ const ROUTES: RouteEntry[] = [
     methods: ["POST"],
     pattern: "/api/posts/:id/block-author",
     load: () => import("@/app/api/posts/[id]/block-author/route"),
-  },
-  {
-    methods: ["GET"],
-    pattern: "/api/posts/:id/stats",
-    load: () => import("@/app/api/posts/[id]/stats/route"),
   },
   {
     methods: ["PATCH", "DELETE"],
@@ -168,11 +158,6 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/me/onboarding/route"),
   },
   {
-    methods: ["POST"],
-    pattern: "/api/me/nsfw",
-    load: () => import("@/app/api/me/nsfw/route"),
-  },
-  {
     methods: ["PATCH"],
     pattern: "/api/me/profile",
     load: () => import("@/app/api/me/profile/route"),
@@ -181,16 +166,6 @@ const ROUTES: RouteEntry[] = [
     methods: ["GET", "PATCH"],
     pattern: "/api/me/settings",
     load: () => import("@/app/api/me/settings/route"),
-  },
-  {
-    methods: ["GET", "POST"],
-    pattern: "/api/me/consent",
-    load: () => import("@/app/api/me/consent/route"),
-  },
-  {
-    methods: ["GET"],
-    pattern: "/api/me/pro",
-    load: () => import("@/app/api/me/pro/route"),
   },
   {
     methods: ["GET", "POST", "DELETE"],
@@ -298,11 +273,6 @@ const ROUTES: RouteEntry[] = [
     load: () => import("@/app/api/listings/[id]/report/route"),
   },
   {
-    methods: ["GET", "POST", "DELETE"],
-    pattern: "/api/listing-alerts",
-    load: () => import("@/app/api/listing-alerts/route"),
-  },
-  {
     methods: ["GET", "POST"],
     pattern: "/api/businesses",
     load: () => import("@/app/api/businesses/route"),
@@ -336,26 +306,6 @@ const ROUTES: RouteEntry[] = [
     methods: ["GET"],
     pattern: "/api/recommendations",
     load: () => import("@/app/api/recommendations/route"),
-  },
-  {
-    methods: ["GET"],
-    pattern: "/api/ads",
-    load: () => import("@/app/api/ads/route"),
-  },
-  {
-    methods: ["GET"],
-    pattern: "/api/ads/:id/click",
-    load: () => import("@/app/api/ads/[id]/click/route"),
-  },
-  {
-    methods: ["POST"],
-    pattern: "/api/ads/impression",
-    load: () => import("@/app/api/ads/impression/route"),
-  },
-  {
-    methods: ["GET"],
-    pattern: "/api/posts/:id/out",
-    load: () => import("@/app/api/posts/[id]/out/route"),
   },
   {
     methods: ["GET", "POST"],

@@ -1,5 +1,4 @@
 import { getDb } from "@/lib/db";
-import { syncAchievementsForEvent } from "@/lib/achievements";
 import { createPublicId } from "@/lib/id";
 import { moderateText } from "@/lib/moderation";
 import {
@@ -18,7 +17,6 @@ import {
 } from "@/lib/post-limits";
 
 import { MAX_COMMENT_DEPTH } from "@/lib/comment-constants";
-import { isProfileCommunityName } from "@/lib/profile-community";
 
 type ExistingPostIdempotencyRow = {
   id: string;
@@ -197,12 +195,6 @@ export async function createPost(input: {
   if (!subreddit || subreddit.is_removed) {
     throw new AuthError("Community not found", 404);
   }
-  if (
-    isProfileCommunityName(subreddit.name) &&
-    subreddit.created_by !== input.userId
-  ) {
-    throw new AuthError("Profile community belongs to another user", 403);
-  }
   if (mediaKey) {
     const { assertOwnedMediaKey } = await import("@/lib/media");
     await assertOwnedMediaKey(mediaKey, input.userId);
@@ -265,7 +257,6 @@ export async function createPost(input: {
   } catch (error) {
     console.error("post_activity_update_failed", error);
   }
-  syncAchievementsForEvent(input.userId, "post_created");
 
   if (!shadow) {
     void import("@/lib/translation")
@@ -521,7 +512,6 @@ export async function createComment(input: {
   }
 
   await bumpUserActivity(input.userId, post.subreddit_id, 1);
-  syncAchievementsForEvent(input.userId, "comment_created");
 
   if (!shadow) {
     void import("@/lib/translation").then(({ scheduleCommentTranslation }) =>
@@ -1055,7 +1045,6 @@ export async function createSubreddit(input: {
     .bind(id, input.actor.id)
     .run();
 
-  syncAchievementsForEvent(input.actor.id, "community_created");
 
   return { id, name };
 }

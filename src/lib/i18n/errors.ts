@@ -6,815 +6,602 @@ import type { Locale } from "@/lib/i18n/config";
  */
 const ERROR_CATALOG: Record<
   string,
-  { en: string; ru: string; vi?: string; ko?: string }
+  { en: string; vi?: string; ko?: string }
 > = {
   KOE004: {
     en: "Kakao Login is not enabled for this app. Enable Kakao Login in Kakao Developers and try again.",
     vi: "Kakao Login chưa được bật cho ứng dụng này. Hãy bật Kakao Login trong Kakao Developers rồi thử lại.",
     ko: "이 앱의 카카오 로그인이 활성화되지 않았습니다. Kakao Developers에서 카카오 로그인을 켠 후 다시 시도하세요.",
-    ru: "Вход через Kakao не включён для этого приложения. Включите Kakao Login в Kakao Developers и повторите попытку.",
   },
   KOE205: {
     en: "Kakao rejected a requested profile item. Enable nickname and profile image in Kakao Developers; email is optional.",
     vi: "Kakao từ chối một mục hồ sơ được yêu cầu. Hãy bật biệt danh và ảnh hồ sơ trong Kakao Developers; email là tùy chọn.",
     ko: "카카오가 요청한 프로필 항목을 거부했습니다. Kakao Developers에서 닉네임과 프로필 사진을 활성화하세요. 이메일은 선택 사항입니다.",
-    ru: "Kakao отклонил запрошенный пункт профиля. Включите никнейм и изображение профиля в Kakao Developers; email необязателен.",
   },
   "Sign in to continue": {
     en: "Sign in to continue",
-    ru: "Войдите, чтобы продолжить",
   },
   "This account can't do that": {
     en: "This account can't do that",
-    ru: "Этот аккаунт не может этого сделать",
   },
   "Complete onboarding before continuing": {
     en: "Complete profile setup before continuing",
-    ru: "Сначала завершите настройку профиля",
     vi: "Hãy hoàn tất thiết lập hồ sơ để tiếp tục",
     ko: "계속하려면 프로필 설정을 완료하세요",
   },
   "Request failed": {
     en: "Request failed",
-    ru: "Не удалось выполнить запрос",
   },
   "Something went wrong": {
     en: "Something went wrong",
-    ru: "Что-то пошло не так",
   },
   "This content isn't allowed": {
     en: "This content isn't allowed",
     vi: "Nội dung này không được phép",
     ko: "허용되지 않는 내용입니다",
-    ru: "Этот контент не допускается",
   },
   "You're doing that too often. Try again later.": {
     en: "You're doing that too often. Try again later.",
     vi: "Bạn đang gửi yêu cầu quá thường xuyên. Hãy thử lại sau.",
     ko: "요청이 너무 많습니다. 나중에 다시 시도해 주세요.",
-    ru: "Слишком часто. Попробуйте позже.",
   },
   "You're doing that too fast. Slow down.": {
     en: "You're doing that too fast. Slow down.",
     vi: "Bạn đang thao tác quá nhanh. Hãy chậm lại.",
     ko: "너무 빠르게 요청했습니다. 잠시 기다려 주세요.",
-    ru: "Вы действуете слишком быстро. Не торопитесь.",
   },
   "Too many requests from this network.": {
     en: "Too many requests from this network.",
     vi: "Có quá nhiều yêu cầu từ mạng này.",
     ko: "이 네트워크에서 요청이 너무 많습니다.",
-    ru: "Слишком много запросов из этой сети.",
   },
   "Too many API requests. Try again later.": {
     en: "Too many API requests. Try again later.",
     vi: "Quá nhiều yêu cầu API. Hãy thử lại sau.",
     ko: "API 요청이 너무 많습니다. 나중에 다시 시도해 주세요.",
-    ru: "Слишком много запросов API. Попробуйте позже.",
   },
   "User not found": {
     en: "User not found",
     vi: "Không tìm thấy người dùng",
     ko: "사용자를 찾을 수 없습니다",
-    ru: "Пользователь не найден",
   },
   "Post not found": {
     en: "Post not found",
-    ru: "Пост не найден",
   },
   "Comment not found": {
     en: "Comment not found",
-    ru: "Комментарий не найден",
   },
   "Community not found": {
     en: "Community not found",
-    ru: "Сообщество не найдено",
   },
   "Subreddit not found": {
     en: "Subreddit not found",
-    ru: "Сообщество не найдено",
   },
   "Chat not found": {
     en: "Chat not found",
     vi: "Không tìm thấy cuộc trò chuyện",
     ko: "대화를 찾을 수 없습니다",
-    ru: "Чат не найден",
   },
   "Request not found": {
     en: "Request not found",
     vi: "Không tìm thấy yêu cầu",
     ko: "요청을 찾을 수 없습니다",
-    ru: "Запрос не найден",
-  },
-  "Campaign not found": {
-    en: "Campaign not found",
-    ru: "Кампания не найдена",
   },
   "Not found": {
     en: "Not found",
-    ru: "Не найдено",
   },
   "You can't message this user": {
     en: "You can't message this user",
     vi: "Bạn không thể nhắn tin cho người dùng này",
     ko: "이 사용자에게 메시지를 보낼 수 없습니다",
-    ru: "Вы не можете написать этому пользователю",
   },
   "Interaction blocked": {
     en: "Interaction blocked",
     vi: "Tương tác bị chặn",
     ko: "상호작용이 차단되었습니다",
-    ru: "Взаимодействие заблокировано",
   },
   "You can't message yourself": {
     en: "You can't message yourself",
     vi: "Bạn không thể nhắn tin cho chính mình",
     ko: "자기 자신에게 메시지를 보낼 수 없습니다",
-    ru: "Нельзя написать самому себе",
   },
   "This user isn't accepting chat requests": {
     en: "This user isn't accepting chat requests",
     vi: "Người dùng này không nhận yêu cầu trò chuyện",
     ko: "이 사용자는 대화 요청을 받지 않습니다",
-    ru: "Этот пользователь не принимает запросы на переписку",
   },
   "Message must be 1–2000 characters": {
     en: "Message must be 1–2000 characters",
     vi: "Tin nhắn phải dài từ 1–2000 ký tự",
     ko: "메시지는 1–2000자여야 합니다",
-    ru: "Сообщение должно быть от 1 до 2000 символов",
   },
   "Message must be 1–4000 characters": {
     en: "Message must be 1–4000 characters",
     vi: "Tin nhắn phải dài từ 1–4000 ký tự",
     ko: "메시지는 1–4000자여야 합니다",
-    ru: "Сообщение должно быть от 1 до 4000 символов",
   },
   "Chat already exists": {
     en: "Chat already exists",
     vi: "Cuộc trò chuyện đã tồn tại",
     ko: "이미 대화가 존재합니다",
-    ru: "Чат уже существует",
   },
   "A chat request is already pending": {
     en: "A chat request is already pending",
     vi: "Đã có một yêu cầu trò chuyện đang chờ xử lý",
     ko: "대화 요청이 이미 처리 대기 중입니다",
-    ru: "Запрос на переписку уже ожидает ответа",
   },
   "Request already handled": {
     en: "Request already handled",
     vi: "Yêu cầu đã được xử lý",
     ko: "대화 요청은 이미 처리되었습니다",
-    ru: "Запрос уже обработан",
   },
   "Chat isn't open yet": {
     en: "Chat isn't open yet",
     vi: "Cuộc trò chuyện chưa được mở",
     ko: "아직 대화를 시작할 수 없습니다",
-    ru: "Чат ещё не открыт",
   },
   "Display name is required": {
     en: "Display name is required",
-    ru: "Укажите отображаемое имя",
   },
   "Username is required": {
     en: "Username is required",
-    ru: "Укажите имя пользователя",
     vi: "Vui lòng nhập tên người dùng",
     ko: "사용자 이름을 입력하세요",
   },
   "Username must be 3–24 letters, numbers, or underscores": {
     en: "Username must be 3–24 letters, numbers, or underscores",
-    ru: "Имя пользователя должно содержать 3–24 латинских буквы, цифры или подчёркивания",
     vi: "Tên người dùng phải có 3–24 chữ cái, chữ số hoặc dấu gạch dưới",
     ko: "사용자 이름은 영문, 숫자 또는 밑줄 3–24자여야 합니다",
   },
   "Username already in use": {
     en: "Username already in use",
-    ru: "Имя пользователя уже используется",
     vi: "Tên người dùng đã được sử dụng",
     ko: "이미 사용 중인 사용자 이름입니다",
   },
   "Username is reserved": {
     en: "This username is temporarily reserved",
-    ru: "Это имя пользователя временно зарезервировано",
     vi: "Tên người dùng này đang được giữ tạm thời",
     ko: "이 사용자 이름은 현재 임시로 예약되어 있습니다",
   },
   "Username change is on cooldown": {
     en: "You can’t change your username yet",
-    ru: "Пока нельзя изменить имя пользователя",
     vi: "Bạn chưa thể đổi tên người dùng",
     ko: "아직 사용자 이름을 변경할 수 없습니다",
   },
   "Complete onboarding before changing username": {
     en: "Complete profile setup before changing your username",
-    ru: "Сначала завершите настройку профиля",
     vi: "Hãy hoàn tất thiết lập hồ sơ trước khi đổi tên người dùng",
     ko: "사용자 이름을 변경하기 전에 프로필 설정을 완료하세요",
   },
   "Username change could not be completed": {
     en: "Could not change username. Try again.",
-    ru: "Не удалось изменить имя пользователя. Повторите попытку.",
     vi: "Không thể đổi tên người dùng. Hãy thử lại.",
     ko: "사용자 이름을 변경하지 못했습니다. 다시 시도하세요.",
   },
   "Onboarding already complete": {
     en: "Profile setup is already complete",
-    ru: "Настройка профиля уже завершена",
     vi: "Thiết lập hồ sơ đã hoàn tất",
     ko: "프로필 설정이 이미 완료되었습니다",
   },
   "Onboarding language is required": {
     en: "Choose a language to continue",
-    ru: "Выберите язык, чтобы продолжить",
     vi: "Hãy chọn ngôn ngữ để tiếp tục",
     ko: "계속하려면 언어를 선택하세요",
   },
   "Onboarding fields are required": {
     en: "Name, username, and language are required",
-    ru: "Нужны имя, имя пользователя и язык",
     vi: "Cần có tên, tên người dùng và ngôn ngữ",
     ko: "이름, 사용자 이름과 언어를 입력하세요",
   },
   "Invalid contact email": {
     en: "Enter a valid contact email",
-    ru: "Введите корректный контактный email",
     vi: "Hãy nhập email liên hệ hợp lệ",
     ko: "유효한 연락 이메일을 입력하세요",
   },
   "contactEmail is required": {
     en: "Contact email must be provided as text",
-    ru: "Контактный email должен быть текстом",
     vi: "Email liên hệ phải là văn bản",
     ko: "연락 이메일은 문자열이어야 합니다",
   },
   "Invalid theme": {
     en: "Invalid theme",
-    ru: "Некорректная тема",
   },
   "Invalid language": {
     en: "Invalid language",
-    ru: "Некорректный язык",
   },
   "Invalid DM preference": {
     en: "Invalid DM preference",
-    ru: "Некорректная настройка сообщений",
   },
   "You can't block yourself": {
     en: "You can't block yourself",
-    ru: "Нельзя заблокировать самого себя",
   },
   "You can't follow yourself": {
     en: "You can't follow yourself",
-    ru: "Нельзя подписаться на самого себя",
   },
   "Can't follow this user": {
     en: "Can't follow this user",
-    ru: "Нельзя подписаться на этого пользователя",
   },
   "Invalid report reason": {
     en: "Invalid report reason",
-    ru: "Некорректная причина жалобы",
   },
   "You can't report your own post": {
     en: "You can't report your own post",
-    ru: "Нельзя пожаловаться на свой пост",
   },
   "You can't report yourself": {
     en: "You can't report yourself",
-    ru: "Нельзя пожаловаться на себя",
   },
   "You can't report your own comment": {
     en: "You can't report your own comment",
-    ru: "Нельзя пожаловаться на свой комментарий",
   },
   "You already reported this": {
     en: "You already reported this",
-    ru: "Вы уже пожаловались на это",
   },
   "Warning message required": {
     en: "Warning message required",
-    ru: "Нужен текст предупреждения",
   },
   "Word too short": {
     en: "Word too short",
-    ru: "Слово слишком короткое",
   },
   "Invalid severity": {
     en: "Invalid severity",
-    ru: "Некорректный уровень",
   },
   "Word already banned": {
     en: "Word already banned",
-    ru: "Слово уже в списке запрещённых",
   },
   "Title must be 3–300 characters": {
     en: "Title must be 3–300 characters",
-    ru: "Заголовок должен быть от 3 до 300 символов",
   },
   "Title must be 3–100 characters": {
     en: "Title must be 3–100 characters",
-    ru: "Заголовок должен быть от 3 до 100 символов",
   },
   "Invalid post payload": {
     en: "Invalid post payload",
     vi: "Dữ liệu bài đăng không hợp lệ",
     ko: "게시글 입력값이 올바르지 않습니다",
-    ru: "Некорректные данные поста",
   },
   "Post body must be 20,000 characters or fewer": {
     en: "Post body must be 20,000 characters or fewer",
     vi: "Nội dung bài đăng phải có tối đa 20.000 ký tự",
     ko: "게시글 본문은 20,000자 이하여야 합니다",
-    ru: "Текст поста должен содержать не более 20 000 символов",
   },
   "Post URL must be 2,048 characters or fewer": {
     en: "Post URL must be 2,048 characters or fewer",
     vi: "Đường dẫn bài đăng phải có tối đa 2.048 ký tự",
     ko: "게시글 URL은 2,048자 이하여야 합니다",
-    ru: "Ссылка поста должна содержать не более 2048 символов",
   },
   "Choose either a link or an image, not both": {
     en: "Choose either a link or an image, not both",
-    ru: "Выберите либо ссылку, либо изображение",
   },
   "Invalid URL": {
     en: "Invalid URL",
-    ru: "Некорректная ссылка",
   },
   "Invalid media": {
     en: "Invalid media",
-    ru: "Некорректный файл",
   },
   "Invalid profile payload": {
     en: "Invalid profile payload",
     vi: "Dữ liệu hồ sơ không hợp lệ",
     ko: "프로필 입력값이 올바르지 않습니다",
-    ru: "Некорректные данные профиля",
   },
   "Invalid profile image": {
     en: "Invalid profile image",
     vi: "Ảnh hồ sơ không hợp lệ",
     ko: "프로필 이미지가 올바르지 않습니다",
-    ru: "Некорректное изображение профиля",
   },
   "Could not link account": {
     en: "Could not link account",
     vi: "Không thể liên kết tài khoản",
     ko: "계정을 연결할 수 없습니다",
-    ru: "Не удалось связать аккаунт",
   },
   "Invalid profile tab": {
     en: "Invalid profile tab",
     vi: "Mục hồ sơ không hợp lệ",
     ko: "프로필 탭이 올바르지 않습니다",
-    ru: "Некорректная вкладка профиля",
   },
   "Failed to load profile activity": {
     en: "Failed to load profile activity",
     vi: "Không thể tải hoạt động hồ sơ",
     ko: "프로필 활동을 불러오지 못했습니다",
-    ru: "Не удалось загрузить активность профиля",
   },
   "Invalid settings payload": {
     en: "Invalid settings payload",
     vi: "Dữ liệu cài đặt không hợp lệ",
     ko: "설정 입력값이 올바르지 않습니다",
-    ru: "Некорректные данные настроек",
   },
   "Comment must be 1–10000 characters": {
     en: "Comment must be 1–10000 characters",
-    ru: "Комментарий должен быть от 1 до 10000 символов",
   },
   "Post is locked": {
     en: "Post is locked",
-    ru: "Пост закрыт для комментариев",
   },
   "Parent comment not found": {
     en: "Parent comment not found",
-    ru: "Родительский комментарий не найден",
   },
   "Comment nesting too deep": {
     en: "Comment nesting too deep",
-    ru: "Слишком глубокая вложенность комментариев",
   },
   "Only the author can delete this post": {
     en: "Only the author can delete this post",
     vi: "Chỉ tác giả mới có thể xóa bài đăng này",
     ko: "작성자만 이 글을 삭제할 수 있습니다",
-    ru: "Удалить пост может только автор",
   },
   "Only the author can delete this comment": {
     en: "Only the author can delete this comment",
     vi: "Chỉ tác giả mới có thể xóa bình luận này",
     ko: "작성자만 이 댓글을 삭제할 수 있습니다",
-    ru: "Удалить комментарий может только автор",
   },
   "Post has comments and cannot be deleted": {
     en: "Post has comments and cannot be deleted",
     vi: "Không thể xóa bài đăng có bình luận",
     ko: "댓글이 있는 글은 삭제할 수 없습니다",
-    ru: "Нельзя удалить пост, в котором есть комментарии",
   },
   "Comment has replies and cannot be deleted": {
     en: "Comment has replies and cannot be deleted",
     vi: "Không thể xóa bình luận có câu trả lời",
     ko: "답글이 있는 댓글은 삭제할 수 없습니다",
-    ru: "Нельзя удалить комментарий, у которого есть ответы",
   },
   "Only the author can edit this post": {
     en: "Only the author can edit this post",
-    ru: "Редактировать пост может только автор",
   },
   "Only the author can edit this comment": {
     en: "Only the author can edit this comment",
-    ru: "Редактировать комментарий может только автор",
-  },
-  "Only the author can view analytics": {
-    en: "Only the author can view analytics",
-    ru: "Статистику может смотреть только автор",
   },
   "Community name must be at least 3 characters": {
     en: "Community name must be at least 3 characters",
-    ru: "Имя сообщества должно быть не короче 3 символов",
   },
   "Community name already taken": {
     en: "Community name already taken",
-    ru: "Это имя сообщества уже занято",
   },
   "Name required": {
     en: "Name required",
-    ru: "Нужно указать название",
   },
   "Invalid target URL": {
     en: "Invalid target URL",
-    ru: "Некорректная целевая ссылка",
   },
   "You don't have permission to do that": {
     en: "You don't have permission to do that",
-    ru: "У вас нет прав для этого действия",
-  },
-  "Invalid username for profile posts": {
-    en: "Invalid username for profile posts",
-    ru: "Некорректное имя пользователя для постов профиля",
   },
   "Image must be under 1 MB": {
     en: "Image must be under 1 MB",
-    ru: "Изображение должно быть меньше 1 МБ",
   },
   "Image must be under 1 MB after processing": {
     en: "Image must be under 1 MB after processing",
-    ru: "После обработки изображение всё ещё больше 1 МБ",
   },
   "Image must be under 1 MB after compression": {
     en: "Image must be under 1 MB after compression",
-    ru: "После сжатия изображение всё ещё больше 1 МБ",
   },
   "Only JPEG, PNG, or WebP images are allowed": {
     en: "Only JPEG, PNG, or WebP images are allowed",
-    ru: "Допускаются только JPEG, PNG или WebP",
   },
   "Image failed security check": {
     en: "Image failed security check",
-    ru: "Изображение не прошло проверку безопасности",
   },
   "Image contains trailing dangerous data": {
     en: "Image contains trailing dangerous data",
-    ru: "В изображении обнаружены подозрительные данные",
   },
   "Corrupt JPEG image": {
     en: "Corrupt JPEG image",
-    ru: "Повреждённый JPEG",
   },
   "Corrupt PNG image": {
     en: "Corrupt PNG image",
-    ru: "Повреждённый PNG",
   },
   "Corrupt WebP image": {
     en: "Corrupt WebP image",
-    ru: "Повреждённый WebP",
   },
   "Invalid image": {
     en: "Invalid image",
-    ru: "Некорректное изображение",
   },
   "Nothing to mark read": {
     en: "Nothing to mark read",
-    ru: "Нечего отмечать прочитанным",
   },
   "Failed to load": {
     en: "Failed to load",
-    ru: "Не удалось загрузить",
   },
   "Failed to save": {
     en: "Failed to save",
-    ru: "Не удалось сохранить",
   },
   Failed: {
     en: "Failed",
-    ru: "Ошибка",
   },
   "Upload failed": {
     en: "Upload failed",
-    ru: "Не удалось загрузить файл",
   },
   "file is required": {
     en: "file is required",
-    ru: "Нужен файл",
   },
   "section is required": {
     en: "section is required",
-    ru: "Укажите раздел",
   },
   "Unknown section": {
     en: "Unknown section",
-    ru: "Неизвестный раздел",
   },
   "Unknown action": {
     en: "Unknown action",
-    ru: "Неизвестное действие",
   },
   "Unknown op": {
     en: "Unknown op",
-    ru: "Неизвестная операция",
   },
   "Missing fields": {
     en: "Missing fields",
-    ru: "Не заполнены обязательные поля",
   },
   "Missing userId": {
     en: "Missing userId",
-    ru: "Не указан пользователь",
   },
   "Missing subredditId": {
     en: "Missing subredditId",
-    ru: "Не указано сообщество",
   },
   "Missing wordId": {
     en: "Missing wordId",
-    ru: "Не указано слово",
-  },
-  "Missing campaignId": {
-    en: "Missing campaignId",
-    ru: "Не указана кампания",
   },
   "Admin action failed": {
     en: "Admin action failed",
-    ru: "Не удалось выполнить действие администратора",
   },
   "Failed to load admin overview": {
     en: "Failed to load admin overview",
-    ru: "Не удалось загрузить панель администратора",
   },
-  "Invalid placement": {
-    en: "Invalid placement",
-    ru: "Некорректное размещение",
-  },
-  "Failed to load ad": {
-    en: "Failed to load ad",
-    ru: "Не удалось загрузить рекламу",
-  },
-  "preferredLanguage must be one of vi, ko, en, or ru": {
-    en: "preferredLanguage must be one of vi, ko, en, or ru",
-    ru: "Язык должен быть одним из: vi, ko, en или ru",
-    vi: "preferredLanguage phải là một trong vi, ko, en hoặc ru",
-    ko: "언어는 vi, ko, en 또는 ru 중 하나여야 합니다",
+  "preferredLanguage must be one of vi, ko, or en": {
+    en: "preferredLanguage must be one of vi, ko, or en",
+    vi: "preferredLanguage phải là một trong vi, ko hoặc en",
+    ko: "언어는 vi, ko 또는 en 중 하나여야 합니다",
   },
   "Could not update language": {
     en: "Could not update language",
-    ru: "Не удалось обновить язык",
-  },
-  "Could not update NSFW setting": {
-    en: "Could not update NSFW setting",
-    ru: "Не удалось обновить настройку NSFW",
-  },
-  "isNsfw boolean is required": {
-    en: "isNsfw boolean is required",
-    ru: "Нужно указать значение NSFW",
   },
   "Could not save profile": {
     en: "Could not save profile",
-    ru: "Не удалось сохранить профиль",
   },
   "Could not save": {
     en: "Could not save",
-    ru: "Не удалось сохранить",
   },
   Saved: {
     en: "Saved",
-    ru: "Сохранено",
   },
   "Could not post comment": {
     en: "Could not post comment",
-    ru: "Не удалось отправить комментарий",
   },
   "Couldn't update membership": {
     en: "Couldn't update membership",
-    ru: "Не удалось обновить подписку",
-  },
-  "Couldn't load analytics": {
-    en: "Couldn't load analytics",
-    ru: "Не удалось загрузить аналитику",
   },
   "Couldn't load more posts.": {
     en: "Couldn't load more posts.",
-    ru: "Не удалось загрузить ещё посты.",
   },
   "Failed to load more posts": {
     en: "Failed to load more posts",
-    ru: "Не удалось загрузить ещё посты",
   },
   "Edit failed": {
     en: "Edit failed",
-    ru: "Не удалось изменить",
   },
   "Delete failed": {
     en: "Delete failed",
-    ru: "Не удалось удалить",
   },
   "Delete this post?": {
     en: "Delete this post?",
-    ru: "Удалить этот пост?",
   },
   "Action failed": {
     en: "Action failed",
-    ru: "Действие не выполнено",
   },
   "Backfill failed": {
     en: "Backfill failed",
-    ru: "Ошибка заполнения",
   },
   "Could not generate avatar": {
     en: "Could not generate avatar",
-    ru: "Не удалось создать аватар",
   },
   "Couldn't load messages": {
     en: "Couldn't load messages",
-    ru: "Не удалось загрузить сообщения",
   },
   "Couldn't load chat": {
     en: "Couldn't load chat",
-    ru: "Не удалось загрузить чат",
   },
   "Couldn't send request": {
     en: "Couldn't send request",
-    ru: "Не удалось отправить запрос",
   },
   "Couldn't update request": {
     en: "Couldn't update request",
-    ru: "Не удалось обновить запрос",
   },
   "Couldn't send": {
     en: "Couldn't send",
-    ru: "Не удалось отправить",
   },
   "Failed to load chat": {
     en: "Failed to load chat",
-    ru: "Не удалось загрузить чат",
   },
   "Failed to send message": {
     en: "Failed to send message",
-    ru: "Не удалось отправить сообщение",
   },
   "Failed to update request": {
     en: "Failed to update request",
-    ru: "Не удалось обновить запрос",
   },
   "Failed to load messages": {
     en: "Failed to load messages",
-    ru: "Не удалось загрузить сообщения",
   },
   "Failed to start chat": {
     en: "Failed to start chat",
-    ru: "Не удалось начать чат",
   },
   "Failed to load feed": {
     en: "Failed to load feed",
-    ru: "Не удалось загрузить ленту",
   },
   "Failed to create post": {
     en: "Failed to create post",
-    ru: "Не удалось создать пост",
   },
   "Failed to edit post": {
     en: "Failed to edit post",
-    ru: "Не удалось изменить пост",
   },
   "Failed to delete post": {
     en: "Failed to delete post",
-    ru: "Не удалось удалить пост",
   },
   "Failed to edit comment": {
     en: "Failed to edit comment",
-    ru: "Не удалось изменить комментарий",
   },
   "Failed to delete comment": {
     en: "Failed to delete comment",
-    ru: "Не удалось удалить комментарий",
   },
   "Failed to load community": {
     en: "Failed to load community",
-    ru: "Не удалось загрузить сообщество",
   },
   "Failed to join community": {
     en: "Failed to join community",
-    ru: "Не удалось вступить в сообщество",
   },
   "Failed to leave community": {
     en: "Failed to leave community",
-    ru: "Не удалось выйти из сообщества",
   },
   "Could not submit report": {
     en: "Could not submit report",
-    ru: "Не удалось отправить жалобу",
   },
   "Could not unhide post": {
     en: "Could not unhide post",
-    ru: "Не удалось показать пост",
   },
   "subreddit and title are required": {
     en: "subreddit and title are required",
-    ru: "Укажите сообщество и заголовок",
-  },
-  "Set a username before posting to your profile": {
-    en: "Set a username before posting to your profile",
-    ru: "Укажите имя пользователя перед публикацией в профиле",
-  },
-  "Profile community belongs to another user": {
-    en: "That profile community belongs to another user",
-    vi: "Cộng đồng hồ sơ đó thuộc về người dùng khác",
-    ko: "해당 프로필 커뮤니티는 다른 사용자의 공간입니다",
-    ru: "Это сообщество профиля принадлежит другому пользователю",
   },
   "toUsername and body are required": {
     en: "toUsername and body are required",
-    ru: "Укажите получателя и текст сообщения",
   },
   "action must be accept or decline": {
     en: "action must be accept or decline",
-    ru: "Действие должно быть accept или decline",
   },
   "body is required": {
     en: "body is required",
-    ru: "Нужен текст",
   },
   "Invalid limit": {
     en: "Invalid limit",
-    ru: "Некорректный лимит",
   },
   "Invalid cursor": {
     en: "Invalid cursor",
-    ru: "Некорректный курсор",
   },
   "Invalid sort": {
     en: "Invalid sort",
-    ru: "Некорректная сортировка",
   },
   "Invalid feed mode": {
     en: "Invalid feed mode",
-    ru: "Некорректный режим ленты",
   },
   "Missing post id": {
     en: "Missing post id",
-    ru: "Не указан пост",
   },
   "Could not hide post": {
     en: "Could not hide post",
-    ru: "Не удалось скрыть пост",
   },
   "Failed to load post": {
     en: "Failed to load post",
-    ru: "Не удалось загрузить пост",
   },
   "reason is required": {
     en: "reason is required",
-    ru: "Укажите причину",
   },
   "Search failed": {
     en: "Search failed",
-    ru: "Поиск не удался",
   },
   "Failed to create comment": {
     en: "Failed to create comment",
-    ru: "Не удалось создать комментарий",
   },
   "Failed to create community": {
     en: "Failed to create community",
-    ru: "Не удалось создать сообщество",
   },
   "Failed to list communities": {
     en: "Failed to list communities",
-    ru: "Не удалось загрузить сообщества",
   },
   "Failed to load recommendations": {
     en: "Failed to load recommendations",
-    ru: "Не удалось загрузить рекомендации",
   },
   "name and title are required": {
     en: "name and title are required",
-    ru: "Укажите имя и название",
   },
 };
 
@@ -824,8 +611,6 @@ function genericError(locale: Locale): string {
       return "Đã xảy ra lỗi";
     case "ko":
       return "문제가 발생했습니다";
-    case "ru":
-      return "Произошла ошибка";
     default:
       return "Something went wrong";
   }

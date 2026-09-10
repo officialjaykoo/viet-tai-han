@@ -13,20 +13,12 @@ export type UserSettings = {
   usernameChangedAt: string | null;
   name: string;
   contactEmail: string | null;
-  /**
-   * This is intentionally separate from Better Auth's emailVerified.
-   * No contact-email verification workflow exists yet, so provider-verified
-   * login email data never silently upgrades this optional contact field.
-   */
-  contactEmailVerified: boolean;
   onboardingComplete: boolean;
   image: string | null;
   bio: string | null;
   bannerKey: string | null;
   preferredLanguage: string;
   theme: ThemePreference;
-  isNsfw: boolean;
-  showNsfw: boolean;
   allowDms: AllowDms;
   notifyComments: boolean;
   notifyFollows: boolean;
@@ -49,10 +41,9 @@ export async function getUserSettings(
   const row = await db
     .prepare(
       `SELECT id, username, onboardingUsernameCandidate, usernameChangedAt,
-              name, contactEmail, contactEmailVerified, onboardingComplete,
-              image, bio, bannerKey, preferredLanguage, theme, isNsfw,
-              showNsfw, allowDms, notifyComments, notifyFollows, notifyChat,
-              notifyMentions
+              name, contactEmail, onboardingComplete,
+              image, bio, bannerKey, preferredLanguage, theme,
+              allowDms, notifyComments, notifyFollows, notifyChat, notifyMentions
        FROM "user" WHERE id = ?`
     )
     .bind(userId)
@@ -63,15 +54,12 @@ export async function getUserSettings(
       usernameChangedAt: string | null;
       name: string;
       contactEmail: string | null;
-      contactEmailVerified: number;
       onboardingComplete: number;
       image: string | null;
       bio: string | null;
       bannerKey: string | null;
       preferredLanguage: string;
       theme: string;
-      isNsfw: number;
-      showNsfw: number;
       allowDms: string;
       notifyComments: number;
       notifyFollows: number;
@@ -88,15 +76,12 @@ export async function getUserSettings(
     usernameChangedAt: row.usernameChangedAt,
     name: row.name,
     contactEmail: row.contactEmail,
-    contactEmailVerified: Boolean(row.contactEmailVerified),
     onboardingComplete: Boolean(row.onboardingComplete),
     image: row.image,
     bio: row.bio,
     bannerKey: row.bannerKey,
     preferredLanguage: row.preferredLanguage,
     theme: isTheme(row.theme) ? row.theme : "system",
-    isNsfw: Boolean(row.isNsfw),
-    showNsfw: Boolean(row.showNsfw),
     allowDms: isAllowDms(row.allowDms) ? row.allowDms : "anyone",
     notifyComments: Boolean(row.notifyComments),
     notifyFollows: Boolean(row.notifyFollows),
@@ -118,17 +103,13 @@ export async function updateUserContactEmail(
   await db
     .prepare(
       `UPDATE "user"
-       SET contactEmail = ?, contactEmailVerified = 0,
-           updatedAt = datetime('now')
+       SET contactEmail = ?, updatedAt = datetime('now')
        WHERE id = ?`
     )
     .bind(normalized || null, userId)
     .run();
 
-  return {
-    contactEmail: normalized || null,
-    contactEmailVerified: false,
-  };
+  return { contactEmail: normalized || null };
 }
 
 
@@ -174,8 +155,6 @@ export async function updateUserPreferences(input: {
   userId: string;
   theme?: ThemePreference;
   preferredLanguage?: Locale;
-  isNsfw?: boolean;
-  showNsfw?: boolean;
   allowDms?: AllowDms;
   notifyComments?: boolean;
   notifyFollows?: boolean;
@@ -199,8 +178,6 @@ export async function updateUserPreferences(input: {
     throw new AuthError("Invalid DM preference", 400);
   }
   for (const field of [
-    "isNsfw",
-    "showNsfw",
     "notifyComments",
     "notifyFollows",
     "notifyChat",
@@ -210,20 +187,9 @@ export async function updateUserPreferences(input: {
       throw new AuthError("Invalid settings payload", 400);
     }
   }
-
   const theme = input.theme ?? current.theme;
   const preferredLanguage =
     input.preferredLanguage ?? current.preferredLanguage;
-  const isNsfw =
-    input.isNsfw !== undefined ? (input.isNsfw ? 1 : 0) : current.isNsfw ? 1 : 0;
-  const showNsfw =
-    input.showNsfw !== undefined
-      ? input.showNsfw
-        ? 1
-        : 0
-      : current.showNsfw
-        ? 1
-        : 0;
   const allowDms = input.allowDms ?? current.allowDms;
   const notifyComments =
     input.notifyComments !== undefined
@@ -261,16 +227,14 @@ export async function updateUserPreferences(input: {
   await db
     .prepare(
       `UPDATE "user"
-       SET theme = ?, preferredLanguage = ?, isNsfw = ?, showNsfw = ?,
-           allowDms = ?, notifyComments = ?, notifyFollows = ?,
+       SET theme = ?, preferredLanguage = ?, allowDms = ?,
+           notifyComments = ?, notifyFollows = ?,
            notifyChat = ?, notifyMentions = ?, updatedAt = datetime('now')
        WHERE id = ?`
     )
     .bind(
       theme,
       preferredLanguage,
-      isNsfw,
-      showNsfw,
       allowDms,
       notifyComments,
       notifyFollows,

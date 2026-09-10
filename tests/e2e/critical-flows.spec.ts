@@ -40,6 +40,21 @@ test.describe("critical browser flows", () => {
     await expect(page).toHaveURL(/\?feed=popular/);
     await expect(page.locator("article").first()).toBeVisible({ timeout: 30_000 });
   });
+  test("community discovery preserves subscription state", async ({ page }) => {
+    await loginAsSeedUser(page, "alice", "/r/cloudflare");
+    const join = page.getByRole("button", { name: /^tham gia$/i });
+    const joined = page.getByRole("button", { name: /^đã tham gia$/i });
+    await expect(join.or(joined)).toBeVisible({ timeout: 30_000 });
+
+    const wasJoined = await joined.isVisible();
+    await (wasJoined ? joined : join).click();
+    await expect(wasJoined ? join : joined).toBeVisible({ timeout: 30_000 });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(wasJoined ? join : joined).toBeVisible({ timeout: 30_000 });
+
+    await (wasJoined ? join : joined).click();
+    await expect(wasJoined ? joined : join).toBeVisible({ timeout: 30_000 });
+  });
 
 
   test("Alice saves Bob's post and opens the saved list", async ({ page }) => {
@@ -145,6 +160,9 @@ test.describe("critical browser flows", () => {
       await alice.getByRole("button", { name: /^đặt câu hỏi$/i }).click();
       await expect(alice).toHaveURL(/\/questions\//, { timeout: 45_000 });
       const questionPath = new URL(alice.url()).pathname;
+      await expect(alice.locator('main article a[href="/r/cloudflare"]')).toBeVisible();
+      await expect(alice.locator('main article a[href="/u/alice"]').first()).toBeVisible();
+
 
       await loginAsSeedUser(bob, "bob", questionPath);
       await waitForHydration(bob);
@@ -155,7 +173,7 @@ test.describe("critical browser flows", () => {
       await expect(bob.getByText(answer, { exact: true })).toBeVisible({
         timeout: 30_000,
       });
-
+      await expect(bob.locator('main li a[href="/u/bob"]').first()).toBeVisible();
       await expect
         .poll(
           async () =>
@@ -230,6 +248,8 @@ test.describe("critical browser flows", () => {
         timeout: 30_000,
       });
       await expect(bob.getByText(body, { exact: true })).toBeVisible();
+      await expect(bob.locator(`a[href="/u/alice"]`)).toBeVisible();
+      await expect(bob.locator('a[href="/messages?to=alice"]')).toBeVisible();
     } finally {
       await aliceContext.close();
       await bobContext.close();

@@ -18,8 +18,8 @@ async function insertUser(id: string, username = id) {
   await env.DB
     .prepare(
       `INSERT INTO "user" (
-         id, name, email, emailVerified, username, karma, allowDms, role, status
-       ) VALUES (?, ?, ?, 1, ?, 0, 'anyone', 'user', 'active')`
+         id, name, email, emailVerified, username, allowDms, role, status
+       ) VALUES (?, ?, ?, 1, ?, 'anyone', 'user', 'active')`
     )
     .bind(id, username, `${id}@test.local`, username)
     .run();

@@ -161,11 +161,42 @@ export default async function BusinessDetailPage({
 
           <section className="rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5">
             <div className="flex items-center gap-3">
-              <UserAvatar username={business.owner.username} image={business.owner.image} size="sm" className="ring-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{tLocale(locale, "business.owner")}</p>
-                <p className="truncate text-sm font-medium">@{business.owner.username ?? "unknown"}</p>
-              </div>
+              {business.owner.username ? (
+                <Link
+                  href={`/u/${encodeURIComponent(business.owner.username)}`}
+                  className="flex min-w-0 items-center gap-3 hover:text-[var(--brand)]"
+                >
+                  <UserAvatar
+                    username={business.owner.username}
+                    image={business.owner.image}
+                    size="sm"
+                    className="ring-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      {tLocale(locale, "business.owner")}
+                    </p>
+                    <p className="truncate text-sm font-medium">
+                      @{business.owner.username}
+                    </p>
+                  </div>
+                </Link>
+              ) : (
+                <>
+                  <UserAvatar
+                    username={business.owner.username}
+                    image={business.owner.image}
+                    size="sm"
+                    className="ring-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      {tLocale(locale, "business.owner")}
+                    </p>
+                    <p className="truncate text-sm font-medium">@unknown</p>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

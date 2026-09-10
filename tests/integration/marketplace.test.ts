@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createListing,
-  createListingAlert,
-  deleteListingAlert,
   getListingDetail,
-  listListingAlerts,
   listListingReportQueue,
   listSavedListings,
   listListings,
@@ -156,22 +153,4 @@ describe("marketplace lifecycle (D1)", () => {
     expect(await getListingDetail(listing.id, actorId)).toBeNull();
   });
 
-  it("creates, lists, and deletes search alerts", async () => {
-    const { authorId } = await seedUsersAndSubreddit();
-    const created = await createListingAlert({
-      userId: authorId,
-      query: "restaurant",
-      kind: "job",
-      location: "Seoul",
-    });
-    expect(created.id).toBeTruthy();
-    expect((await listListingAlerts(authorId)).some((item) => item.id === created.id)).toBe(
-      true
-    );
-
-    await deleteListingAlert({ userId: authorId, alertId: created.id });
-    expect((await listListingAlerts(authorId)).some((item) => item.id === created.id)).toBe(
-      false
-    );
-  });
 });

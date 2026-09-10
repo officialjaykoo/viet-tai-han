@@ -18,7 +18,6 @@ export default async function AskQuestionPage() {
   await redirectIfIncompleteOnboarding(session?.user?.id);
   const { locale } = await getRequestLocale();
   const communities = (await listSubreddits(100))
-    .filter((community) => !/^u_/i.test(community.name))
     .map(({ name, title }) => ({ name, title }));
 
   return (

@@ -25,11 +25,7 @@ export type PostProjectionRow = {
   author_display_name: string | null;
   author_image?: string | null;
   author_role?: string | null;
-  author_is_nsfw?: number | null;
-  author_created_at?: string | null;
-  author_karma?: number | null;
   author_is_community_mod?: number | null;
-  author_has_veteran?: number | null;
   subreddit_id: string;
   subreddit_name: string;
   subreddit_title: string;
@@ -89,11 +85,7 @@ export function mapPostProjection(
       image: row.author_image ?? null,
       tags: resolveAccountTags({
         role: row.author_role,
-        isNsfw: row.author_is_nsfw,
-        createdAt: row.author_created_at,
-        karma: row.author_karma,
         isCommunityMod: Boolean(row.author_is_community_mod),
-        hasVeteranAchievement: Boolean(row.author_has_veteran),
       }),
       isAuthor: Boolean(viewerUserId && viewerUserId === row.author_id),
     },

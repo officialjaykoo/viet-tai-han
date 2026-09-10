@@ -156,10 +156,35 @@ export default async function BusinessesPage({
                         </p>
                       </Link>
                       <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                        <UserAvatar username={business.owner.username} image={business.owner.image} size="xs" className="ring-0" />
-                        <span className="truncate">
-                          {tLocale(locale, "business.owner")}: @{business.owner.username ?? "unknown"}
-                        </span>
+                        {business.owner.username ? (
+                          <Link
+                            href={`/u/${encodeURIComponent(business.owner.username)}`}
+                            className="flex min-w-0 items-center gap-2 hover:text-foreground"
+                          >
+                            <UserAvatar
+                              username={business.owner.username}
+                              image={business.owner.image}
+                              size="xs"
+                              className="ring-0"
+                            />
+                            <span className="truncate">
+                              {tLocale(locale, "business.owner")}: @
+                              {business.owner.username}
+                            </span>
+                          </Link>
+                        ) : (
+                          <>
+                            <UserAvatar
+                              username={business.owner.username}
+                              image={business.owner.image}
+                              size="xs"
+                              className="ring-0"
+                            />
+                            <span className="truncate">
+                              {tLocale(locale, "business.owner")}: @unknown
+                            </span>
+                          </>
+                        )}
                         <span aria-hidden>·</span>
                         <span>{tLocale(locale, "business.serviceCount", { count: business.serviceCount })}</span>
                       </div>

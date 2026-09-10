@@ -146,8 +146,8 @@ describe("business lifecycle (D1)", () => {
     const { authorId, actorId } = await seedUsersAndSubreddit();
     const competitorId = `u_competitor_${crypto.randomUUID().slice(0, 8)}`;
     await env.DB.prepare(
-      `INSERT INTO "user" (id, name, email, emailVerified, username, karma, role, status)
-       VALUES (?, 'Competitor', ?, 1, ?, 30, 'user', 'active')`
+      `INSERT INTO "user" (id, name, email, emailVerified, username, role, status)
+       VALUES (?, 'Competitor', ?, 1, ?, 'user', 'active')`
     )
       .bind(competitorId, `${competitorId}@test.local`, `competitor_${competitorId.slice(-8)}`)
       .run();

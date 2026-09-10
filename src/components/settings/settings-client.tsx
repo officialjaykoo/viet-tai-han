@@ -24,7 +24,6 @@ import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import type { MessageKey } from "@/lib/i18n/messages/en";
 import type { UserSettings } from "@/lib/user-settings";
-import type { ConsentRecord, ProStatus } from "@/lib/monetization";
 import type { OAuthProviderCapabilities } from "@/lib/oauth-providers";
 import { cn } from "@/lib/utils";
 
@@ -71,8 +70,6 @@ export function SettingsClient({
   initialPush,
   initialIdentityError,
   oauthProviders,
-  initialConsent,
-  initialPro,
 }: {
   initialSettings: UserSettings;
   initialBlocked: BlockedUser[];
@@ -88,8 +85,6 @@ export function SettingsClient({
   };
   initialIdentityError?: string;
   oauthProviders: OAuthProviderCapabilities;
-  initialConsent: ConsentRecord | null;
-  initialPro: ProStatus;
 }) {
   const { t } = useI18n();
   const localizeError = useLocalizedError();
@@ -180,7 +175,6 @@ export function SettingsClient({
           <>
             <AccountSettings
               settings={settings}
-              initialPro={initialPro}
               onSettingsChange={setSettings}
               flash={flash}
             />
@@ -202,7 +196,6 @@ export function SettingsClient({
         {section === "privacy" ? (
           <PrivacySettings
             settings={settings}
-            initialConsent={initialConsent}
             initialBlocked={blocked}
             initialMuted={initialMuted}
             onSettingsChange={setSettings}

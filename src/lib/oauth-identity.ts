@@ -79,9 +79,8 @@ export function mapOAuthProfile(input: {
 }
 
 /**
- * Better Auth requires an email column for its social-account compatibility
- * model. Email/password sign-in stays disabled; the app's optional contact
- * channel is tracked separately in contactEmail/contactEmailVerified.
+ * Better Auth requires an email column for social-account compatibility;
+ * optional contact channel is tracked separately in contactEmail.
  */
 export function mapOAuthEmail(input: {
   providerId: string;

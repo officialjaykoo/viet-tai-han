@@ -40,7 +40,6 @@ export function guardWorkerRequest(
     return null;
   }
 
-  if (pathname === "/api/billing/webhook") return null;
   if (!pathname.startsWith("/api/")) return null;
 
   const auth = request.headers.get("authorization") ?? "";

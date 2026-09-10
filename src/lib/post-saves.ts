@@ -67,17 +67,6 @@ export async function listSavedPosts(
          p.title_translated, p.body_translated, p.translation_status,
          u.id AS author_id, u.username AS author_username,
          u.name AS author_display_name, u.image AS author_image,
-         u.role AS author_role, u.isNsfw AS author_is_nsfw,
-         u.createdAt AS author_created_at, u.karma AS author_karma,
-         EXISTS (
-           SELECT 1 FROM subreddit_moderators sm
-           WHERE sm.subreddit_id = p.subreddit_id AND sm.user_id = p.author_id
-         ) AS author_is_community_mod,
-         EXISTS (
-           SELECT 1 FROM user_achievements ua
-           INNER JOIN achievements a ON a.id = ua.achievement_id
-           WHERE ua.user_id = u.id AND a.slug = 'veteran'
-         ) AS author_has_veteran,
          s.id AS subreddit_id, s.name AS subreddit_name,
          s.title AS subreddit_title,
          EXISTS (

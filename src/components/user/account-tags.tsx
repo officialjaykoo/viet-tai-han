@@ -10,16 +10,11 @@ const TAG_STYLES: Record<AccountTagId, string> = {
     "bg-[color-mix(in_oklch,var(--brand)_18%,transparent)] text-[var(--brand)] ring-[color-mix(in_oklch,var(--brand)_35%,transparent)]",
   moderator:
     "bg-emerald-500/15 text-emerald-700 ring-emerald-500/30 dark:text-emerald-300",
-  veteran:
-    "bg-amber-500/15 text-amber-800 ring-amber-500/30 dark:text-amber-200",
-  nsfw: "bg-rose-500/15 text-rose-700 ring-rose-500/30 dark:text-rose-300",
 };
 
 const TAG_KEYS: Record<AccountTagId, MessageKey> = {
   admin: "tags.admin",
   moderator: "tags.moderator",
-  veteran: "tags.veteran",
-  nsfw: "tags.nsfw",
 };
 
 export function AccountTags({

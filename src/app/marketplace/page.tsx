@@ -3,7 +3,6 @@ import Link from "next/link";
 import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageHero } from "@/components/layout/page-hero";
 import { PageShell } from "@/components/layout/page-shell";
-import { ListingAlertButton } from "@/components/marketplace/listing-alert-button";
 import { ListingSaveButton } from "@/components/marketplace/listing-save-button";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -119,12 +118,6 @@ export default async function MarketplacePage({
                     >
                       {tLocale(locale, "marketplace.saved")}
                     </Link>
-                    <Link
-                      href="/marketplace/alerts"
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                    >
-                      {tLocale(locale, "marketplace.alerts")}
-                    </Link>
                   </>
                 ) : null}
               </div>
@@ -200,16 +193,6 @@ export default async function MarketplacePage({
                 />
               </div>
             </form>
-            {session ? (
-              <div className="mt-4 border-t border-border/50 pt-4">
-                <ListingAlertButton
-                  query={query}
-                  kind={kind}
-                  category={category}
-                  location={location}
-                />
-              </div>
-            ) : null}
           </section>
 
           <section className="space-y-3" aria-labelledby="marketplace-list-title">
@@ -249,16 +232,35 @@ export default async function MarketplacePage({
                       </Link>
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-3">
                         <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                          <UserAvatar
-                            username={listing.seller.username}
-                            image={listing.seller.image}
-                            size="xs"
-                            className="ring-0"
-                          />
-                          <span className="truncate">
-                            {tLocale(locale, "marketplace.by")} @
-                            {listing.seller.username ?? "unknown"}
-                          </span>
+                          {listing.seller.username ? (
+                            <Link
+                              href={`/u/${encodeURIComponent(listing.seller.username)}`}
+                              className="flex min-w-0 items-center gap-2 hover:text-foreground"
+                            >
+                              <UserAvatar
+                                username={listing.seller.username}
+                                image={listing.seller.image}
+                                size="xs"
+                                className="ring-0"
+                              />
+                              <span className="truncate">
+                                {tLocale(locale, "marketplace.by")} @
+                                {listing.seller.username}
+                              </span>
+                            </Link>
+                          ) : (
+                            <>
+                              <UserAvatar
+                                username={listing.seller.username}
+                                image={listing.seller.image}
+                                size="xs"
+                                className="ring-0"
+                              />
+                              <span className="truncate">
+                                {tLocale(locale, "marketplace.by")} @unknown
+                              </span>
+                            </>
+                          )}
                           <span aria-hidden>·</span>
                           <span>{new Date(listing.createdAt).toLocaleDateString(locale)}</span>
                         </div>

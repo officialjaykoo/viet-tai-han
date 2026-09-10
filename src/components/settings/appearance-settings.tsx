@@ -22,7 +22,6 @@ const LANGUAGE_LABEL_KEYS = {
   vi: "language.vietnamese",
   ko: "language.korean",
   en: "language.english",
-  ru: "language.russian",
 } as const;
 
 const THEME_LABEL_KEYS = {

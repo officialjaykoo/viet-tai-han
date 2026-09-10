@@ -19,7 +19,6 @@ import { PageBackdrop } from "@/components/layout/page-backdrop";
 import { PageShell } from "@/components/layout/page-shell";
 import { SiteHeader } from "@/components/layout/site-header";
 import { OnlinePeopleList } from "@/components/online/online-people-list";
-import { withFeedAds } from "@/lib/ads";
 import {
   DEFAULT_POPULAR_WINDOW,
   getFeedPosts,
@@ -64,7 +63,11 @@ async function loadInitialFeed(options: {
       mode: options.mode,
       window: options.window,
     });
-    return await withFeedAds(feed, options.viewerUserId);
+    return {
+      posts: feed.posts.map((post) => ({ ...post, kind: "post" as const })),
+      nextCursor: feed.nextCursor,
+      hasMore: feed.hasMore,
+    };
   } catch (error) {
     console.error("Failed to load initial feed", error);
     return { posts: [], nextCursor: null, hasMore: false };

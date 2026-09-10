@@ -8,7 +8,6 @@ export interface UserRow {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
-  karma: number;
   created_at: string;
 }
 
@@ -96,22 +95,9 @@ export interface FeedPost {
   };
 }
 
-/** Sponsored item embedded in the feed response (not a separate ad fetch). */
-export interface FeedAdItem {
-  kind: "ad";
-  id: string;
-  campaignId: string;
-  title: string;
-  body: string | null;
-  mediaKey: string | null;
-  clickUrl: string;
-  placement: "feed_inline" | "sidebar" | "post_footer";
-  createdAt: string;
-}
+/** Organic posts only, tagged for the public feed contract. */
+export type FeedItem = FeedPost & { kind: "post" };
 
-export type FeedItem = (FeedPost & { kind: "post" }) | FeedAdItem;
-
-/** Organic posts only (before ad injection). */
 export interface OrganicFeedPage {
   posts: FeedPost[];
   nextCursor: string | null;

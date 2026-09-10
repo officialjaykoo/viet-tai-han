@@ -109,10 +109,6 @@ export default async function SearchPage({
                         />
                         <div className="min-w-0">
                           <p className="font-medium">@{account.username}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {account.karma.toLocaleString(locale)}{" "}
-                            {tLocale(locale, "profile.karma").toLowerCase()}
-                          </p>
                           {"tags" in account && account.tags ? (
                             <AccountTags tags={account.tags} size="sm" />
                           ) : null}
@@ -139,9 +135,7 @@ export default async function SearchPage({
                           {post.title}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {/^u_/i.test(post.subredditName)
-                            ? `@${post.subredditName.slice(2)}`
-                            : post.subredditName}{" "}
+                          {post.subredditName}{" "}
                           · @{post.authorUsername} ·{" "}
                           {tLocale(locale, "search.likes", {
                             count: post.likeCount,

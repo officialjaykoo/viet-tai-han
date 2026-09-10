@@ -44,7 +44,6 @@ const {
 });
 
 vi.mock("@/lib/actions", () => ({ createPost }));
-vi.mock("@/lib/ads", () => ({ withFeedAds: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   InvalidFeedCursorError: class InvalidFeedCursorError extends Error {},
   getDb,
@@ -65,9 +64,6 @@ vi.mock("@/lib/post-payload", async () => {
   );
   return actual;
 });
-vi.mock("@/lib/profile-community", () => ({
-  isProfileCommunityName: vi.fn(() => false),
-}));
 vi.mock("@/lib/public-error", () => ({
   jsonLocalizedError: vi.fn(async (message: string, status: number) =>
     Response.json({ error: message }, { status })

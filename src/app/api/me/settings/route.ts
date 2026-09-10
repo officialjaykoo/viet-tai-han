@@ -62,8 +62,6 @@ export async function PATCH(request: NextRequest) {
       userId: session.user.id,
       theme: body.theme,
       preferredLanguage: body.preferredLanguage,
-      isNsfw: body.isNsfw,
-      showNsfw: body.showNsfw,
       allowDms: body.allowDms,
       notifyComments: body.notifyComments,
       notifyFollows: body.notifyFollows,

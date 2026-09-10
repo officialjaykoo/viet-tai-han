@@ -45,16 +45,23 @@ export default async function QuestionPage({
           <article className="rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <Link
-                href={`/r/${question.community.name}`}
+                href={`/r/${encodeURIComponent(question.community.name)}`}
                 className="font-medium text-[var(--brand)] hover:underline"
               >
                 {question.community.name}
               </Link>
               <span aria-hidden>·</span>
-              <span>
-                {tLocale(locale, "questions.by")} @
-                {question.author.username ?? "unknown"}
-              </span>
+              <span>{tLocale(locale, "questions.by")} </span>
+              {question.author.username ? (
+                <Link
+                  href={`/u/${encodeURIComponent(question.author.username)}`}
+                  className="font-medium text-foreground hover:underline"
+                >
+                  @{question.author.username}
+                </Link>
+              ) : (
+                <span>unknown</span>
+              )}
             </div>
             <h1 className="mt-3 font-heading text-2xl font-semibold leading-tight text-balance sm:text-3xl">
               {question.title}
@@ -63,12 +70,27 @@ export default async function QuestionPage({
               {question.body}
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <UserAvatar
-                username={question.author.username}
-                image={question.author.image}
-                size="xs"
-                className="ring-0"
-              />
+              {question.author.username ? (
+                <Link
+                  href={`/u/${encodeURIComponent(question.author.username)}`}
+                  aria-label={`@${question.author.username}`}
+                  className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                >
+                  <UserAvatar
+                    username={question.author.username}
+                    image={question.author.image}
+                    size="xs"
+                    className="ring-0"
+                  />
+                </Link>
+              ) : (
+                <UserAvatar
+                  username={question.author.username}
+                  image={question.author.image}
+                  size="xs"
+                  className="ring-0"
+                />
+              )}
               <span>
                 {new Date(question.createdAt).toLocaleDateString(locale)}
               </span>
@@ -112,14 +134,38 @@ export default async function QuestionPage({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                       <div className="flex min-w-0 items-center gap-2">
-                        <UserAvatar
-                          username={answer.author.username}
-                          image={answer.author.image}
-                          size="xs"
-                          className="ring-0"
-                        />
+                        {answer.author.username ? (
+                          <Link
+                            href={`/u/${encodeURIComponent(answer.author.username)}`}
+                            aria-label={`@${answer.author.username}`}
+                            className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                          >
+                            <UserAvatar
+                              username={answer.author.username}
+                              image={answer.author.image}
+                              size="xs"
+                              className="ring-0"
+                            />
+                          </Link>
+                        ) : (
+                          <UserAvatar
+                            username={answer.author.username}
+                            image={answer.author.image}
+                            size="xs"
+                            className="ring-0"
+                          />
+                        )}
                         <span className="truncate">
-                          @{answer.author.username ?? "unknown"}
+                          {answer.author.username ? (
+                            <Link
+                              href={`/u/${encodeURIComponent(answer.author.username)}`}
+                              className="hover:underline"
+                            >
+                              @{answer.author.username}
+                            </Link>
+                          ) : (
+                            "@unknown"
+                          )}
                         </span>
                         <span aria-hidden>·</span>
                         <span>

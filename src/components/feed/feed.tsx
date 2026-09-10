@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Virtuoso } from "react-virtuoso";
 
-import { AdFeedCard } from "@/components/ads/ad-feed-card";
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { PostCard } from "@/components/feed/post-card";
 import { Button } from "@/components/ui/button";
@@ -118,11 +117,7 @@ export function Feed({
         computeItemKey={(_index, item) => item.id}
         itemContent={(_index, item) => (
           <div className="pb-3">
-            {item.kind === "ad" ? (
-              <AdFeedCard ad={item} />
-            ) : (
-              <PostCard post={item} discoverySource={discoverySource} />
-            )}
+            <PostCard post={item} discoverySource={discoverySource} />
           </div>
         )}
         components={{

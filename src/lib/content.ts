@@ -1,8 +1,6 @@
 import { getDb } from "@/lib/db";
 import { openFeedCursor, signFeedCursor } from "@/lib/security/feed-cursor";
 import type { ContentTranslation, FeedPost, ViewerLike } from "@/lib/types";
-import type { AccountBadge } from "@/lib/achievement-levels";
-import { resolveAccountBadges } from "@/lib/achievement-levels";
 import { resolveAccountTags, type AccountTag } from "@/lib/tags";
 import {
   mapPostProjection,
@@ -55,12 +53,8 @@ export interface PublicProfile {
   image: string | null;
   bio: string | null;
   bannerKey: string | null;
-  karma: number;
-  postKarma: number;
-  commentKarma: number;
   createdAt: string;
   tags: AccountTag[];
-  badges: AccountBadge[];
 }
 
 /** Server-only profile record; moderation and identity fields never cross the DTO boundary. */
@@ -68,41 +62,23 @@ export interface ProfileRecord extends PublicProfile {
   id: string;
   status: string;
   role: string;
-  isNsfw: boolean;
 }
 
 
 const AUTHOR_TAG_SELECT = `
   u.role AS author_role,
-  u.isNsfw AS author_is_nsfw,
-  u.createdAt AS author_created_at,
-  u.karma AS author_karma,
   EXISTS (
     SELECT 1 FROM subreddit_moderators sm
     WHERE sm.subreddit_id = p.subreddit_id AND sm.user_id = p.author_id
-  ) AS author_is_community_mod,
-  EXISTS (
-    SELECT 1 FROM user_achievements ua
-    INNER JOIN achievements a ON a.id = ua.achievement_id
-    WHERE ua.user_id = u.id AND a.slug = 'veteran'
-  ) AS author_has_veteran`;
+  ) AS author_is_community_mod`;
 
 const COMMENT_AUTHOR_TAG_SELECT = `
   u.role AS author_role,
-  u.isNsfw AS author_is_nsfw,
-  u.createdAt AS author_created_at,
-  u.karma AS author_karma,
   EXISTS (
     SELECT 1 FROM subreddit_moderators sm
     INNER JOIN posts pmod ON pmod.subreddit_id = sm.subreddit_id
     WHERE pmod.id = c.post_id AND sm.user_id = c.author_id
-  ) AS author_is_community_mod,
-  EXISTS (
-    SELECT 1 FROM user_achievements ua
-    INNER JOIN achievements a ON a.id = ua.achievement_id
-    WHERE ua.user_id = u.id AND a.slug = 'veteran'
-  ) AS author_has_veteran`;
-
+  ) AS author_is_community_mod`;
 export async function getSubredditByName(name: string) {
   const db = await getDb();
   return db
@@ -287,6 +263,7 @@ export async function getPostDetail(
       is_removed: number;
       is_shadow_hidden: number;
       source_lang: string | null;
+      author_is_community_mod: number | null;
       translation_target_lang: string | null;
       body_translated: string | null;
       translation_status: string | null;
@@ -295,11 +272,6 @@ export async function getPostDetail(
       author_display_name: string | null;
       author_image: string | null;
       author_role: string | null;
-      author_is_nsfw: number | null;
-      author_created_at: string | null;
-      author_karma: number | null;
-      author_is_community_mod: number | null;
-      author_has_veteran: number | null;
       viewer_liked: number | null;
     };
     if (row.is_shadow_hidden) continue;
@@ -333,11 +305,7 @@ export async function getPostDetail(
         image: row.author_image,
         tags: resolveAccountTags({
           role: row.author_role,
-          isNsfw: row.author_is_nsfw,
-          createdAt: row.author_created_at,
-          karma: row.author_karma,
           isCommunityMod: Boolean(row.author_is_community_mod),
-          hasVeteranAchievement: Boolean(row.author_has_veteran),
         }),
         isAuthor: Boolean(viewerUserId && viewerUserId === row.author_id),
       },
@@ -379,25 +347,15 @@ type PublicProfileRow = {
   image: string | null;
   bio: string | null;
   bannerKey: string | null;
-  karma: number;
-  postKarma: number;
-  commentKarma: number;
   createdAt: string;
   status: string;
   role: string;
-  isNsfw: number;
-  has_veteran: number;
   is_community_mod: number;
 };
 
 const PUBLIC_PROFILE_SELECT = `
-  SELECT u.id, u.username, u.name, u.image, u.bio, u.bannerKey, u.karma,
-         u.postKarma, u.commentKarma, u.createdAt, u.status, u.role, u.isNsfw,
-         EXISTS (
-           SELECT 1 FROM user_achievements ua
-           INNER JOIN achievements a ON a.id = ua.achievement_id
-           WHERE ua.user_id = u.id AND a.slug = 'veteran'
-         ) AS has_veteran,
+  SELECT u.id, u.username, u.name, u.image, u.bio, u.bannerKey,
+         u.createdAt, u.status, u.role,
          EXISTS (
            SELECT 1 FROM subreddit_moderators
            WHERE user_id = u.id
@@ -412,24 +370,12 @@ function mapProfileRecord(row: PublicProfileRow): ProfileRecord {
     image: row.image,
     bio: row.bio,
     bannerKey: row.bannerKey,
-    karma: row.karma,
-    postKarma: row.postKarma,
-    commentKarma: row.commentKarma,
     createdAt: row.createdAt,
     status: row.status,
     role: row.role,
-    isNsfw: Boolean(row.isNsfw),
     tags: resolveAccountTags({
       role: row.role,
-      isNsfw: row.isNsfw,
-      createdAt: row.createdAt,
-      karma: row.karma,
       isCommunityMod: Boolean(row.is_community_mod),
-      hasVeteranAchievement: Boolean(row.has_veteran),
-    }),
-    badges: resolveAccountBadges({
-      karma: row.karma,
-      createdAt: row.createdAt,
     }),
   };
 }
@@ -441,12 +387,8 @@ export function toPublicProfile(profile: ProfileRecord): PublicProfile {
     image: profile.image,
     bio: profile.bio,
     bannerKey: profile.bannerKey,
-    karma: profile.karma,
-    postKarma: profile.postKarma,
-    commentKarma: profile.commentKarma,
     createdAt: profile.createdAt,
     tags: profile.tags,
-    badges: profile.badges,
   };
 }
 

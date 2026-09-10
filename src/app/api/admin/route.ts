@@ -279,65 +279,6 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ ok: true });
       }
-      case "list_ads": {
-        const { listAdCampaigns } = await import("@/lib/ads");
-        return NextResponse.json({ campaigns: await listAdCampaigns() });
-      }
-      case "create_ad": {
-        const { createAdCampaign } = await import("@/lib/ads");
-        const adBody = body as {
-          name?: string;
-          placement?: "feed_inline" | "sidebar" | "post_footer";
-          targetUrl?: string;
-          adBody?: string;
-          weight?: number;
-          status?: "draft" | "active" | "paused" | "ended";
-        };
-        if (!adBody.name || !adBody.placement || !adBody.targetUrl) {
-          return await jsonLocalizedError("Missing fields", 400);
-        }
-        const id = await createAdCampaign({
-          name: adBody.name,
-          placement: adBody.placement,
-          targetUrl: adBody.targetUrl,
-          body: adBody.adBody,
-          weight: adBody.weight,
-          status: adBody.status ?? "draft",
-          createdBy: actor.id,
-        });
-        return NextResponse.json({ id }, { status: 201 });
-      }
-      case "update_ad": {
-        const { updateAdCampaign } = await import("@/lib/ads");
-        const adBody = body as {
-          campaignId?: string;
-          status?: "draft" | "active" | "paused" | "ended";
-          name?: string;
-          weight?: number;
-          adBody?: string | null;
-          targetUrl?: string;
-        };
-        if (!adBody.campaignId) {
-          return await jsonLocalizedError("Missing campaignId", 400);
-        }
-        await updateAdCampaign({
-          id: adBody.campaignId,
-          status: adBody.status,
-          name: adBody.name,
-          weight: adBody.weight,
-          body: adBody.adBody,
-          targetUrl: adBody.targetUrl,
-        });
-        return NextResponse.json({ ok: true });
-      }
-      case "ad_stats": {
-        const { getAdCampaignStats } = await import("@/lib/ads");
-        const campaignId = (body as { campaignId?: string }).campaignId;
-        if (!campaignId) {
-          return await jsonLocalizedError("Missing campaignId", 400);
-        }
-        return NextResponse.json(await getAdCampaignStats(campaignId));
-      }
       default:
         return await jsonLocalizedError("Unknown op", 400);
     }

@@ -9,14 +9,13 @@ import {
 import { localizeErrorMessage } from "@/lib/i18n/errors";
 
 describe("request locale detection", () => {
-  it("supports the four UI locales", () => {
-    expect(LOCALES).toEqual(["vi", "ko", "en", "ru"]);
+  it("supports the three UI locales", () => {
+    expect(LOCALES).toEqual(["vi", "ko", "en"]);
   });
 
   it.each([
     ["ko-KR,ko;q=0.9,en;q=0.8", "ko"],
     ["vi-VN, en;q=0.8", "vi"],
-    ["ru-RU;q=0.7,en;q=0.9", "en"],
     ["zh-CN,ja;q=0.9", null],
     [null, null],
   ])("detects the best browser locale from %s", (header, expected) => {
@@ -26,7 +25,6 @@ describe("request locale detection", () => {
   it.each([
     ["VN", "vi"],
     ["kr", "ko"],
-    ["RU", "ru"],
     ["US", null],
   ])("uses Cloudflare country %s as a fallback", (country, expected) => {
     expect(detectLocaleFromCountry(country)).toBe(expected);
@@ -35,12 +33,12 @@ describe("request locale detection", () => {
   it("keeps explicit choices ahead of automatic detection", () => {
     expect(
       resolveLocale({
-        cookieLocale: "ru",
+        cookieLocale: "ko",
         preferredLanguage: "ko",
         acceptLanguage: "vi",
         countryCode: "VN",
       })
-    ).toBe("ru");
+    ).toBe("ko");
     expect(
       resolveLocale({
         preferredLanguage: "ko",

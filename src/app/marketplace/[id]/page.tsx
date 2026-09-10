@@ -92,15 +92,35 @@ export default async function MarketplaceListingPage({
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-4">
               <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                <UserAvatar
-                  username={listing.seller.username}
-                  image={listing.seller.image}
-                  size="sm"
-                  className="ring-0"
-                />
-                <span className="truncate">
-                  {tLocale(locale, "marketplace.seller")}: @{sellerName}
-                </span>
+                {listing.seller.username ? (
+                  <Link
+                    href={`/u/${encodeURIComponent(listing.seller.username)}`}
+                    className="flex min-w-0 items-center gap-2 hover:text-foreground"
+                  >
+                    <UserAvatar
+                      username={listing.seller.username}
+                      image={listing.seller.image}
+                      size="sm"
+                      className="ring-0"
+                    />
+                    <span className="truncate">
+                      {tLocale(locale, "marketplace.seller")}: @
+                      {sellerName}
+                    </span>
+                  </Link>
+                ) : (
+                  <>
+                    <UserAvatar
+                      username={listing.seller.username}
+                      image={listing.seller.image}
+                      size="sm"
+                      className="ring-0"
+                    />
+                    <span className="truncate">
+                      {tLocale(locale, "marketplace.seller")}: @{sellerName}
+                    </span>
+                  </>
+                )}
                 <span aria-hidden>·</span>
                 <span>{new Date(listing.createdAt).toLocaleDateString(locale)}</span>
               </div>

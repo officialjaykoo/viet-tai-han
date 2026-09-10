@@ -18,11 +18,6 @@ describe("site setting definitions", () => {
   });
 
   it("validates booleans and bounded numbers from the shared registry", () => {
-    expect(validateSiteSettingValue("ads_enabled", "1")).toEqual({
-      ok: true,
-      value: "1",
-    });
-    expect(validateSiteSettingValue("ads_enabled", "true").ok).toBe(false);
     expect(validateSiteSettingValue("max_posts_per_hour", "12")).toEqual({
       ok: true,
       value: "12",

@@ -1,15 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { useLocalizedError } from "@/components/i18n/use-localized-error";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import {
   MAX_POST_BODY_LENGTH,
   MAX_POST_TITLE_LENGTH,
@@ -92,15 +90,6 @@ export function PostAuthorActions({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1">
-        <Link
-          href={`/post/${postId}/stats`}
-          className={cn(
-            buttonVariants({ size: "sm", variant: "ghost" }),
-            "min-h-8"
-          )}
-        >
-          {t("post.analytics")}
-        </Link>
         <Button
           type="button"
           size="sm"

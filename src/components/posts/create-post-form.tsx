@@ -7,7 +7,6 @@ import {
   Link2Icon,
   Loader2Icon,
   SearchIcon,
-  UserRoundIcon,
   XIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -26,14 +25,12 @@ import { useLocalizedError } from "@/components/i18n/use-localized-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { UserAvatar } from "@/components/user/user-avatar";
 import {
   ParserTraps,
   passBotCheck,
   useBotGuard,
 } from "@/components/security/bot-check";
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
-import { useSession } from "@/lib/auth-client";
 import {
   MAX_POST_BODY_LENGTH,
   MAX_POST_TITLE_LENGTH,
@@ -53,9 +50,11 @@ type CommunityOption = {
   subscriberCount: number;
 };
 
-type Destination =
-  | { kind: "profile" }
-  | { kind: "community"; name: string; title: string };
+type Destination = {
+  kind: "community";
+  name: string;
+  title: string;
+};
 
 const POST_TYPES: {
   id: PostType;
@@ -109,14 +108,8 @@ export function CreatePostForm({
   defaultPostType?: PostType;
 }) {
   const router = useRouter();
-  const { data: session } = useSession();
   const { t } = useI18n();
   const localizeError = useLocalizedError();
-  const username =
-    (session?.user as { username?: string } | undefined)?.username ??
-    session?.user?.name ??
-    null;
-  const image = session?.user?.image ?? null;
 
   const fileRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -193,16 +186,6 @@ export function CreatePostForm({
     url,
   ]);
 
-  // Default destination: own profile once session is known (unless community was prefills)
-  useEffect(() => {
-    if (defaultSubreddit) return;
-    if (destination) return;
-    if (username) {
-      startTransition(() => {
-        setDestination({ kind: "profile" });
-      });
-    }
-  }, [defaultSubreddit, destination, username]);
 
   const loadCommunities = useCallback(async (query: string) => {
     setLoadingCommunities(true);
@@ -212,12 +195,7 @@ export function CreatePostForm({
       );
       if (!res.ok) return;
       const data = (await res.json()) as { communities?: CommunityOption[] };
-      // Hide personal u_* communities from the community list
-      setCommunities(
-        (data.communities ?? []).filter(
-          (c) => !/^u_/i.test(c.name)
-        )
-      );
+      setCommunities(data.communities ?? []);
     } catch {
       // Keep previous suggestions
     } finally {
@@ -242,12 +220,6 @@ export function CreatePostForm({
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
-
-  function selectProfile() {
-    setDestination({ kind: "profile" });
-    setPickerOpen(false);
-    setCommunityQuery("");
-  }
 
   function selectCommunity(community: CommunityOption) {
     setDestination({
@@ -406,10 +378,7 @@ export function CreatePostForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             bot.attachToPayload({
-              subreddit:
-                destinationSnapshot.kind === "profile"
-                  ? "profile"
-                  : destinationSnapshot.name,
+              subreddit: destinationSnapshot.name,
               title: titleSnapshot,
               body:
                 postTypeSnapshot === "text"
@@ -488,24 +457,7 @@ export function CreatePostForm({
             "hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
           )}
         >
-          {destination?.kind === "profile" && username ? (
-            <>
-              <UserAvatar
-                username={username}
-                image={image}
-                size="xs"
-                className="ring-0"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">
-                  {t("nav.profile")}
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  @{username}
-                </span>
-              </span>
-            </>
-          ) : destination?.kind === "community" ? (
+          {destination?.kind === "community" ? (
             <>
               <span
                 aria-hidden
@@ -528,7 +480,7 @@ export function CreatePostForm({
                 <SearchIcon className="size-3.5" />
               </span>
               <span className="flex-1 text-sm text-muted-foreground">
-                {t("post.chooseDestination")}
+                {t("post.community")}
               </span>
             </>
           )}
@@ -567,34 +519,6 @@ export function CreatePostForm({
               role="listbox"
               className="max-h-64 overflow-auto p-1"
             >
-              {username ? (
-                <li role="option" aria-selected={destination?.kind === "profile"}>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted",
-                      destination?.kind === "profile" && "bg-muted"
-                    )}
-                    onClick={selectProfile}
-                  >
-                    <UserAvatar
-                      username={username}
-                      image={image}
-                      size="sm"
-                      className="ring-0"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-sm font-medium">
-                        <UserRoundIcon className="size-3.5 text-[var(--brand)]" />
-                        {t("nav.profile")}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {t("post.postToAccount", { username })}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ) : null}
 
               <li className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 {t("communities.title")}

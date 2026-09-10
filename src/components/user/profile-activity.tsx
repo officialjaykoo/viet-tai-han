@@ -20,7 +20,7 @@ type ProfilePostPage = {
 type ProfileActivityProps = {
   username: string;
   tab: "posts" | "comments";
-  locale: "vi" | "ko" | "en" | "ru";
+  locale: "vi" | "ko" | "en";
   initialPosts?: ProfilePostPage;
   initialComments?: ProfileCommentPage;
   empty: string;
